@@ -1,0 +1,21 @@
+{
+  "name": "@flowstream/contracts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test",
+    "test:v": "forge test -vvv",
+    "deploy": "tsx deploy/main.ts",
+    "deploy:arc": "tsx deploy/main.ts --name arc-testnet",
+    "deploy:local": "tsx deploy/main.ts --name localhost",
+    "deploy:dry": "echo 'Use --scope to test individual scopes'"
+  },
+  "dependencies": {
+    "viem": "^2.23.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}
