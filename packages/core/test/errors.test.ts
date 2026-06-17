@@ -1,25 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
-  FlowStreamCapabilityError,
-  FlowStreamCommandError,
-  FlowStreamConfigError,
-  FlowStreamNotImplementedError,
-  FlowStreamRegistryError,
-  FlowStreamRuntimeError,
-  isFlowStreamError,
-  serializeFlowStreamError,
+  LiveStreakCapabilityError,
+  LiveStreakCommandError,
+  LiveStreakConfigError,
+  LiveStreakNotImplementedError,
+  LiveStreakRegistryError,
+  LiveStreakRuntimeError,
+  isLiveStreakError,
+  serializeLiveStreakError,
   serializeUnknownError,
   toCliError
 } from "../src/errors.js";
 
-describe("serializeFlowStreamError", () => {
+describe("serializeLiveStreakError", () => {
   it("maps config errors", () => {
-    const serialized = serializeFlowStreamError(
-      new FlowStreamConfigError({ message: "Invalid pause settings" })
+    const serialized = serializeLiveStreakError(
+      new LiveStreakConfigError({ message: "Invalid pause settings" })
     );
 
     expect(serialized).toMatchObject({
-      tag: "FlowStreamConfigError",
+      tag: "LiveStreakConfigError",
       shortName: "config",
       title: "Configuration error",
       message: "Invalid pause settings",
@@ -31,12 +31,12 @@ describe("serializeFlowStreamError", () => {
   });
 
   it("maps runtime errors", () => {
-    const serialized = serializeFlowStreamError(
-      new FlowStreamRuntimeError({ message: "Worker failed during capture pump" })
+    const serialized = serializeLiveStreakError(
+      new LiveStreakRuntimeError({ message: "Worker failed during capture pump" })
     );
 
     expect(serialized).toMatchObject({
-      tag: "FlowStreamRuntimeError",
+      tag: "LiveStreakRuntimeError",
       shortName: "runtime",
       title: "Runtime error",
       message: "Worker failed during capture pump"
@@ -45,15 +45,15 @@ describe("serializeFlowStreamError", () => {
   });
 
   it("maps capability errors with requiredScope context", () => {
-    const serialized = serializeFlowStreamError(
-      new FlowStreamCapabilityError({
+    const serialized = serializeLiveStreakError(
+      new LiveStreakCapabilityError({
         message: "No capability grant authorizes system:pause:setPresentation",
         requiredScope: "system:pause:setPresentation"
       })
     );
 
     expect(serialized).toMatchObject({
-      tag: "FlowStreamCapabilityError",
+      tag: "LiveStreakCapabilityError",
       shortName: "capability",
       title: "Permission denied",
       context: { requiredScope: "system:pause:setPresentation" }
@@ -61,53 +61,53 @@ describe("serializeFlowStreamError", () => {
   });
 
   it("maps registry errors with registryId context", () => {
-    const serialized = serializeFlowStreamError(
-      new FlowStreamRegistryError({
+    const serialized = serializeLiveStreakError(
+      new LiveStreakRegistryError({
         message: "Unknown capture driver",
         registryId: "browser"
       })
     );
 
     expect(serialized).toMatchObject({
-      tag: "FlowStreamRegistryError",
+      tag: "LiveStreakRegistryError",
       shortName: "registry",
       context: { registryId: "browser" }
     });
   });
 
   it("maps command errors with commandScope context", () => {
-    const serialized = serializeFlowStreamError(
-      new FlowStreamCommandError({
+    const serialized = serializeLiveStreakError(
+      new LiveStreakCommandError({
         message: "Command rejected",
         commandScope: "capture:browser:setCrop"
       })
     );
 
     expect(serialized).toMatchObject({
-      tag: "FlowStreamCommandError",
+      tag: "LiveStreakCommandError",
       shortName: "command",
       context: { commandScope: "capture:browser:setCrop" }
     });
   });
 
   it("maps not-implemented errors with component context", () => {
-    const serialized = serializeFlowStreamError(
-      new FlowStreamNotImplementedError({
+    const serialized = serializeLiveStreakError(
+      new LiveStreakNotImplementedError({
         component: "observe.gateway",
         message: "Gateway transport is not implemented"
       })
     );
 
     expect(serialized).toMatchObject({
-      tag: "FlowStreamNotImplementedError",
+      tag: "LiveStreakNotImplementedError",
       shortName: "not-implemented",
       context: { component: "observe.gateway" }
     });
   });
 
   it("preserves metadata details, documentationPath, and retryable", () => {
-    const serialized = serializeFlowStreamError(
-      new FlowStreamConfigError({
+    const serialized = serializeLiveStreakError(
+      new LiveStreakConfigError({
         message: "Bad input",
         metadata: {
           details: "whilePaused must be hold or slate",
@@ -123,8 +123,8 @@ describe("serializeFlowStreamError", () => {
   });
 
   it("does not serialize metadata.cause", () => {
-    const serialized = serializeFlowStreamError(
-      new FlowStreamRuntimeError({
+    const serialized = serializeLiveStreakError(
+      new LiveStreakRuntimeError({
         message: "Wrapped failure",
         metadata: {
           cause: { secret: "internal" },
@@ -142,8 +142,8 @@ describe("serializeFlowStreamError", () => {
     const circular: { self?: unknown } = {};
     circular.self = circular;
 
-    const serialized = serializeFlowStreamError(
-      new FlowStreamConfigError({
+    const serialized = serializeLiveStreakError(
+      new LiveStreakConfigError({
         message: "metadata sanitized",
         metadata: {
           cause: circular,
@@ -161,8 +161,8 @@ describe("serializeFlowStreamError", () => {
   });
 
   it("omits context when capability error has no requiredScope", () => {
-    const serialized = serializeFlowStreamError(
-      new FlowStreamCapabilityError({ message: "Permission denied" })
+    const serialized = serializeLiveStreakError(
+      new LiveStreakCapabilityError({ message: "Permission denied" })
     );
 
     expect(serialized.context).toBeUndefined();
@@ -172,8 +172,8 @@ describe("serializeFlowStreamError", () => {
     const circular: { self?: unknown } = {};
     circular.self = circular;
 
-    const serialized = serializeFlowStreamError(
-      new FlowStreamConfigError({
+    const serialized = serializeLiveStreakError(
+      new LiveStreakConfigError({
         message: "Invalid config",
         metadata: {
           cause: circular,
@@ -190,83 +190,83 @@ describe("serializeFlowStreamError", () => {
   });
 
   it("keeps toCliError as a compatibility alias", () => {
-    const error = new FlowStreamConfigError({ message: "alias check" });
-    expect(toCliError(error)).toEqual(serializeFlowStreamError(error));
+    const error = new LiveStreakConfigError({ message: "alias check" });
+    expect(toCliError(error)).toEqual(serializeLiveStreakError(error));
   });
 });
 
-describe("isFlowStreamError", () => {
-  it("returns true for each FlowStream error class", () => {
-    expect(isFlowStreamError(new FlowStreamConfigError({ message: "config" }))).toBe(true);
-    expect(isFlowStreamError(new FlowStreamRuntimeError({ message: "runtime" }))).toBe(true);
+describe("isLiveStreakError", () => {
+  it("returns true for each LiveStreak error class", () => {
+    expect(isLiveStreakError(new LiveStreakConfigError({ message: "config" }))).toBe(true);
+    expect(isLiveStreakError(new LiveStreakRuntimeError({ message: "runtime" }))).toBe(true);
     expect(
-      isFlowStreamError(
-        new FlowStreamCapabilityError({
+      isLiveStreakError(
+        new LiveStreakCapabilityError({
           message: "capability",
           requiredScope: "bridge:board:read"
         })
       )
     ).toBe(true);
     expect(
-      isFlowStreamError(
-        new FlowStreamRegistryError({ message: "registry", registryId: "browser" })
+      isLiveStreakError(
+        new LiveStreakRegistryError({ message: "registry", registryId: "browser" })
       )
     ).toBe(true);
     expect(
-      isFlowStreamError(
-        new FlowStreamCommandError({ message: "command", commandScope: "system:run:stop" })
+      isLiveStreakError(
+        new LiveStreakCommandError({ message: "command", commandScope: "system:run:stop" })
       )
     ).toBe(true);
     expect(
-      isFlowStreamError(
-        new FlowStreamNotImplementedError({ component: "gateway", message: "not implemented" })
+      isLiveStreakError(
+        new LiveStreakNotImplementedError({ component: "gateway", message: "not implemented" })
       )
     ).toBe(true);
   });
 
   it("returns false for primitive, null, array, plain object, and Error", () => {
-    expect(isFlowStreamError(null)).toBe(false);
-    expect(isFlowStreamError(undefined)).toBe(false);
-    expect(isFlowStreamError("FlowStreamConfigError")).toBe(false);
-    expect(isFlowStreamError(42)).toBe(false);
-    expect(isFlowStreamError([])).toBe(false);
-    expect(isFlowStreamError({ message: "plain" })).toBe(false);
-    expect(isFlowStreamError(new Error("native"))).toBe(false);
+    expect(isLiveStreakError(null)).toBe(false);
+    expect(isLiveStreakError(undefined)).toBe(false);
+    expect(isLiveStreakError("LiveStreakConfigError")).toBe(false);
+    expect(isLiveStreakError(42)).toBe(false);
+    expect(isLiveStreakError([])).toBe(false);
+    expect(isLiveStreakError({ message: "plain" })).toBe(false);
+    expect(isLiveStreakError(new Error("native"))).toBe(false);
   });
 
   it("returns true for cross-boundary objects with a valid _tag and message", () => {
-    const value = { _tag: "FlowStreamConfigError", message: "external" };
-    expect(isFlowStreamError(value)).toBe(true);
-    expect(serializeFlowStreamError(value as FlowStreamConfigError)).toMatchObject({
-      tag: "FlowStreamConfigError",
+    const value = { _tag: "LiveStreakConfigError", message: "external" };
+    expect(isLiveStreakError(value)).toBe(true);
+    expect(serializeLiveStreakError(value as LiveStreakConfigError)).toMatchObject({
+      tag: "LiveStreakConfigError",
       shortName: "config",
       message: "external"
     });
   });
 
   it("returns false for objects with unknown _tag values", () => {
-    expect(isFlowStreamError({ _tag: "FlowStreamMysteryError", message: "nope" })).toBe(false);
+    expect(isLiveStreakError({ _tag: "LiveStreakMysteryError", message: "nope" })).toBe(false);
   });
 
   it("returns false for structurally incomplete or malformed errors", () => {
-    expect(isFlowStreamError({ _tag: "FlowStreamConfigError" })).toBe(false);
-    expect(isFlowStreamError({ _tag: "FlowStreamCommandError", message: "x" })).toBe(false);
+    expect(isLiveStreakError({ _tag: "LiveStreakConfigError" })).toBe(false);
+    expect(isLiveStreakError({ _tag: "LiveStreakCommandError", message: "x" })).toBe(false);
     expect(
-      isFlowStreamError({ _tag: "FlowStreamCommandError", message: "x", commandScope: 123 })
+      isLiveStreakError({ _tag: "LiveStreakCommandError", message: "x", commandScope: 123 })
     ).toBe(false);
-    expect(isFlowStreamError({ _tag: "FlowStreamNotImplementedError", message: "x" })).toBe(false);
+    expect(isLiveStreakError({ _tag: "LiveStreakNotImplementedError", message: "x" })).toBe(false);
     expect(
-      isFlowStreamError({ _tag: "FlowStreamCapabilityError", message: "x", requiredScope: 123 })
-    ).toBe(false);
-    expect(
-      isFlowStreamError({ _tag: "FlowStreamRegistryError", message: "x", registryId: 123 })
+      isLiveStreakError({ _tag: "LiveStreakCapabilityError", message: "x", requiredScope: 123 })
     ).toBe(false);
     expect(
-      isFlowStreamError({ _tag: "FlowStreamConfigError", message: "x", metadata: [] })
+      isLiveStreakError({ _tag: "LiveStreakRegistryError", message: "x", registryId: 123 })
     ).toBe(false);
     expect(
-      isFlowStreamError({
-        _tag: "FlowStreamConfigError",
+      isLiveStreakError({ _tag: "LiveStreakConfigError", message: "x", metadata: [] })
+    ).toBe(false);
+    expect(
+      isLiveStreakError({
+        _tag: "LiveStreakConfigError",
         message: "x",
         metadata: { retryable: "yes" }
       })
@@ -274,20 +274,20 @@ describe("isFlowStreamError", () => {
   });
 });
 
-describe("serializeFlowStreamError defensive behavior", () => {
+describe("serializeLiveStreakError defensive behavior", () => {
   it("does not emit undefined message or malformed context for bad casts", () => {
-    const command = serializeFlowStreamError({
-      _tag: "FlowStreamCommandError"
-    } as FlowStreamCommandError);
+    const command = serializeLiveStreakError({
+      _tag: "LiveStreakCommandError"
+    } as LiveStreakCommandError);
 
-    expect(command.message).toBe("FlowStream failed");
+    expect(command.message).toBe("LiveStreak failed");
     expect(command.context).toBeUndefined();
     expect(JSON.stringify(command)).not.toContain("undefined");
 
-    const notImplemented = serializeFlowStreamError({
-      _tag: "FlowStreamNotImplementedError",
+    const notImplemented = serializeLiveStreakError({
+      _tag: "LiveStreakNotImplementedError",
       message: "missing component"
-    } as FlowStreamNotImplementedError);
+    } as LiveStreakNotImplementedError);
 
     expect(notImplemented.message).toBe("missing component");
     expect(notImplemented.context).toBeUndefined();
@@ -295,11 +295,11 @@ describe("serializeFlowStreamError defensive behavior", () => {
   });
 
   it("ignores malformed metadata fields without throwing", () => {
-    const serialized = serializeFlowStreamError({
-      _tag: "FlowStreamConfigError",
+    const serialized = serializeLiveStreakError({
+      _tag: "LiveStreakConfigError",
       message: "bad metadata cast",
       metadata: { details: 123, retryable: "yes" }
-    } as unknown as FlowStreamConfigError);
+    } as unknown as LiveStreakConfigError);
 
     expect(serialized.message).toBe("bad metadata cast");
     expect(serialized.details).toBeUndefined();
@@ -307,27 +307,27 @@ describe("serializeFlowStreamError defensive behavior", () => {
     expect(() => JSON.stringify(serialized)).not.toThrow();
   });
 
-  it("trims bad-cast FlowStream messages and falls back on whitespace-only values", () => {
+  it("trims bad-cast LiveStreak messages and falls back on whitespace-only values", () => {
     expect(
-      serializeFlowStreamError({
-        _tag: "FlowStreamConfigError",
+      serializeLiveStreakError({
+        _tag: "LiveStreakConfigError",
         message: "  bad  "
-      } as FlowStreamConfigError).message
+      } as LiveStreakConfigError).message
     ).toBe("bad");
 
     expect(
-      serializeFlowStreamError({
-        _tag: "FlowStreamConfigError",
+      serializeLiveStreakError({
+        _tag: "LiveStreakConfigError",
         message: "   "
-      } as FlowStreamConfigError).message
-    ).toBe("FlowStream failed");
+      } as LiveStreakConfigError).message
+    ).toBe("LiveStreak failed");
   });
 });
 
 describe("serializeUnknownError", () => {
-  it("delegates FlowStream errors to serializeFlowStreamError", () => {
-    const error = new FlowStreamConfigError({ message: "Invalid config" });
-    expect(serializeUnknownError(error)).toEqual(serializeFlowStreamError(error));
+  it("delegates LiveStreak errors to serializeLiveStreakError", () => {
+    const error = new LiveStreakConfigError({ message: "Invalid config" });
+    expect(serializeUnknownError(error)).toEqual(serializeLiveStreakError(error));
   });
 
   it("serializes native Error values without stack traces", () => {

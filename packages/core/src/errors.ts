@@ -12,62 +12,62 @@ type SanitizedErrorMetadata = Pick<
   "details" | "retryable" | "documentationPath"
 >;
 
-export class FlowStreamConfigError extends Data.TaggedError("FlowStreamConfigError")<{
+export class LiveStreakConfigError extends Data.TaggedError("LiveStreakConfigError")<{
   readonly message: string;
   readonly metadata?: ErrorMetadata;
 }> {}
 
-export class FlowStreamRuntimeError extends Data.TaggedError("FlowStreamRuntimeError")<{
+export class LiveStreakRuntimeError extends Data.TaggedError("LiveStreakRuntimeError")<{
   readonly message: string;
   readonly metadata?: ErrorMetadata;
 }> {}
 
-export class FlowStreamCapabilityError extends Data.TaggedError("FlowStreamCapabilityError")<{
+export class LiveStreakCapabilityError extends Data.TaggedError("LiveStreakCapabilityError")<{
   readonly message: string;
   readonly requiredScope?: string;
   readonly metadata?: ErrorMetadata;
 }> {}
 
-export class FlowStreamRegistryError extends Data.TaggedError("FlowStreamRegistryError")<{
+export class LiveStreakRegistryError extends Data.TaggedError("LiveStreakRegistryError")<{
   readonly message: string;
   readonly registryId?: string;
   readonly metadata?: ErrorMetadata;
 }> {}
 
-export class FlowStreamCommandError extends Data.TaggedError("FlowStreamCommandError")<{
+export class LiveStreakCommandError extends Data.TaggedError("LiveStreakCommandError")<{
   readonly message: string;
   readonly commandScope: string;
   readonly metadata?: ErrorMetadata;
 }> {}
 
-export class FlowStreamNotImplementedError extends Data.TaggedError("FlowStreamNotImplementedError")<{
+export class LiveStreakNotImplementedError extends Data.TaggedError("LiveStreakNotImplementedError")<{
   readonly component: string;
   readonly message: string;
   readonly metadata?: ErrorMetadata;
 }> {}
 
-export type FlowStreamError =
-  | FlowStreamConfigError
-  | FlowStreamRuntimeError
-  | FlowStreamCapabilityError
-  | FlowStreamRegistryError
-  | FlowStreamCommandError
-  | FlowStreamNotImplementedError;
+export type LiveStreakError =
+  | LiveStreakConfigError
+  | LiveStreakRuntimeError
+  | LiveStreakCapabilityError
+  | LiveStreakRegistryError
+  | LiveStreakCommandError
+  | LiveStreakNotImplementedError;
 
-const flowStreamErrorTags = [
-  "FlowStreamConfigError",
-  "FlowStreamRuntimeError",
-  "FlowStreamCapabilityError",
-  "FlowStreamRegistryError",
-  "FlowStreamCommandError",
-  "FlowStreamNotImplementedError"
-] as const satisfies readonly FlowStreamError["_tag"][];
+const liveStreakErrorTags = [
+  "LiveStreakConfigError",
+  "LiveStreakRuntimeError",
+  "LiveStreakCapabilityError",
+  "LiveStreakRegistryError",
+  "LiveStreakCommandError",
+  "LiveStreakNotImplementedError"
+] as const satisfies readonly LiveStreakError["_tag"][];
 
-export type FlowStreamErrorTag = (typeof flowStreamErrorTags)[number];
+export type LiveStreakErrorTag = (typeof liveStreakErrorTags)[number];
 
-const flowStreamErrorTagSet = new Set<string>(flowStreamErrorTags);
+const liveStreakErrorTagSet = new Set<string>(liveStreakErrorTags);
 
-export const isFlowStreamError = (value: unknown): value is FlowStreamError => {
+export const isLiveStreakError = (value: unknown): value is LiveStreakError => {
   if (!isRecord(value)) {
     return false;
   }
@@ -81,28 +81,28 @@ export const isFlowStreamError = (value: unknown): value is FlowStreamError => {
   }
 
   const tag = value._tag;
-  if (typeof tag !== "string" || flowStreamErrorTagSet.has(tag) === false) {
+  if (typeof tag !== "string" || liveStreakErrorTagSet.has(tag) === false) {
     return false;
   }
 
   switch (tag) {
-    case "FlowStreamConfigError":
-    case "FlowStreamRuntimeError":
+    case "LiveStreakConfigError":
+    case "LiveStreakRuntimeError":
       return true;
-    case "FlowStreamCapabilityError":
+    case "LiveStreakCapabilityError":
       return isOptionalString(value.requiredScope);
-    case "FlowStreamRegistryError":
+    case "LiveStreakRegistryError":
       return isOptionalString(value.registryId);
-    case "FlowStreamCommandError":
+    case "LiveStreakCommandError":
       return typeof value.commandScope === "string";
-    case "FlowStreamNotImplementedError":
+    case "LiveStreakNotImplementedError":
       return typeof value.component === "string";
     default:
       return false;
   }
 };
 
-export type FlowStreamErrorShortName =
+export type LiveStreakErrorShortName =
   | "config"
   | "runtime"
   | "capability"
@@ -110,9 +110,9 @@ export type FlowStreamErrorShortName =
   | "command"
   | "not-implemented";
 
-export interface SerializedFlowStreamError {
-  readonly tag: FlowStreamErrorTag;
-  readonly shortName: FlowStreamErrorShortName;
+export interface SerializedLiveStreakError {
+  readonly tag: LiveStreakErrorTag;
+  readonly shortName: LiveStreakErrorShortName;
   readonly title: string;
   readonly message: string;
   readonly description: string;
@@ -136,11 +136,11 @@ export interface SerializedUnknownError {
   readonly retryable: false;
 }
 
-export type SerializedError = SerializedFlowStreamError | SerializedUnknownError;
+export type SerializedError = SerializedLiveStreakError | SerializedUnknownError;
 
 export const serializeUnknownError = (error: unknown): SerializedError => {
-  if (isFlowStreamError(error)) {
-    return serializeFlowStreamError(error);
+  if (isLiveStreakError(error)) {
+    return serializeLiveStreakError(error);
   }
 
   return {
@@ -153,12 +153,12 @@ export const serializeUnknownError = (error: unknown): SerializedError => {
   };
 };
 
-export const serializeFlowStreamError = (error: FlowStreamError): SerializedFlowStreamError => {
+export const serializeLiveStreakError = (error: LiveStreakError): SerializedLiveStreakError => {
   const metadata = metadataFromError(error);
   const base = serializedBase(error, metadata);
 
   switch (error._tag) {
-    case "FlowStreamConfigError":
+    case "LiveStreakConfigError":
       return {
         ...base,
         shortName: "config",
@@ -166,14 +166,14 @@ export const serializeFlowStreamError = (error: FlowStreamError): SerializedFlow
         description:
           "The request could not be accepted because configuration or input was invalid."
       };
-    case "FlowStreamRuntimeError":
+    case "LiveStreakRuntimeError":
       return {
         ...base,
         shortName: "runtime",
         title: "Runtime error",
         description: "The operation failed while the system was running."
       };
-    case "FlowStreamCapabilityError": {
+    case "LiveStreakCapabilityError": {
       const requiredScope = stringField(error, "requiredScope");
       return {
         ...base,
@@ -183,7 +183,7 @@ export const serializeFlowStreamError = (error: FlowStreamError): SerializedFlow
         ...contextField(requiredScope === undefined ? undefined : { requiredScope })
       };
     }
-    case "FlowStreamRegistryError": {
+    case "LiveStreakRegistryError": {
       const registryId = stringField(error, "registryId");
       return {
         ...base,
@@ -193,7 +193,7 @@ export const serializeFlowStreamError = (error: FlowStreamError): SerializedFlow
         ...contextField(registryId === undefined ? undefined : { registryId })
       };
     }
-    case "FlowStreamCommandError": {
+    case "LiveStreakCommandError": {
       const commandScope = stringField(error, "commandScope");
       return {
         ...base,
@@ -205,7 +205,7 @@ export const serializeFlowStreamError = (error: FlowStreamError): SerializedFlow
         )
       };
     }
-    case "FlowStreamNotImplementedError": {
+    case "LiveStreakNotImplementedError": {
       const component = stringField(error, "component");
       return {
         ...base,
@@ -218,8 +218,8 @@ export const serializeFlowStreamError = (error: FlowStreamError): SerializedFlow
   }
 };
 
-/** @deprecated Use {@link serializeFlowStreamError} — canonical typed error JSON for CLI, web, and Gateway. */
-export const toCliError = serializeFlowStreamError;
+/** @deprecated Use {@link serializeLiveStreakError} — canonical typed error JSON for CLI, web, and Gateway. */
+export const toCliError = serializeLiveStreakError;
 
 // --- helpers ---
 
@@ -257,7 +257,7 @@ const isValidErrorMetadata = (value: unknown): boolean => {
   return true;
 };
 
-const metadataFromError = (error: FlowStreamError): SanitizedErrorMetadata | undefined => {
+const metadataFromError = (error: LiveStreakError): SanitizedErrorMetadata | undefined => {
   if (!("metadata" in error)) {
     return undefined;
   }
@@ -276,13 +276,13 @@ const metadataFromError = (error: FlowStreamError): SanitizedErrorMetadata | und
   };
 };
 
-const messageFromError = (error: FlowStreamError): string => {
+const messageFromError = (error: LiveStreakError): string => {
   if (typeof error.message !== "string") {
-    return "FlowStream failed";
+    return "LiveStreak failed";
   }
 
   const trimmed = error.message.trim();
-  return trimmed.length > 0 ? trimmed : "FlowStream failed";
+  return trimmed.length > 0 ? trimmed : "LiveStreak failed";
 };
 
 const unknownErrorMessage = (error: unknown): string => {
@@ -303,7 +303,7 @@ const unknownErrorMessage = (error: unknown): string => {
   return "Unknown error";
 };
 
-const stringField = (error: FlowStreamError, field: string): string | undefined => {
+const stringField = (error: LiveStreakError, field: string): string | undefined => {
   const record = error as unknown as Record<string, unknown>;
   if (!(field in record)) {
     return undefined;
@@ -317,10 +317,10 @@ const retryableFromMetadata = (metadata: SanitizedErrorMetadata | undefined): bo
   metadata?.retryable === true;
 
 const serializedBase = (
-  error: FlowStreamError,
+  error: LiveStreakError,
   metadata: SanitizedErrorMetadata | undefined
 ): Pick<
-  SerializedFlowStreamError,
+  SerializedLiveStreakError,
   "tag" | "message" | "retryable" | "details" | "documentationPath"
 > => ({
   tag: error._tag,
@@ -333,6 +333,6 @@ const serializedBase = (
 });
 
 const contextField = (
-  context: SerializedFlowStreamError["context"]
-): Pick<SerializedFlowStreamError, "context"> | Record<string, never> =>
+  context: SerializedLiveStreakError["context"]
+): Pick<SerializedLiveStreakError, "context"> | Record<string, never> =>
   context === undefined ? {} : { context };
