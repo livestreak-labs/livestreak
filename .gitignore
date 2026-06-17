@@ -36,6 +36,9 @@ tmp/
 .mastra/
 context/
 
+# ML weights (keep under context/quary on disk only)
+*.pt
+
 # Python
 __pycache__/
 *.py[cod]
