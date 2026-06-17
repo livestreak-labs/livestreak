@@ -6,6 +6,9 @@ venv/
 # Build outputs
 dist/
 .next/
+.tanstack/
+.output/
+deploy/
 
 # Environment
 .env
@@ -33,7 +36,6 @@ output.txt
 tmp/
 .mastra/
 context/
-drafts
 
 # Python
 __pycache__/

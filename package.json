@@ -1,0 +1,35 @@
+{
+  "name": "flowstream-rewrite-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages-re/core",
+    "packages-re/schema",
+    "contracts-re",
+    "packages-re/sdk-stats",
+    "packages-re/sdk-options",
+    "packages-re/sdk-bookmaker",
+    "packages-re/sdk-steward",
+    "packages-re/control-surface",
+    "cli-re"
+  ],
+  "scripts": {
+    "clean:re": "npm run clean --workspaces --if-present",
+    "build:re": "npm run build --workspaces --if-present",
+    "check:re": "npm run check --workspaces --if-present",
+    "lint:re": "eslint cli-re packages-re contracts-re",
+    "lint:re:fix": "eslint cli-re packages-re contracts-re --fix",
+    "lint:re:workspaces": "npm run lint --workspaces --if-present",
+    "test:re": "npm run test --workspaces --if-present",
+    "pack:re": "npm run pack --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
+    "eslint-plugin-unicorn": "^65.0.1",
+    "globals": "^17.6.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.61.0",
+    "vitest": "^4.1.8"
+  }
+}

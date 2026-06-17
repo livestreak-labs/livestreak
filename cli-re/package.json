@@ -1,0 +1,35 @@
+{
+  "name": "@flowstream-re/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "flowstream-re": "./dist/main.js"
+  },
+  "main": "dist/main.js",
+  "types": "dist/main.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run --passWithNoTests",
+    "pack": "npm pack --dry-run --ignore-scripts",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@effect/cli": "0.75.2",
+    "@effect/platform": "0.96.1",
+    "@effect/platform-node": "0.107.0",
+    "@flowstream-re/sdk-options": "file:../packages-re/sdk-options",
+    "@flowstream-re/sdk-stats": "file:../packages-re/sdk-stats",
+    "effect": "3.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.2",
+    "typescript": "6.0.3"
+  }
+}

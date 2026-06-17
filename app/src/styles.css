@@ -237,6 +237,28 @@ body {
   }
 }
 
+@media (max-width: 640px) {
+  .app-global-nav {
+    padding: 0 10px !important;
+    gap: 8px;
+  }
+
+  .app-global-nav-left {
+    gap: 10px !important;
+    min-width: 0;
+  }
+
+  .app-global-nav-brand-label,
+  .app-global-nav-alpha {
+    display: none;
+  }
+
+  .app-global-nav-links a {
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+  }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

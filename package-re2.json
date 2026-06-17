@@ -1,0 +1,25 @@
+{
+  "name": "flowstream-re2-workspace",
+  "private": false,
+  "type": "module",
+  "workspaces": [
+    "packages-re2/core",
+    "packages-re2/schema",
+    "packages-re2/contracts",
+    "packages-re2/observe",
+    "packages-re2/options",
+    "packages-re2/bookmaker",
+    "packages-re2/steward",
+    "cli-re2"
+  ],
+  "scripts": {
+    "clean:re2": "npm run clean --workspaces --if-present",
+    "build:re2": "npm run build --workspaces --if-present",
+    "check:re2": "npm run check --workspaces --if-present",
+    "test:re2": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

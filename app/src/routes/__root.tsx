@@ -47,6 +47,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 const navLinks = [
   { to: '/' as const, label: 'Home' },
   { to: '/agents' as const, label: 'Agents' },
+  { to: '/control' as const, label: 'Control' },
 ]
 
 function RootComponent() {
@@ -73,7 +74,7 @@ function RootComponent() {
     }}>
       <div className="grid-bg" />
       {/* Global nav */}
-      <nav style={{
+      <nav className="app-global-nav" style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -87,7 +88,7 @@ function RootComponent() {
         position: 'sticky',
         top: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+        <div className="app-global-nav-left" style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
             <div style={{
               width: 28, height: 28, borderRadius: 7,
@@ -96,10 +97,10 @@ function RootComponent() {
             }}>
               <span style={{ fontSize: 14, fontWeight: 800, color: '#000', fontFamily: 'var(--font-display)' }}>F</span>
             </div>
-            <span className="display" style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.02em' }}>FlowStream</span>
-            <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '1px 5px' }}>ALPHA</span>
+            <span className="display app-global-nav-brand-label" style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.02em' }}>FlowStream</span>
+            <span className="app-global-nav-alpha" style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '1px 5px' }}>ALPHA</span>
           </Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div className="app-global-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             {navLinks.map(link => {
               const isActive = link.to === '/' ? pathname === '/' : pathname.startsWith(link.to)
               return (
