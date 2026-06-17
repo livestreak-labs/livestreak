@@ -10,7 +10,8 @@ export type StewardDecisionAction =
   | "challenge"
   | "resolve"
   | "proposePenalty"
-  | "vetoSteward";
+  | "vetoSteward"
+  | "challengeStewardDecision";
 
 export interface StewardDecision {
   readonly action: StewardDecisionAction;

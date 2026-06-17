@@ -5,6 +5,14 @@ import type { StewardSubject } from "./subject.js";
 
 // --- exports ---
 
+export interface StewardPanelSummary {
+  readonly watchedSubjectCount: number;
+  readonly findingCount: number;
+  readonly pendingPlanCount: number;
+  readonly completedPlanCount: number;
+  readonly criticalFindingCount: number;
+}
+
 export interface StewardPanelView {
   readonly runtimeId: string;
   readonly watchedSubjects: readonly StewardSubject[];
@@ -14,4 +22,5 @@ export interface StewardPanelView {
   readonly completedActionPlans: readonly StewardActionPlan[];
   readonly lastError?: string;
   readonly updatedAtMs?: number;
+  readonly summary?: StewardPanelSummary;
 }

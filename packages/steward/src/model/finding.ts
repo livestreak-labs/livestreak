@@ -1,3 +1,4 @@
+import type { TeeAttestationRef } from "../facts/tee.js";
 import type { StewardSubject } from "./subject.js";
 
 // --- exports ---
@@ -23,5 +24,5 @@ export interface StewardFinding {
   readonly message: string;
   readonly evidenceRefs?: readonly string[];
   readonly createdAtMs?: number;
-  readonly attestationRef?: string;
+  readonly attestationRef?: TeeAttestationRef;
 }
