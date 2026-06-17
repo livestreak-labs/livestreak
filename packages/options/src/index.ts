@@ -61,3 +61,11 @@ export type {
   OptionsVaultUserPanel
 } from "./panel/index.js";
 export { projectOptionsPanel } from "./panel/index.js";
+export type {
+  OptionsRuntime,
+  OptionsRuntimeConfig,
+  OptionsRuntimeInput,
+  OptionsRuntimeLastError,
+  OptionsRuntimeState
+} from "./runtime/index.js";
+export { createOptionsRuntime, validateOptionsRuntimeConfig } from "./runtime/index.js";
