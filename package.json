@@ -1,38 +1,35 @@
 {
-  "name": "flowstream-rewrite-workspace",
+  "name": "livestreak-workspace",
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages-re/core",
-    "packages-re/schema",
-    "contracts-re",
-    "packages-re/sdk-stats",
-    "packages-re/sdk-options",
-    "packages-re/sdk-bookmaker",
-    "packages-re/sdk-steward",
-    "packages-re/control-surface",
-    "cli-re",
-    "packages/wallet"
+    "packages/contracts",
+    "packages/core",
+    "packages/schema",
+    "packages/observe",
+    "packages/options",
+    "packages/bookmaker",
+    "packages/steward",
+    "packages/wallet",
+    "packages/host",
+    "host",
+    "cli"
   ],
   "scripts": {
-    "clean:re": "npm run clean --workspaces --if-present",
-    "build:re": "npm run build --workspaces --if-present",
-    "check:re": "npm run check --workspaces --if-present",
-    "lint:re": "eslint cli-re packages-re contracts-re",
-    "lint:re:fix": "eslint cli-re packages-re contracts-re --fix",
-    "lint:re:workspaces": "npm run lint --workspaces --if-present",
-    "test:re": "npm run test --workspaces --if-present",
-    "pack:re": "npm run pack --workspaces --if-present",
-    "postinstall": "patch-package --patch-dir packages/wallet/patches"
+    "postinstall": "patch-package --patch-dir packages/wallet/patches",
+    "check:re2": "npm run check --workspace=@livestreak/options --workspace=@livestreak/observe --workspace=@livestreak/core --workspace=@livestreak/host --if-present",
+    "test:re2": "npm run test --workspace=@livestreak/options --workspace=@livestreak/observe --workspace=@livestreak/core --workspace=@livestreak/host --if-present",
+    "check:host": "npm run check --workspace=@livestreak/host --workspace=@livestreak/host-server --if-present",
+    "test:host": "npm run test --workspace=@livestreak/host --workspace=@livestreak/host-server --if-present"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "eslint": "^9.39.4",
     "eslint-plugin-unicorn": "^65.0.1",
     "globals": "^17.6.0",
+    "patch-package": "^8.0.0",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.61.0",
-    "vitest": "^4.1.8",
-    "patch-package": "^8.0.0"
+    "vitest": "^4.1.8"
   }
 }
