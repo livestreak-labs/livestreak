@@ -1,5 +1,5 @@
 export type {
-  OptionsFlowPanel,
+  OptionsLvstPanel,
   OptionsMarketPanel,
   OptionsPanel,
   OptionsProtocolPanel,

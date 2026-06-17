@@ -1,4 +1,4 @@
-import { FlowStreamConfigError } from "@flowstream-re2/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 import { describe, expect, it } from "vitest";
 
 import { asMarketId, asUserAddress, asVaultId } from "../src/model/index.js";
@@ -10,6 +10,7 @@ import {
 import {
   createFakeOptionsReadTransport,
   fixtureSeed,
+  fixtureSeedWithoutProtocol,
   fixtureUser
 } from "./helpers/fake-transport.js";
 
@@ -39,34 +40,46 @@ describe("options read snapshots", () => {
     const transport = createFakeOptionsReadTransport(fixtureSeed(user));
     const snapshot = await readUserOptionsSnapshot(transport, user, asMarketId("market_01"));
 
-    expect(snapshot.flowAccount.balance).toBeGreaterThan(0n);
+    expect(snapshot.lvstAccount.balance).toBeGreaterThan(0n);
     expect(snapshot.markets).toHaveLength(1);
     expect(snapshot.vaults).toHaveLength(1);
     expect(snapshot.protocol?.marketCount).toBe(1);
   });
 
-  it("fails with FlowStreamConfigError when market is missing", async () => {
+  it("readUserOptionsSnapshot omits protocol when transport has no readProtocolSummary", async () => {
+    const user = fixtureUser();
+    const transport = createFakeOptionsReadTransport(fixtureSeedWithoutProtocol(user));
+
+    expect(transport.readProtocolSummary).toBeUndefined();
+
+    const snapshot = await readUserOptionsSnapshot(transport, user, asMarketId("market_01"));
+
+    expect(snapshot.protocol).toBeUndefined();
+    expect(snapshot.lvstAccount.balance).toBeGreaterThan(0n);
+  });
+
+  it("fails with LiveStreakConfigError when market is missing", async () => {
     const transport = createFakeOptionsReadTransport(fixtureSeed());
 
     await expect(readMarketSnapshot(transport, asMarketId("missing"))).rejects.toBeInstanceOf(
-      FlowStreamConfigError
+      LiveStreakConfigError
     );
   });
 
-  it("fails with FlowStreamConfigError when vault is missing", async () => {
+  it("fails with LiveStreakConfigError when vault is missing", async () => {
     const transport = createFakeOptionsReadTransport(fixtureSeed());
 
     await expect(readVaultSnapshot(transport, asVaultId("missing"))).rejects.toBeInstanceOf(
-      FlowStreamConfigError
+      LiveStreakConfigError
     );
   });
 
-  it("fails with FlowStreamConfigError when FLOW account is missing", async () => {
+  it("fails with LiveStreakConfigError when FLOW account is missing", async () => {
     const transport = createFakeOptionsReadTransport(fixtureSeed());
 
     await expect(
       readUserOptionsSnapshot(transport, asUserAddress("0xmissing"), asMarketId("market_01"))
-    ).rejects.toBeInstanceOf(FlowStreamConfigError);
+    ).rejects.toBeInstanceOf(LiveStreakConfigError);
   });
 
   it("keeps fake transport data isolated between instances", async () => {
@@ -75,7 +88,7 @@ describe("options read snapshots", () => {
 
     await expect(readMarketSnapshot(left, asMarketId("market_01"))).resolves.toBeDefined();
     await expect(readMarketSnapshot(right, asMarketId("market_01"))).rejects.toBeInstanceOf(
-      FlowStreamConfigError
+      LiveStreakConfigError
     );
   });
 });

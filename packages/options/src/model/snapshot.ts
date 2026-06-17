@@ -1,6 +1,6 @@
 // --- exports ---
 
-import type { FlowAccount } from "./flow.js";
+import type { LvstAccount } from "./lvst.js";
 import type { OptionsFundingStream } from "./funding.js";
 import type { MarketId, UserAddress } from "./ids.js";
 import type { OptionsMarket } from "./market.js";
@@ -33,6 +33,6 @@ export interface OptionsUserOptionsSnapshot {
   readonly marketId?: MarketId;
   readonly markets: readonly OptionsMarketSnapshot[];
   readonly vaults: readonly OptionsVaultSnapshot[];
-  readonly flowAccount: FlowAccount;
+  readonly lvstAccount: LvstAccount;
   readonly protocol?: OptionsProtocolSummary;
 }

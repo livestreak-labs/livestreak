@@ -1,6 +1,6 @@
 // --- exports ---
 
-import { FlowStreamConfigError } from "@flowstream-re2/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 
 import type {
   MarketId,
@@ -64,9 +64,9 @@ export const readUserOptionsSnapshot = async (
   user: UserAddress,
   marketId?: MarketId
 ): Promise<OptionsUserOptionsSnapshot> => {
-  const flowAccount = await readOrThrow(
-    () => transport.readFlowAccount(user),
-    "FLOW account",
+  const lvstAccount = await readOrThrow(
+    () => transport.readLvstAccount(user),
+    "LVST account",
     user
   );
 
@@ -80,7 +80,7 @@ export const readUserOptionsSnapshot = async (
       account: user,
       markets: [],
       vaults: [],
-      flowAccount,
+      lvstAccount,
       protocol
     };
   }
@@ -95,7 +95,7 @@ export const readUserOptionsSnapshot = async (
     marketId,
     markets: [marketSnapshot],
     vaults,
-    flowAccount,
+    lvstAccount,
     protocol
   };
 };
@@ -110,11 +110,11 @@ const readOrThrow = async <T>(
   try {
     return await read();
   } catch (error) {
-    if (error instanceof FlowStreamConfigError) {
+    if (error instanceof LiveStreakConfigError) {
       throw error;
     }
 
-    throw new FlowStreamConfigError({
+    throw new LiveStreakConfigError({
       message: `Failed to read ${entity}`,
       metadata: {
         details: id,

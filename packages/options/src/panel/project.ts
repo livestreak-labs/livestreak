@@ -1,7 +1,7 @@
 // --- exports ---
 
 import type {
-  FlowAccount,
+  LvstAccount,
   OptionsFundingStream,
   OptionsMarketSnapshot,
   OptionsUserOptionsSnapshot,
@@ -11,7 +11,7 @@ import type {
 } from "../model/index.js";
 import { isFundingStreamPaused, totalVaultPool } from "../model/index.js";
 import type {
-  OptionsFlowPanel,
+  OptionsLvstPanel,
   OptionsMarketPanel,
   OptionsPanel,
   OptionsSidePanel,
@@ -24,7 +24,7 @@ export const projectOptionsPanel = (snapshot: OptionsUserOptionsSnapshot): Optio
   markets: snapshot.markets.map((marketSnapshot) =>
     projectMarketPanel(marketSnapshot, snapshot.vaults)
   ),
-  flow: projectFlowPanel(snapshot.flowAccount),
+  lvst: projectLvstPanel(snapshot.lvstAccount),
   ...(snapshot.protocol === undefined ? {} : { protocol: snapshot.protocol }),
   user: {
     account: snapshot.account,
@@ -163,7 +163,7 @@ const projectVaultUserPanel = (
       shares: shares.toString(),
       currentValueUSDC: currentValue.toString(),
       claimableUSDC: claimable.toString(),
-      lossClaimableFLOW: lossClaimable.toString()
+      lossClaimableLVST: lossClaimable.toString()
     },
     activeFunding: {
       yesRatePerMinuteUSDC: yesRate.toString(),
@@ -192,7 +192,7 @@ const projectSidePanel = (
     shares: position.shares.toString(),
     currentValueUSDC: position.currentValue.toString(),
     claimableUSDC: position.claimable.toString(),
-    lossClaimableFLOW: (position.lossClaimable ?? 0n).toString(),
+    lossClaimableLVST: (position.lossClaimable ?? 0n).toString(),
     fundingRatePerMinuteUSDC: ratePerMinute.toString(),
     fundingActive: funding?.active === true && !isFundingStreamPaused(funding),
     streamPaused: paused,
@@ -201,23 +201,23 @@ const projectSidePanel = (
   };
 };
 
-const projectFlowPanel = (account: FlowAccount): OptionsFlowPanel => {
+const projectLvstPanel = (account: LvstAccount): OptionsLvstPanel => {
   const unstaked =
     account.balance > account.staked ? account.balance - account.staked : 0n;
 
   return {
     account: account.account,
-    balanceFLOW: account.balance.toString(),
-    stakedFLOW: account.staked.toString(),
-    unstakedFLOW: unstaked.toString(),
+    balanceLVST: account.balance.toString(),
+    stakedLVST: account.staked.toString(),
+    unstakedLVST: unstaked.toString(),
     pendingDividendsUSDC: account.pendingDividends.toString(),
     ...(account.totalEarned === undefined
       ? {}
-      : { totalEarnedFLOW: account.totalEarned.toString() }),
+      : { totalEarnedLVST: account.totalEarned.toString() }),
     lossClaims: {
-      claimableFLOW: account.lossClaims.claimable.toString(),
-      claimedFLOW: account.lossClaims.claimed.toString(),
-      stakedFromClaimsFLOW: account.lossClaims.stakedFromClaims.toString()
+      claimableLVST: account.lossClaims.claimable.toString(),
+      claimedLVST: account.lossClaims.claimed.toString(),
+      stakedFromClaimsLVST: account.lossClaims.stakedFromClaims.toString()
     }
   };
 };

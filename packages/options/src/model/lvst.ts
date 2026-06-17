@@ -2,7 +2,7 @@
 
 import type { UserAddress } from "./ids.js";
 
-export interface FlowAccount {
+export interface LvstAccount {
   readonly account: UserAddress;
   readonly balance: bigint;
   readonly staked: bigint;

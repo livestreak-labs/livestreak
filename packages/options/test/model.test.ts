@@ -1,4 +1,4 @@
-import { FlowStreamConfigError } from "@flowstream-re2/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -19,8 +19,8 @@ describe("options model", () => {
   });
 
   it("rejects invalid side values", () => {
-    expect(() => validateOptionsVaultSide("maybe")).toThrow(FlowStreamConfigError);
-    expect(() => validateOptionsVaultSide("YES")).toThrow(FlowStreamConfigError);
+    expect(() => validateOptionsVaultSide("maybe")).toThrow(LiveStreakConfigError);
+    expect(() => validateOptionsVaultSide("YES")).toThrow(LiveStreakConfigError);
   });
 
   it("supports user positions with both YES and NO exposure", () => {

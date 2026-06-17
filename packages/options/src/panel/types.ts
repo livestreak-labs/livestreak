@@ -14,7 +14,7 @@ export interface OptionsSidePanel {
   readonly shares: string;
   readonly currentValueUSDC: string;
   readonly claimableUSDC: string;
-  readonly lossClaimableFLOW: string;
+  readonly lossClaimableLVST: string;
   readonly fundingRatePerMinuteUSDC: string;
   readonly fundingActive: boolean;
   readonly streamPaused: boolean;
@@ -33,7 +33,7 @@ export interface OptionsVaultUserPanel {
     readonly shares: string;
     readonly currentValueUSDC: string;
     readonly claimableUSDC: string;
-    readonly lossClaimableFLOW: string;
+    readonly lossClaimableLVST: string;
   };
   readonly activeFunding: {
     readonly yesRatePerMinuteUSDC: string;
@@ -98,17 +98,17 @@ export interface OptionsMarketPanel {
   readonly vaults: readonly OptionsVaultPanel[];
 }
 
-export interface OptionsFlowPanel {
+export interface OptionsLvstPanel {
   readonly account: string;
-  readonly balanceFLOW: string;
-  readonly stakedFLOW: string;
-  readonly unstakedFLOW: string;
+  readonly balanceLVST: string;
+  readonly stakedLVST: string;
+  readonly unstakedLVST: string;
   readonly pendingDividendsUSDC: string;
-  readonly totalEarnedFLOW?: string;
+  readonly totalEarnedLVST?: string;
   readonly lossClaims: {
-    readonly claimableFLOW: string;
-    readonly claimedFLOW: string;
-    readonly stakedFromClaimsFLOW: string;
+    readonly claimableLVST: string;
+    readonly claimedLVST: string;
+    readonly stakedFromClaimsLVST: string;
   };
 }
 
@@ -125,7 +125,7 @@ export interface OptionsUserPanel {
 export interface OptionsPanel {
   readonly account: string;
   readonly markets: readonly OptionsMarketPanel[];
-  readonly flow: OptionsFlowPanel;
+  readonly lvst: OptionsLvstPanel;
   readonly protocol?: OptionsProtocolPanel;
   readonly user: OptionsUserPanel;
 }

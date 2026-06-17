@@ -1,5 +1,5 @@
 export type {
-  FlowAccount,
+  LvstAccount,
   MarketId,
   OptionsFundingStream,
   OptionsMarket,
@@ -44,7 +44,7 @@ export {
   readVaultSnapshot
 } from "./read/index.js";
 export type {
-  OptionsFlowPanel,
+  OptionsLvstPanel,
   OptionsMarketPanel,
   OptionsPanel,
   OptionsProtocolPanel,

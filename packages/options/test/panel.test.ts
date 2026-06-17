@@ -55,10 +55,10 @@ describe("projectOptionsPanel", () => {
     const snapshot = await readUserOptionsSnapshot(transport, user, asMarketId("market_01"));
     const panel = projectOptionsPanel(snapshot);
 
-    expect(panel.flow.balanceFLOW).toBe("1000000000000000000");
-    expect(panel.flow.stakedFLOW).toBe("250000000000000000");
-    expect(panel.flow.pendingDividendsUSDC).toBe("12500000");
-    expect(panel.flow.lossClaims.claimableFLOW).toBe("500000000000000000");
+    expect(panel.lvst.balanceLVST).toBe("1000000000000000000");
+    expect(panel.lvst.stakedLVST).toBe("250000000000000000");
+    expect(panel.lvst.pendingDividendsUSDC).toBe("12500000");
+    expect(panel.lvst.lossClaims.claimableLVST).toBe("500000000000000000");
   });
 
   it("projects resolved vault claimable winnings and per-side loss claims", async () => {
@@ -75,7 +75,7 @@ describe("projectOptionsPanel", () => {
     expect(vault?.status).toBe("resolved");
     expect(vault?.outcome).toBe("yes");
     expect(vault?.user?.positions.yes.claimableUSDC).toBe("58000000");
-    expect(vault?.user?.positions.no.lossClaimableFLOW).toBe("2500000");
+    expect(vault?.user?.positions.no.lossClaimableLVST).toBe("2500000");
     expect(vault?.user?.positions.yes.isWinningSide).toBe(true);
     expect(vault?.user?.positions.no.isWinningSide).toBe(false);
   });

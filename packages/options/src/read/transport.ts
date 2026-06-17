@@ -1,7 +1,7 @@
 // --- exports ---
 
 import type {
-  FlowAccount,
+  LvstAccount,
   MarketId,
   OptionsFundingStream,
   OptionsMarket,
@@ -26,6 +26,6 @@ export interface OptionsReadTransport {
     vaultId: VaultId,
     side: OptionsVaultSide
   ): Promise<OptionsFundingStream>;
-  readFlowAccount(user: UserAddress): Promise<FlowAccount>;
+  readLvstAccount(user: UserAddress): Promise<LvstAccount>;
   readProtocolSummary?(): Promise<OptionsProtocolSummary>;
 }

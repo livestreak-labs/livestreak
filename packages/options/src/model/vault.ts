@@ -1,6 +1,6 @@
 // --- exports ---
 
-import { FlowStreamConfigError } from "@flowstream-re2/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 
 import type { MarketId, VaultId } from "./ids.js";
 
@@ -62,7 +62,7 @@ export const validateOptionsVaultSide = (value: unknown): OptionsVaultSide => {
     return value;
   }
 
-  throw new FlowStreamConfigError({
+  throw new LiveStreakConfigError({
     message: "Invalid vault side",
     metadata: { details: `Expected "yes" or "no", received ${String(value)}` }
   });

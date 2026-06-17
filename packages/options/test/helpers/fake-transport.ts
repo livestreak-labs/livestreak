@@ -1,11 +1,11 @@
-import { FlowStreamConfigError } from "@flowstream-re2/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 
 import {
   asMarketId,
   asUserAddress,
   asVaultId,
   emptySidePosition,
-  type FlowAccount,
+  type LvstAccount,
   type MarketId,
   type OptionsFundingStream,
   type OptionsMarket,
@@ -23,7 +23,7 @@ export interface FakeTransportSeed {
   readonly vaults?: readonly OptionsVault[];
   readonly positions?: readonly OptionsUserVaultPosition[];
   readonly funding?: readonly OptionsFundingStream[];
-  readonly flowAccounts?: readonly FlowAccount[];
+  readonly lvstAccounts?: readonly LvstAccount[];
   readonly protocol?: OptionsProtocolSummary;
 }
 
@@ -36,8 +36,8 @@ export class FakeTransportInMemory implements OptionsReadTransport {
   private readonly vaults = new Map<string, OptionsVault>();
   private readonly positions = new Map<string, OptionsUserVaultPosition>();
   private readonly funding = new Map<string, OptionsFundingStream>();
-  private readonly flowAccounts = new Map<string, FlowAccount>();
-  private protocolSummary: OptionsProtocolSummary | undefined;
+  private readonly lvstAccounts = new Map<string, LvstAccount>();
+  readProtocolSummary?: () => Promise<OptionsProtocolSummary>;
 
   constructor(seed: FakeTransportSeed) {
     for (const market of seed.markets ?? []) {
@@ -56,11 +56,14 @@ export class FakeTransportInMemory implements OptionsReadTransport {
       this.funding.set(fundingKey(stream.account, stream.vaultId, stream.side), stream);
     }
 
-    for (const account of seed.flowAccounts ?? []) {
-      this.flowAccounts.set(account.account, account);
+    for (const account of seed.lvstAccounts ?? []) {
+      this.lvstAccounts.set(account.account, account);
     }
 
-    this.protocolSummary = seed.protocol;
+    if (seed.protocol !== undefined) {
+      const summary = seed.protocol;
+      this.readProtocolSummary = async () => summary;
+    }
   }
 
   async readMarket(marketId: MarketId): Promise<OptionsMarket> {
@@ -111,21 +114,13 @@ export class FakeTransportInMemory implements OptionsReadTransport {
     return stream;
   }
 
-  async readFlowAccount(user: UserAddress): Promise<FlowAccount> {
-    const account = this.flowAccounts.get(user);
+  async readLvstAccount(user: UserAddress): Promise<LvstAccount> {
+    const account = this.lvstAccounts.get(user);
     if (account === undefined) {
-      throw notFound("FLOW account", user);
+      throw notFound("LVST account", user);
     }
 
     return account;
-  }
-
-  async readProtocolSummary(): Promise<OptionsProtocolSummary> {
-    if (this.protocolSummary === undefined) {
-      throw notFound("protocol summary", "default");
-    }
-
-    return this.protocolSummary;
   }
 
   setMarket(market: OptionsMarket): void {
@@ -144,8 +139,8 @@ export class FakeTransportInMemory implements OptionsReadTransport {
     this.funding.set(fundingKey(stream.account, stream.vaultId, stream.side), stream);
   }
 
-  setFlowAccount(account: FlowAccount): void {
-    this.flowAccounts.set(account.account, account);
+  setLvstAccount(account: LvstAccount): void {
+    this.lvstAccounts.set(account.account, account);
   }
 }
 
@@ -279,7 +274,7 @@ export const fixtureFundingNoPaused = (
   updatedAtMs: 1_730_000_100_000
 });
 
-export const fixtureFlowAccount = (user: UserAddress = fixtureUser()): FlowAccount => ({
+export const fixtureLvstAccount = (user: UserAddress = fixtureUser()): LvstAccount => ({
   account: user,
   balance: 1_000_000_000_000_000_000n,
   staked: 250_000_000_000_000_000n,
@@ -297,11 +292,21 @@ export const fixtureSeed = (user: UserAddress = fixtureUser()): FakeTransportSee
   vaults: [fixtureVault()],
   positions: [fixturePositionBothSides(user)],
   funding: [fixtureFundingYes(user), fixtureFundingNoPaused(user)],
-  flowAccounts: [fixtureFlowAccount(user)],
+  lvstAccounts: [fixtureLvstAccount(user)],
   protocol: {
     marketCount: 1,
     vaultCount: 1
   }
+});
+
+export const fixtureSeedWithoutProtocol = (
+  user: UserAddress = fixtureUser()
+): FakeTransportSeed => ({
+  markets: [fixtureMarket()],
+  vaults: [fixtureVault()],
+  positions: [fixturePositionBothSides(user)],
+  funding: [fixtureFundingYes(user), fixtureFundingNoPaused(user)],
+  lvstAccounts: [fixtureLvstAccount(user)]
 });
 
 const positionKey = (user: UserAddress, vaultId: VaultId): string => `${user}:${vaultId}`;
@@ -309,8 +314,8 @@ const positionKey = (user: UserAddress, vaultId: VaultId): string => `${user}:${
 const fundingKey = (user: UserAddress, vaultId: VaultId, side: OptionsVaultSide): string =>
   `${user}:${vaultId}:${side}`;
 
-const notFound = (entity: string, id: string): FlowStreamConfigError =>
-  new FlowStreamConfigError({
+const notFound = (entity: string, id: string): LiveStreakConfigError =>
+  new LiveStreakConfigError({
     message: `${entity} not found`,
     metadata: { details: id }
   });

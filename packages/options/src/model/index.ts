@@ -1,4 +1,4 @@
-export type { FlowAccount } from "./flow.js";
+export type { LvstAccount } from "./lvst.js";
 export type { OptionsFundingStream } from "./funding.js";
 export type {
   MarketId,
