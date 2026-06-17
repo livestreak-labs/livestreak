@@ -1,5 +1,5 @@
 {
-  "name": "@flowstream-re2/bookmaker",
+  "name": "@livestreak/bookmaker",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
@@ -18,11 +18,11 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@flowstream-re2/core": "file:../core",
-    "@flowstream-re2/schema": "file:../schema",
-    "effect": "3.21.3"
+    "@livestreak/host": "file:../host"
   },
   "devDependencies": {
-    "typescript": "6.0.3"
+    "@types/node": "^22.15.30",
+    "typescript": "6.0.3",
+    "vitest": "^4.1.8"
   }
 }
