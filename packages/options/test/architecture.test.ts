@@ -15,10 +15,10 @@ const forbiddenEffectPatterns = [
 const forbiddenNodePatterns = [/from\s+["']node:/, /require\(\s*["']node:/];
 
 const forbiddenImportPatterns = [
-  /@flowstream-re2\/observe/,
-  /@flowstream-re2\/bookmaker/,
-  /@flowstream-re2\/steward/,
-  /cli-re2/,
+  /@livestreak\/observe/,
+  /@livestreak\/bookmaker/,
+  /@livestreak\/steward/,
+  /cli\//,
   /host\/src/,
   /\.\.\/observe/,
   /\.\.\/bookmaker/,
@@ -29,7 +29,7 @@ const staleTermPatterns = [
   /\bcreateVault\b/,
   /\bcreateMarket\b/,
   /\bcreateOption\b/,
-  /\bmakeFlowStreamClient\b/
+  /\bmakeLiveStreakClient\b/
 ];
 
 describe("options architecture guards", () => {

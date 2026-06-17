@@ -69,3 +69,22 @@ export type {
   OptionsRuntimeState
 } from "./runtime/index.js";
 export { createOptionsRuntime, validateOptionsRuntimeConfig } from "./runtime/index.js";
+export type {
+  ClaimLossFlowInput,
+  ContractWriteRequest,
+  ContractWriter,
+  ContractsOptionsWriteTransportInput,
+  OptionsWriteTransport,
+  SetFundingRateInput,
+  StakeFlowInput,
+  StopFundingStreamInput,
+  UnstakeFlowInput
+} from "./write/index.js";
+export {
+  claimLossFlow,
+  createContractsOptionsWriteTransport,
+  setFundingRate,
+  stakeFlow,
+  stopFundingStream,
+  unstakeFlow
+} from "./write/index.js";
