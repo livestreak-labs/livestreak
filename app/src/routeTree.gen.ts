@@ -9,16 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ControlRouteImport } from './routes/control'
 import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StreamIdRouteImport } from './routes/stream/$id'
 
-const ControlRoute = ControlRouteImport.update({
-  id: '/control',
-  path: '/control',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AgentsRoute = AgentsRouteImport.update({
   id: '/agents',
   path: '/agents',
@@ -38,46 +32,35 @@ const StreamIdRoute = StreamIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
-  '/control': typeof ControlRoute
   '/stream/$id': typeof StreamIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
-  '/control': typeof ControlRoute
   '/stream/$id': typeof StreamIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
-  '/control': typeof ControlRoute
   '/stream/$id': typeof StreamIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/agents' | '/control' | '/stream/$id'
+  fullPaths: '/' | '/agents' | '/stream/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/agents' | '/control' | '/stream/$id'
-  id: '__root__' | '/' | '/agents' | '/control' | '/stream/$id'
+  to: '/' | '/agents' | '/stream/$id'
+  id: '__root__' | '/' | '/agents' | '/stream/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgentsRoute: typeof AgentsRoute
-  ControlRoute: typeof ControlRoute
   StreamIdRoute: typeof StreamIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/control': {
-      id: '/control'
-      path: '/control'
-      fullPath: '/control'
-      preLoaderRoute: typeof ControlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/agents': {
       id: '/agents'
       path: '/agents'
@@ -105,7 +88,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgentsRoute: AgentsRoute,
-  ControlRoute: ControlRoute,
   StreamIdRoute: StreamIdRoute,
 }
 export const routeTree = rootRouteImport

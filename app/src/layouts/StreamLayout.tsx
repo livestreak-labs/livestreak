@@ -64,7 +64,7 @@ export function StreamLayout({ streamTitle, category, totalPooled }: StreamLayou
             }}>
               <span style={{ fontSize: 13, fontWeight: 800, color: '#000', fontFamily: 'var(--font-display)' }}>F</span>
             </div>
-            <span className="display" style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.02em' }}>FlowStream</span>
+            <span className="display" style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.02em' }}>LiveStreak</span>
           </Link>
           <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '1px 5px' }}>ALPHA</span>
           <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />

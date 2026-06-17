@@ -9,7 +9,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'FlowStream' },
+      { title: 'LiveStreak' },
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
@@ -47,7 +47,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 const navLinks = [
   { to: '/' as const, label: 'Home' },
   { to: '/agents' as const, label: 'Agents' },
-  { to: '/control' as const, label: 'Control' },
 ]
 
 function RootComponent() {
@@ -95,9 +94,9 @@ function RootComponent() {
               background: 'linear-gradient(135deg, #00ff87, #00c8ff)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <span style={{ fontSize: 14, fontWeight: 800, color: '#000', fontFamily: 'var(--font-display)' }}>F</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#000', fontFamily: 'var(--font-display)' }}>L</span>
             </div>
-            <span className="display app-global-nav-brand-label" style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.02em' }}>FlowStream</span>
+            <span className="display app-global-nav-brand-label" style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.02em' }}>LiveStreak</span>
             <span className="app-global-nav-alpha" style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '1px 5px' }}>ALPHA</span>
           </Link>
           <div className="app-global-nav-links" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

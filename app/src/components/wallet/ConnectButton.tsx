@@ -19,15 +19,14 @@ export function ConnectButton() {
     isLoading,
     error,
     legacyWallet,
-    register,
-    login,
+    connect,
     disconnect,
   } = useWalletContext()
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'choose' | 'register'>('choose')
-  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [copied, setCopied] = useState(false)
 
   function copyAddress() {
@@ -40,28 +39,19 @@ export function ConnectButton() {
 
   function openModal() {
     setModalMode('choose')
-    setUsername('')
+    setPassword('')
     setModalOpen(true)
   }
 
   function closeModal() {
     setModalOpen(false)
-    setUsername('')
+    setPassword('')
   }
 
-  async function handleRegister() {
-    if (!username.trim()) return
+  async function handleConnect() {
+    if (!password.trim()) return
     try {
-      await register(username.trim())
-      closeModal()
-    } catch {
-      // Error is set in the hook — shown in modal
-    }
-  }
-
-  async function handleLogin() {
-    try {
-      await login()
+      await connect(password.trim())
       closeModal()
     } catch {
       // Error is set in the hook — shown in modal
@@ -163,7 +153,7 @@ export function ConnectButton() {
                   fontSize: 14, color: 'rgba(255,255,255,0.5)',
                   lineHeight: 1.6, marginBottom: 24,
                 }}>
-                  Use a passkey to create or access your smart wallet. No extensions, no seed phrases.
+                  Enter a password to derive your smart wallet. Testnet only — this is not secure key management.
                 </Dialog.Description>
 
                 {/* Error display */}
@@ -189,19 +179,19 @@ export function ConnectButton() {
                   hoverBg="rgba(0,255,135,0.06)"
                   hoverBorder="rgba(0,255,135,0.2)"
                   title="Create Wallet"
-                  subtitle="New passkey + smart account"
+                  subtitle="Derive a new smart account from a password"
                 />
 
                 {/* I have a wallet */}
                 <ModalOption
-                  onClick={handleLogin}
+                  onClick={() => setModalMode('register')}
                   disabled={isLoading}
                   icon={<Key size={16} color="#00c8ff" />}
                   iconBg="rgba(0,200,255,0.1)"
                   hoverBg="rgba(0,200,255,0.06)"
                   hoverBorder="rgba(0,200,255,0.2)"
                   title="I have a wallet"
-                  subtitle="Sign in with existing passkey"
+                  subtitle="Re-enter your password to restore it"
                 />
               </>
             ) : (
@@ -211,13 +201,13 @@ export function ConnectButton() {
                   fontSize: 20, fontWeight: 700, marginBottom: 10,
                   color: '#fff', letterSpacing: '0.02em',
                 }}>
-                  Create Wallet
+                  Enter Password
                 </Dialog.Title>
                 <Dialog.Description style={{
                   fontSize: 14, color: 'rgba(255,255,255,0.5)',
                   lineHeight: 1.6, marginBottom: 20,
                 }}>
-                  Choose a username for your passkey. This is stored locally to identify your credential.
+                  Your wallet is derived deterministically from this password — same password, same wallet. Testnet only.
                 </Dialog.Description>
 
                 {error && (
@@ -234,11 +224,11 @@ export function ConnectButton() {
                 )}
 
                 <input
-                  type="text"
-                  placeholder="Username or email"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleRegister() }}
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleConnect() }}
                   autoFocus
                   style={{
                     width: '100%', padding: '12px 14px',
@@ -267,14 +257,14 @@ export function ConnectButton() {
                     Back
                   </button>
                   <button
-                    onClick={handleRegister}
-                    disabled={isLoading || !username.trim()}
+                    onClick={handleConnect}
+                    disabled={isLoading || !password.trim()}
                     className="btn-primary"
                     style={{
                       flex: 2, padding: '12px 0', fontSize: 13,
                       borderRadius: 8, fontWeight: 600,
-                      opacity: isLoading || !username.trim() ? 0.5 : 1,
-                      cursor: isLoading || !username.trim() ? 'not-allowed' : 'pointer',
+                      opacity: isLoading || !password.trim() ? 0.5 : 1,
+                      cursor: isLoading || !password.trim() ? 'not-allowed' : 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
                   >
@@ -283,10 +273,10 @@ export function ConnectButton() {
                         <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}>
                           <SpinnerGap size={14} />
                         </motion.div>
-                        Creating...
+                        Deriving...
                       </>
                     ) : (
-                      'Create with Passkey'
+                      'Continue'
                     )}
                   </button>
                 </div>
@@ -297,7 +287,7 @@ export function ConnectButton() {
               fontSize: 11, color: 'rgba(255,255,255,0.2)',
               textAlign: 'center', marginTop: 16,
             }}>
-              Powered by Circle &middot; Gasless on Arc
+              Gasless on Arc &middot; testnet
             </p>
           </Dialog.Content>
         </Dialog.Portal>
