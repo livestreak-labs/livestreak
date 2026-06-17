@@ -1,20 +1,20 @@
 import { Effect } from "effect";
-import { FlowStreamConfigError } from "@flowstream-re2/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 import type { Board } from "#run/control/board/model.js";
 import {
   assertPausePresentationValue,
   defaultCapturePausePresentation,
   type PausePresentation
-} from "#pipeline/capture/pause.js";
+} from "#pipeline/capture/index.js";
 import { projectWorkerControlView } from "./worker-view.js";
 
-export type { PausePresentation } from "#pipeline/capture/pause.js";
+export type { PausePresentation } from "#pipeline/capture/index.js";
 
 export {
   assertPausePresentationValue,
   isPausePresentation,
   pausePresentationValues
-} from "#pipeline/capture/pause.js";
+} from "#pipeline/capture/index.js";
 
 export const defaultControlPause = {
   requested: false,
@@ -36,7 +36,7 @@ const browserEncodingValues = ["jpeg", "png"] as const;
 
 export const validateBoardSettings = (
   board: Board
-): Effect.Effect<Board, FlowStreamConfigError> =>
+): Effect.Effect<Board, LiveStreakConfigError> =>
   Effect.gen(function* () {
     const view = projectWorkerControlView(board);
 
@@ -48,7 +48,7 @@ export const validateBoardSettings = (
 
     if (view.sinks.length === 0) {
       return yield* Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: "At least one sink policy is required"
         })
       );
@@ -57,7 +57,7 @@ export const validateBoardSettings = (
     for (const sink of view.sinks) {
       if (sink.subscribe.length === 0) {
         return yield* Effect.fail(
-          new FlowStreamConfigError({
+          new LiveStreakConfigError({
             message: `Sink ${sink.sinkId} must subscribe to at least one manifest track`
           })
         );
@@ -67,7 +67,7 @@ export const validateBoardSettings = (
     return board;
   });
 
-const validateSystemRunSettings = (board: Board): Effect.Effect<void, FlowStreamConfigError> =>
+const validateSystemRunSettings = (board: Board): Effect.Effect<void, LiveStreakConfigError> =>
   Effect.gen(function* () {
     const settings = board.cells["system:run"]?.settings;
     if (settings === undefined) {
@@ -88,7 +88,7 @@ const validateSystemRunSettings = (board: Board): Effect.Effect<void, FlowStream
     }
   });
 
-const validateSystemPauseSettings = (board: Board): Effect.Effect<void, FlowStreamConfigError> =>
+const validateSystemPauseSettings = (board: Board): Effect.Effect<void, LiveStreakConfigError> =>
   Effect.gen(function* () {
     const settings = board.cells["system:pause"]?.settings;
     if (settings === undefined) {
@@ -109,7 +109,7 @@ const validateSystemPauseSettings = (board: Board): Effect.Effect<void, FlowStre
     yield* rejectLegacyPauseFields(pauseSettings, "system:pause.settings");
   });
 
-const validateCaptureFileSettings = (board: Board): Effect.Effect<void, FlowStreamConfigError> =>
+const validateCaptureFileSettings = (board: Board): Effect.Effect<void, LiveStreakConfigError> =>
   Effect.gen(function* () {
     const captureCell = board.cells["capture:file"];
     if (captureCell === undefined) {
@@ -133,7 +133,7 @@ const validateCaptureFileSettings = (board: Board): Effect.Effect<void, FlowStre
     }
   });
 
-const validateCaptureBrowserSettings = (board: Board): Effect.Effect<void, FlowStreamConfigError> =>
+const validateCaptureBrowserSettings = (board: Board): Effect.Effect<void, LiveStreakConfigError> =>
   Effect.gen(function* () {
     const captureCell = board.cells["capture:browser"];
     if (captureCell === undefined) {
@@ -188,7 +188,7 @@ const validateCaptureBrowserSettings = (board: Board): Effect.Effect<void, FlowS
         ))
     ) {
       return yield* Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: "capture:browser.settings.encoding must be one of: jpeg, png"
         })
       );
@@ -199,14 +199,14 @@ const validateCaptureBrowserSettings = (board: Board): Effect.Effect<void, FlowS
 
     if (browserSettings.livePause !== undefined) {
       return yield* Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: "capture:browser.settings.livePause is no longer supported"
         })
       );
     }
   });
 
-const validateSinkCellSettings = (board: Board): Effect.Effect<void, FlowStreamConfigError> =>
+const validateSinkCellSettings = (board: Board): Effect.Effect<void, LiveStreakConfigError> =>
   Effect.gen(function* () {
     for (const [cellId, cell] of Object.entries(board.cells)) {
       if (!cellId.startsWith("sink:")) {
@@ -229,7 +229,7 @@ const validateSinkCellSettings = (board: Board): Effect.Effect<void, FlowStreamC
 
 const validateBrowserViewport = (
   viewport: unknown
-): Effect.Effect<void, FlowStreamConfigError> =>
+): Effect.Effect<void, LiveStreakConfigError> =>
   Effect.gen(function* () {
     const viewportSettings = yield* assertPlainOptionalObject(
       viewport,
@@ -255,7 +255,7 @@ const validateBrowserViewport = (
     }
   });
 
-const validateBrowserCrop = (crop: unknown): Effect.Effect<void, FlowStreamConfigError> =>
+const validateBrowserCrop = (crop: unknown): Effect.Effect<void, LiveStreakConfigError> =>
   Effect.gen(function* () {
     if (crop === undefined || crop === null) {
       return;
@@ -287,7 +287,7 @@ const validateBrowserCrop = (crop: unknown): Effect.Effect<void, FlowStreamConfi
 const validateSlateAssetIdSettings = (
   settings: Readonly<Record<string, unknown>>,
   fieldPrefix: string
-): Effect.Effect<void, FlowStreamConfigError> =>
+): Effect.Effect<void, LiveStreakConfigError> =>
   Effect.gen(function* () {
     const whilePaused = settings.whilePaused;
     const slateAssetId = settings.slateAssetId;
@@ -299,7 +299,7 @@ const validateSlateAssetIdSettings = (
 
       if (whilePausedIsSlate === false) {
         return yield* Effect.fail(
-          new FlowStreamConfigError({
+          new LiveStreakConfigError({
             message: `${fieldPrefix}.whilePaused must be "slate" when slateAssetId is set`
           })
         );
@@ -308,7 +308,7 @@ const validateSlateAssetIdSettings = (
 
     if (whilePausedIsSlate && hasSlateAssetId === false) {
       return yield* Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: `${fieldPrefix}.slateAssetId is required when whilePaused is "slate"`
         })
       );
@@ -318,11 +318,11 @@ const validateSlateAssetIdSettings = (
 const rejectLegacyPauseFields = (
   settings: Readonly<Record<string, unknown>>,
   fieldPrefix: string
-): Effect.Effect<void, FlowStreamConfigError> => {
+): Effect.Effect<void, LiveStreakConfigError> => {
   for (const legacyField of ["mode", "fill", "markDiscontinuity"] as const) {
     if (settings[legacyField] !== undefined) {
       return Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: `${fieldPrefix}.${legacyField} is no longer supported`
         })
       );
@@ -335,7 +335,7 @@ const rejectLegacyPauseFields = (
 const assertPlainSettingsObject = (
   value: unknown,
   fieldPath: string
-): Effect.Effect<Readonly<Record<string, unknown>>, FlowStreamConfigError> => {
+): Effect.Effect<Readonly<Record<string, unknown>>, LiveStreakConfigError> => {
   if (
     typeof value !== "object" ||
     value === null ||
@@ -343,7 +343,7 @@ const assertPlainSettingsObject = (
     Object.getPrototypeOf(value) !== Object.prototype
   ) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: `${fieldPath} must be a plain object`
       })
     );
@@ -355,7 +355,7 @@ const assertPlainSettingsObject = (
 const assertPlainOptionalObject = (
   value: unknown,
   fieldPath: string
-): Effect.Effect<Readonly<Record<string, unknown>> | undefined, FlowStreamConfigError> => {
+): Effect.Effect<Readonly<Record<string, unknown>> | undefined, LiveStreakConfigError> => {
   if (value === undefined) {
     return Effect.succeed(void 0 as Readonly<Record<string, unknown>> | undefined);
   }
@@ -366,14 +366,14 @@ const assertPlainOptionalObject = (
 const assertOptionalString = (
   value: unknown,
   fieldPath: string
-): Effect.Effect<void, FlowStreamConfigError> => {
+): Effect.Effect<void, LiveStreakConfigError> => {
   if (value === undefined) {
     return Effect.void;
   }
 
   if (typeof value !== "string") {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: `${fieldPath} must be a string`
       })
     );
@@ -385,14 +385,14 @@ const assertOptionalString = (
 const assertOptionalBoolean = (
   value: unknown,
   fieldPath: string
-): Effect.Effect<void, FlowStreamConfigError> => {
+): Effect.Effect<void, LiveStreakConfigError> => {
   if (value === undefined) {
     return Effect.void;
   }
 
   if (typeof value !== "boolean") {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: `${fieldPath} must be a boolean`
       })
     );
@@ -404,14 +404,14 @@ const assertOptionalBoolean = (
 const assertOptionalNumber = (
   value: unknown,
   fieldPath: string
-): Effect.Effect<void, FlowStreamConfigError> => {
+): Effect.Effect<void, LiveStreakConfigError> => {
   if (value === undefined) {
     return Effect.void;
   }
 
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: `${fieldPath} must be a finite number`
       })
     );
@@ -423,13 +423,13 @@ const assertOptionalNumber = (
 const assertPositiveNumber = (
   value: unknown,
   fieldPath: string
-): Effect.Effect<void, FlowStreamConfigError> =>
+): Effect.Effect<void, LiveStreakConfigError> =>
   Effect.gen(function* () {
     yield* assertOptionalNumber(value, fieldPath);
 
     if (value !== undefined && (value as number) <= 0) {
       return yield* Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: `${fieldPath} must be greater than 0`
         })
       );
@@ -440,13 +440,13 @@ const assertMinimumNumber = (
   value: unknown,
   fieldPath: string,
   minimum: number
-): Effect.Effect<void, FlowStreamConfigError> =>
+): Effect.Effect<void, LiveStreakConfigError> =>
   Effect.gen(function* () {
     yield* assertOptionalNumber(value, fieldPath);
 
     if (value !== undefined && (value as number) < minimum) {
       return yield* Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: `${fieldPath} must be at least ${minimum}`
         })
       );
@@ -456,10 +456,10 @@ const assertMinimumNumber = (
 const assertNonEmptyTrimmedString = (
   value: unknown,
   fieldPath: string
-): Effect.Effect<void, FlowStreamConfigError> => {
+): Effect.Effect<void, LiveStreakConfigError> => {
   if (typeof value !== "string" || value.trim().length === 0) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: `${fieldPath} must be a non-empty string`
       })
     );
@@ -471,14 +471,14 @@ const assertNonEmptyTrimmedString = (
 const assertOptionalStringArray = (
   value: unknown,
   fieldPath: string
-): Effect.Effect<void, FlowStreamConfigError> => {
+): Effect.Effect<void, LiveStreakConfigError> => {
   if (value === undefined) {
     return Effect.void;
   }
 
   if (!Array.isArray(value)) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: `${fieldPath} must be an array`
       })
     );
@@ -487,7 +487,7 @@ const assertOptionalStringArray = (
   for (const entry of value) {
     if (typeof entry !== "string") {
       return Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: `${fieldPath} must be an array of strings`
         })
       );

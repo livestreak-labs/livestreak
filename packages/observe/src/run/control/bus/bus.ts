@@ -1,11 +1,11 @@
 import { Effect } from "effect";
-import { FlowStreamConfigError, FlowStreamRuntimeError, type FlowStreamError } from "@flowstream-re2/core";
-import type { Board } from "#run/control/board/model.js";
-import { boardSettingsChanged } from "#run/control/board/patch.js";
-import { validateBoardSettings } from "#run/control/board/settings.js";
+import { LiveStreakConfigError, LiveStreakRuntimeError, type LiveStreakError } from "@livestreak/core";
+import type { Board } from "#run/control/board/index.js";
+import { boardSettingsChanged } from "#run/control/board/index.js";
+import { validateBoardSettings } from "#run/control/board/index.js";
 import { findCatalogFunctionByScope } from "#run/control/catalog.js";
 import type { ControlCatalog } from "#run/control/catalog.js";
-import { applyBoardPatch } from "#run/control/board/patch.js";
+import { applyBoardPatch } from "#run/control/board/index.js";
 import type { BoardPatch } from "#run/control/bus/types.js";
 import type { ControlArtifact, ControlCallResult } from "#run/control/bus/calls.js";
 import { createOpaqueArtifactId } from "./artifacts.js";
@@ -28,7 +28,7 @@ import type {
 
 export const createControlBus = (
   input: CreateControlBusInput
-): Effect.Effect<ControlBus, FlowStreamConfigError> =>
+): Effect.Effect<ControlBus, LiveStreakConfigError> =>
   Effect.gen(function* () {
     const runId = input.runId;
     let surfaces: readonly ControlSurface[] = [];
@@ -56,7 +56,7 @@ export const createControlBus = (
 
     const applyPatch = (
       patch: BoardPatch
-    ): Effect.Effect<{ readonly board: Board; readonly changed: boolean }, FlowStreamError> =>
+    ): Effect.Effect<{ readonly board: Board; readonly changed: boolean }, LiveStreakError> =>
       Effect.gen(function* () {
         const result = yield* applyBoardPatch(board, patch);
         board = result.board;
@@ -72,7 +72,7 @@ export const createControlBus = (
     const commitBoardInternal = (
       nextBoard: Board,
       validateSettings: boolean
-    ): Effect.Effect<Board, FlowStreamConfigError> =>
+    ): Effect.Effect<Board, LiveStreakConfigError> =>
       Effect.gen(function* () {
         const changed = nextBoard.revision > board.revision;
         if (!changed) {
@@ -152,7 +152,7 @@ export const createControlBus = (
         Effect.gen(function* () {
           if (envelope.runId !== runId) {
             return yield* Effect.fail(
-              new FlowStreamConfigError({
+              new LiveStreakConfigError({
                 message: `Control call runId ${envelope.runId} does not match bus runId ${runId}`
               })
             );
@@ -161,7 +161,7 @@ export const createControlBus = (
           const catalogFunction = findCatalogFunctionByScope(catalog, envelope.scope);
           if (catalogFunction === undefined) {
             return yield* Effect.fail(
-              new FlowStreamConfigError({
+              new LiveStreakConfigError({
                 message: `Catalog does not advertise function scope ${envelope.scope}`
               })
             );
@@ -209,18 +209,18 @@ export const createControlBus = (
 export const assertCatalogFunctionAdvertised = (
   catalog: ControlCatalog,
   scope: string
-): Effect.Effect<void, FlowStreamConfigError> =>
+): Effect.Effect<void, LiveStreakConfigError> =>
   findCatalogFunctionByScope(catalog, scope) === undefined
     ? Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: `Catalog does not advertise function scope ${scope}`
         })
       )
     : Effect.void;
 
-export const failUnsupportedFunction = (scope: string): Effect.Effect<never, FlowStreamRuntimeError> =>
+export const failUnsupportedFunction = (scope: string): Effect.Effect<never, LiveStreakRuntimeError> =>
   Effect.fail(
-    new FlowStreamRuntimeError({
+    new LiveStreakRuntimeError({
       message: `Unsupported function scope: ${scope}`
     })
   );

@@ -1,5 +1,5 @@
 import { Effect, Ref } from "effect";
-import { FlowStreamConfigError, type FlowStreamError } from "@flowstream-re2/core";
+import { LiveStreakConfigError, type LiveStreakError } from "@livestreak/core";
 import type { CapabilityScope } from "#scope/scopes.js";
 import type {
   BrowserCaptureCrop,
@@ -52,19 +52,19 @@ export type BrowserCaptureSetCaptureFpsPayload =
   | { readonly captureFps: number };
 
 export interface BrowserCaptureControls {
-  readonly snapshot: Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, FlowStreamError>;
-  readonly getPreview: Effect.Effect<BrowserCapturePreview, FlowStreamError>;
-  readonly inspectTargets: Effect.Effect<BrowserCaptureTargetInspection, FlowStreamError>;
+  readonly snapshot: Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, LiveStreakError>;
+  readonly getPreview: Effect.Effect<BrowserCapturePreview, LiveStreakError>;
+  readonly inspectTargets: Effect.Effect<BrowserCaptureTargetInspection, LiveStreakError>;
   readonly setTarget: (
     payload: BrowserCaptureSetTargetPayload
-  ) => Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, FlowStreamConfigError>;
+  ) => Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, LiveStreakConfigError>;
   readonly setCrop: (
     payload: BrowserCaptureSetCropPayload
-  ) => Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, FlowStreamConfigError>;
-  readonly clearCrop: Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, FlowStreamError>;
+  ) => Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, LiveStreakConfigError>;
+  readonly clearCrop: Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, LiveStreakError>;
   readonly setCaptureFps: (
     payload: BrowserCaptureSetCaptureFpsPayload
-  ) => Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, FlowStreamConfigError>;
+  ) => Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, LiveStreakConfigError>;
 }
 
 export const makeBrowserCaptureControls = (options: {
@@ -74,10 +74,10 @@ export const makeBrowserCaptureControls = (options: {
   readonly validateCrop: (
     crop: BrowserCaptureCrop | undefined,
     viewport: BrowserCaptureViewport
-  ) => Effect.Effect<BrowserCaptureCrop | undefined, FlowStreamConfigError>;
+  ) => Effect.Effect<BrowserCaptureCrop | undefined, LiveStreakConfigError>;
   readonly validateCaptureFps: (
     captureFps: unknown
-  ) => Effect.Effect<number, FlowStreamConfigError>;
+  ) => Effect.Effect<number, LiveStreakConfigError>;
 }): BrowserCaptureControls => {
   const previewControls = makeBrowserPreviewControls(options);
 
@@ -122,10 +122,10 @@ const applyManualCrop = (
     readonly validateCrop: (
       crop: BrowserCaptureCrop | undefined,
       viewport: BrowserCaptureViewport
-    ) => Effect.Effect<BrowserCaptureCrop | undefined, FlowStreamConfigError>;
+    ) => Effect.Effect<BrowserCaptureCrop | undefined, LiveStreakConfigError>;
   },
   payload: BrowserCaptureSetCropPayload
-): Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, FlowStreamConfigError> =>
+): Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, LiveStreakConfigError> =>
   Effect.gen(function* () {
     const parsed = cropFromPayload(payload);
     if (parsed.previewRevision !== undefined) {
@@ -148,7 +148,7 @@ const applyManualCrop = (
 
 const clearCropSelection = (options: {
   readonly configRef: Ref.Ref<BrowserCaptureRuntimeConfigSnapshot>;
-}): Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, FlowStreamError> =>
+}): Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, LiveStreakError> =>
   Ref.updateAndGet(options.configRef, (current) => ({
     ...current,
     crop: undefined,
@@ -162,10 +162,10 @@ const applyCaptureFps = (
     readonly configRef: Ref.Ref<BrowserCaptureRuntimeConfigSnapshot>;
     readonly validateCaptureFps: (
       captureFps: unknown
-    ) => Effect.Effect<number, FlowStreamConfigError>;
+    ) => Effect.Effect<number, LiveStreakConfigError>;
   },
   payload: BrowserCaptureSetCaptureFpsPayload
-): Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, FlowStreamConfigError> =>
+): Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, LiveStreakConfigError> =>
   Effect.gen(function* () {
     const captureFps = yield* options.validateCaptureFps(captureFpsFromPayload(payload));
     const next = yield* Ref.updateAndGet(options.configRef, (current) => ({

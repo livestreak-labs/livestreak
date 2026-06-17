@@ -1,7 +1,7 @@
 import type { DescriptorValueSchema } from "#pipeline/shared.js";
 import type { ObserveRegistry } from "#pipeline/registry.js";
 import { builtInObserveRegistry } from "#builtins.js";
-import { pausePresentationValues } from "#pipeline/capture/pause.js";
+import { pausePresentationValues } from "#pipeline/capture/index.js";
 
 export type JsonSchema = DescriptorValueSchema;
 

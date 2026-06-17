@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import type { FlowStreamError } from "@flowstream-re2/core";
-import type { WorkerControlView } from "#run/control/board/worker-view.js";
-import type { RawFrame } from "#pipeline/capture/types.js";
-import type { MarkerSinkDeliveryItem, VideoSinkDeliveryItem } from "#pipeline/publish/types.js";
+import type { LiveStreakError } from "@livestreak/core";
+import type { WorkerControlView } from "#run/control/board/index.js";
+import type { RawFrame } from "#pipeline/capture/index.js";
+import type { MarkerSinkDeliveryItem, VideoSinkDeliveryItem } from "#pipeline/publish/index.js";
 import {
   appendEosMarker,
   appendTrackItem,
@@ -24,7 +24,7 @@ export interface PumpResult {
 export const pumpCapture = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<PumpResult, FlowStreamError> => {
+): Effect.Effect<PumpResult, LiveStreakError> => {
   if (shouldPumpCapture(state, control) === false) {
     return Effect.succeed({ didWork: false });
   }
@@ -66,7 +66,7 @@ export const pumpCapture = (
 export const pumpProcess = (
   _state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<PumpResult, FlowStreamError> => {
+): Effect.Effect<PumpResult, LiveStreakError> => {
   if (control.process === null) {
     return Effect.succeed({ didWork: false });
   }
@@ -77,7 +77,7 @@ export const pumpProcess = (
 export const pumpSinks = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<PumpResult, FlowStreamError> => {
+): Effect.Effect<PumpResult, LiveStreakError> => {
   if (shouldPumpSinks(state.lifecycle) === false) {
     return Effect.succeed({ didWork: false });
   }
@@ -152,7 +152,7 @@ export const pumpSinks = (
 export const finalizeSinks = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<PumpResult, FlowStreamError> => {
+): Effect.Effect<PumpResult, LiveStreakError> => {
   if (state.lifecycle !== "draining") {
     return Effect.succeed({ didWork: false });
   }

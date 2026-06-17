@@ -1,6 +1,6 @@
-import type { Board } from "#run/control/board/model.js";
-import type { CatalogFunction, ControlCatalog } from "#run/control/catalog.js";
-import type { ControlPanel } from "#run/control/bus/types.js";
+import type { Board } from "#run/control/board/index.js";
+import type { CatalogFunction, ControlCatalog } from "#run/control/index.js";
+import type { ControlPanel } from "#run/control/bus/index.js";
 import type { ControlCellView, ControlFunctionView, ControlsView } from "./types.js";
 
 export type { ControlCellView, ControlFunctionView, ControlsView } from "./types.js";

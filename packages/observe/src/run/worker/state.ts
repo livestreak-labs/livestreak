@@ -1,7 +1,7 @@
 import { Effect } from "effect";
-import type { FlowStreamError } from "@flowstream-re2/core";
-import type { SinkAttachment, SinkFinalizeResult } from "#pipeline/publish/types.js";
-import type { CaptureDriverDescriptor, CaptureStageHealth } from "#pipeline/capture/types.js";
+import type { LiveStreakError } from "@livestreak/core";
+import type { SinkAttachment, SinkFinalizeResult } from "#pipeline/publish/index.js";
+import type { CaptureDriverDescriptor, CaptureStageHealth } from "#pipeline/capture/index.js";
 import type { CaptureFramePull, CaptureLivePauseStageState } from "./capture-pull.js";
 import { appendEosMarker as appendEosTimelineMarker } from "./timeline.js";
 
@@ -64,7 +64,7 @@ export interface PublishManifest {
 export interface CaptureStageState {
   readonly pull: CaptureFramePull;
   readonly descriptor: CaptureDriverDescriptor;
-  readonly readHealth: Effect.Effect<CaptureStageHealth, FlowStreamError>;
+  readonly readHealth: Effect.Effect<CaptureStageHealth, LiveStreakError>;
   health?: CaptureStageHealth;
   exhausted: boolean;
   eosAppended: boolean;
@@ -266,7 +266,7 @@ export const ensureCaptureEndForStop = (state: WorkerState): void => {
 
 export const refreshCaptureStageHealth = (
   state: WorkerState
-): Effect.Effect<void, FlowStreamError> => {
+): Effect.Effect<void, LiveStreakError> => {
   const capture = state.capture;
   if (capture === undefined) {
     return Effect.void;
@@ -294,7 +294,7 @@ export type { TrackItem as WorkerTrackItem } from "./timeline.js";
 
 // --- helpers ---
 
-const healthErrorMessage = (error: FlowStreamError): string => {
+const healthErrorMessage = (error: LiveStreakError): string => {
   if ("message" in error) {
     return error.message;
   }

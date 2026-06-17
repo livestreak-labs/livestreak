@@ -1,13 +1,13 @@
 import { Effect } from "effect";
-import type { FlowStreamError } from "@flowstream-re2/core";
-import type { WorkerControlView } from "#run/control/board/worker-view.js";
+import type { LiveStreakError } from "@livestreak/core";
+import type { WorkerControlView } from "#run/control/board/index.js";
 import { failWorker, type WorkerState } from "./state.js";
 import type { CaptureLivePauseStageState } from "./capture-pull.js";
 
 export const reconcileLivePause = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<void, FlowStreamError> => {
+): Effect.Effect<void, LiveStreakError> => {
   if (control.run.stopRequested) {
     return Effect.void;
   }
@@ -34,7 +34,7 @@ export const reconcileLivePause = (
 export const reconcileLiveResume = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<void, FlowStreamError> => {
+): Effect.Effect<void, LiveStreakError> => {
   if (control.run.stopRequested) {
     return Effect.void;
   }
@@ -51,7 +51,7 @@ const applyLivePause = (
   livePause: CaptureLivePauseStageState,
   boardRevision: number,
   state: WorkerState
-): Effect.Effect<void, FlowStreamError> =>
+): Effect.Effect<void, LiveStreakError> =>
   livePause.controls.pause().pipe(
     Effect.tap(() =>
       Effect.sync(() => {
@@ -70,7 +70,7 @@ const applyLiveResume = (
   livePause: CaptureLivePauseStageState,
   boardRevision: number,
   state: WorkerState
-): Effect.Effect<void, FlowStreamError> =>
+): Effect.Effect<void, LiveStreakError> =>
   livePause.controls.resume().pipe(
     Effect.tap(() =>
       Effect.sync(() => {
@@ -86,7 +86,7 @@ const applyLiveResume = (
   );
 
 const livePauseErrorMessage = (
-  error: FlowStreamError,
+  error: LiveStreakError,
   action: "pause" | "resume"
 ): string => {
   if ("message" in error && typeof error.message === "string") {

@@ -1,5 +1,5 @@
-import type { CaptureDriverDescriptor, CaptureStageHealth } from "#pipeline/capture/types.js";
-import type { SinkFinalizeResult } from "#pipeline/publish/types.js";
+import type { CaptureDriverDescriptor, CaptureStageHealth } from "#pipeline/capture/index.js";
+import type { SinkFinalizeResult } from "#pipeline/publish/index.js";
 import type { WorkerState } from "./state.js";
 
 export interface WorkerSnapshotSink {

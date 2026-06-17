@@ -1,5 +1,5 @@
 import { Effect, Ref, Scope, Stream } from "effect";
-import { type FlowStreamError } from "@flowstream-re2/core";
+import { type LiveStreakError } from "@livestreak/core";
 import type {
   CaptureStageHealth,
   CaptureVideoPayload,
@@ -175,7 +175,7 @@ const browserCaptureFrameStream = (options: {
   readonly sourceId: string;
   readonly livePauseRuntime: BrowserLivePauseRuntime;
   readonly clock: BrowserCaptureClock;
-}): Stream.Stream<RawFrame, FlowStreamError> => {
+}): Stream.Stream<RawFrame, LiveStreakError> => {
   const timing = {
     nextDueMs: 0,
     initialized: false
@@ -276,7 +276,7 @@ const captureHealthStatus = (
   return "stopped";
 };
 
-const errorMessage = (error: FlowStreamError): string => {
+const errorMessage = (error: LiveStreakError): string => {
   if ("message" in error) {
     return error.message;
   }

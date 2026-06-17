@@ -1,6 +1,6 @@
 import type { Board, BoardRunStatus } from "#run/control/board/model.js";
-import type { PausePresentation } from "#pipeline/capture/pause.js";
-import { isPausePresentation } from "#pipeline/capture/pause.js";
+import type { PausePresentation } from "#pipeline/capture/index.js";
+import { isPausePresentation } from "#pipeline/capture/index.js";
 import { defaultControlPause } from "./settings.js";
 
 export type ControlRunStatus = BoardRunStatus;

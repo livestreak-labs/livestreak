@@ -1,6 +1,6 @@
 import { Effect } from "effect";
-import type { FlowStreamError } from "@flowstream-re2/core";
-import type { WorkerControlView } from "#run/control/board/worker-view.js";
+import type { LiveStreakError } from "@livestreak/core";
+import type { WorkerControlView } from "#run/control/board/index.js";
 import {
   advanceStoppingToDraining,
   beginPauseCycleIfNeeded,
@@ -32,7 +32,7 @@ export interface SupervisorTurnResult {
 export const supervisorTurn = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<SupervisorTurnResult, FlowStreamError> => {
+): Effect.Effect<SupervisorTurnResult, LiveStreakError> => {
   return Effect.gen(function* () {
     state.lastAppliedControlRevision = control.revision;
 
@@ -95,7 +95,7 @@ export const supervisorTurn = (
 const turnRunning = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<SupervisorTurnResult, FlowStreamError> =>
+): Effect.Effect<SupervisorTurnResult, LiveStreakError> =>
   Effect.gen(function* () {
     if (shouldPumpCapture(state, control) === false) {
       return yield* completeSupervisorTurn(state, {
@@ -148,7 +148,7 @@ const turnRunning = (
 const turnPausing = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<SupervisorTurnResult, FlowStreamError> =>
+): Effect.Effect<SupervisorTurnResult, LiveStreakError> =>
   Effect.gen(function* () {
     const didWork = beginPauseCycleIfNeeded(state, control);
 
@@ -182,7 +182,7 @@ const turnPausing = (
 const turnPaused = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<SupervisorTurnResult, FlowStreamError> =>
+): Effect.Effect<SupervisorTurnResult, LiveStreakError> =>
   Effect.gen(function* () {
     if (control.pause.requested) {
       yield* reconcilePauseLiveControls(state, control);
@@ -198,7 +198,7 @@ const turnPaused = (
 const turnResuming = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<SupervisorTurnResult, FlowStreamError> =>
+): Effect.Effect<SupervisorTurnResult, LiveStreakError> =>
   Effect.gen(function* () {
     const didWork = yield* completeResumeIfNeeded(state, control);
     if (workerTurnFailed(state)) {
@@ -219,7 +219,7 @@ const turnResuming = (
 const turnStopping = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<SupervisorTurnResult, FlowStreamError> =>
+): Effect.Effect<SupervisorTurnResult, LiveStreakError> =>
   Effect.gen(function* () {
     advanceStoppingToDraining(state);
 
@@ -242,7 +242,7 @@ const turnStopping = (
 const turnDraining = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<SupervisorTurnResult, FlowStreamError> =>
+): Effect.Effect<SupervisorTurnResult, LiveStreakError> =>
   Effect.gen(function* () {
     const sinks = yield* pumpSinks(state, control);
     if (workerTurnFailed(state)) {
@@ -283,7 +283,7 @@ const turnDraining = (
 const completeSupervisorTurn = (
   state: WorkerState,
   result: SupervisorTurnResult
-): Effect.Effect<SupervisorTurnResult, FlowStreamError> => {
+): Effect.Effect<SupervisorTurnResult, LiveStreakError> => {
   return Effect.gen(function* () {
     yield* refreshCaptureStageHealth(state);
 

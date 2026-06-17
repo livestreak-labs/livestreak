@@ -1,4 +1,4 @@
-import type { FlowStreamConfigError } from "@flowstream-re2/core";
+import type { LiveStreakConfigError } from "@livestreak/core";
 import { Effect } from "effect";
 import { createInitialBoard, type Board } from "./control/board/model.js";
 import { createPassthroughVideoManifest, type PublishManifest } from "./worker/state.js";
@@ -32,7 +32,7 @@ export interface ObserveRun {
 
 export const makeObserveRun = (
   config: unknown
-): Effect.Effect<ObserveRun, FlowStreamConfigError> =>
+): Effect.Effect<ObserveRun, LiveStreakConfigError> =>
   Effect.map(validateObserveRunConfig(config), createObserveRunFromConfig);
 
 const createObserveRunFromConfig = (validated: ObserveRunConfig): ObserveRun => ({

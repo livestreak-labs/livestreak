@@ -1,5 +1,5 @@
-import type { Board } from "#run/control/board/model.js";
-import { incrementBoardRevision } from "#run/control/board/model.js";
+import type { Board } from "#run/control/board/index.js";
+import { incrementBoardRevision } from "#run/control/board/index.js";
 import type { BoardCell, ControlCellDefinition } from "./types.js";
 
 export interface MergeBoardCellOnSurfaceMountResult {

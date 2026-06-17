@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { FlowStreamConfigError, type FlowStreamError } from "@flowstream-re2/core";
+import { LiveStreakConfigError, type LiveStreakError } from "@livestreak/core";
 import { probeMedia, validateVideoDimensions, type FfmpegBinaries } from "#adapters/ffmpeg/index.js";
 import type {
   CaptureDriver,
@@ -49,8 +49,8 @@ const flag = (
   ...extras
 });
 
-const configError = (message: string, details?: string): FlowStreamConfigError =>
-  new FlowStreamConfigError({
+const configError = (message: string, details?: string): LiveStreakConfigError =>
+  new LiveStreakConfigError({
     message,
     metadata: details === undefined ? undefined : { details }
   });
@@ -72,7 +72,7 @@ export const fileCaptureDescriptor: CaptureDriverDescriptor = {
 
 export const validateFileCaptureConfig = (
   config: FileCaptureConfig
-): Effect.Effect<FileCaptureConfig, FlowStreamError> =>
+): Effect.Effect<FileCaptureConfig, LiveStreakError> =>
   Effect.gen(function* () {
     if (typeof config.path !== "string") {
       return yield* Effect.fail(configError("File capture path is required"));
@@ -120,7 +120,7 @@ export const createFileCaptureDriver = (
       };
 
       const healthMessage = `file capture reading ${config.path}`;
-      const health: Effect.Effect<CaptureStageHealth, FlowStreamError> = Effect.sync(() => ({
+      const health: Effect.Effect<CaptureStageHealth, LiveStreakError> = Effect.sync(() => ({
         stage: "capture",
         descriptorId: fileCaptureDescriptor.id,
         status: captureHealthStatus(stats.status),

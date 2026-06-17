@@ -1,5 +1,5 @@
 import { Effect, Stream } from "effect";
-import { FlowStreamRuntimeError, type FlowStreamError } from "@flowstream-re2/core";
+import { LiveStreakRuntimeError, type LiveStreakError } from "@livestreak/core";
 import {
   concatBytes,
   copyBytes,
@@ -51,12 +51,12 @@ export const rawVideoFrameStream = (options: {
   readonly sourceId: string;
   readonly binaries?: FfmpegBinaries;
   readonly stats: FileDecodeStats;
-}): Stream.Stream<RawFrame, FlowStreamError> => {
+}): Stream.Stream<RawFrame, LiveStreakError> => {
   const frameSize = options.probe.width * options.probe.height * 3;
   const effectiveFps = options.probe.fps;
   const ffmpeg = options.binaries?.ffmpegPath ?? "ffmpeg";
 
-  return Stream.asyncPush<RawFrame, FlowStreamError>(
+  return Stream.asyncPush<RawFrame, LiveStreakError>(
     (emit) =>
       Effect.acquireRelease(
         Effect.flatMap(spawnChild(ffmpeg, makeFfmpegRawVideoDecodeArguments(options.config.path)), (child) =>
@@ -75,7 +75,7 @@ export const rawVideoFrameStream = (options: {
 
 type StreamEmit = {
   readonly single: (frame: RawFrame) => boolean;
-  readonly fail: (error: FlowStreamError) => void;
+  readonly fail: (error: LiveStreakError) => void;
   readonly end: () => void;
 };
 
@@ -99,7 +99,7 @@ const startRawVideoDecodeChild = (
   options.stats.startedAtMs = Date.now();
   options.stats.status = "running";
 
-  const fail = (error: FlowStreamError) => {
+  const fail = (error: LiveStreakError) => {
     if (ended) {
       return;
     }
@@ -112,7 +112,7 @@ const startRawVideoDecodeChild = (
   child.on("error", (cause) => {
     if (cause.code === "ENOENT") {
       fail(
-        new FlowStreamRuntimeError({
+        new LiveStreakRuntimeError({
           message: `${ffmpeg} is required for file source decoding`,
           metadata: {
             details: `Install ${ffmpeg} or configure a compatible binary on PATH.`,
@@ -122,7 +122,7 @@ const startRawVideoDecodeChild = (
       );
       return;
     }
-    fail(new FlowStreamRuntimeError({ message: "ffmpeg failed to start", metadata: { details: cause.message } }));
+    fail(new LiveStreakRuntimeError({ message: "ffmpeg failed to start", metadata: { details: cause.message } }));
   });
 
   child.stderr.on("data", (chunk) => stderr.push(chunk));
@@ -173,7 +173,7 @@ const startRawVideoDecodeChild = (
     }
 
     emit.fail(
-      new FlowStreamRuntimeError({
+      new LiveStreakRuntimeError({
         message: "ffmpeg decode failed",
         metadata: {
           details:
@@ -222,7 +222,7 @@ const makeRawFrame = (
   }
 });
 
-const failMessageFromError = (error: FlowStreamError): string => {
+const failMessageFromError = (error: LiveStreakError): string => {
   if ("message" in error) {
     return error.message;
   }

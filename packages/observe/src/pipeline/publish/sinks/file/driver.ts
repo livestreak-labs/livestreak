@@ -1,6 +1,6 @@
 import { Effect } from "effect";
-import { FlowStreamConfigError, type FlowStreamError } from "@flowstream-re2/core";
-import type { CaptureVideoPayload } from "#pipeline/capture/types.js";
+import { LiveStreakConfigError, type LiveStreakError } from "@livestreak/core";
+import type { CaptureVideoPayload } from "#pipeline/capture/index.js";
 import type { FfmpegBinaries } from "#adapters/ffmpeg/index.js";
 import { createMp4VideoEncoder, type Mp4VideoEncoder, type Mp4EncoderInputFormat } from "#pipeline/publish/encoder/mp4.js";
 import type {
@@ -12,7 +12,7 @@ import type {
   SinkDriverDescriptor,
   SinkFinalizeResult,
   SinkStageHealth
-} from "#pipeline/publish/types.js";
+} from "#pipeline/publish/index.js";
 import type { DescribeControlContext, ControlCellDefinition } from "#run/control/bus/types.js";
 
 export interface FileSinkConfig {
@@ -52,8 +52,8 @@ const flag = (
   ...extras
 });
 
-const configError = (message: string, details?: string): FlowStreamConfigError =>
-  new FlowStreamConfigError({
+const configError = (message: string, details?: string): LiveStreakConfigError =>
+  new LiveStreakConfigError({
     message,
     metadata: details === undefined ? undefined : { details }
   });
@@ -76,7 +76,7 @@ export const fileSinkDescriptor: SinkDriverDescriptor = {
 
 export const validateFileSinkConfig = (
   config: FileSinkConfig
-): Effect.Effect<FileSinkConfig, FlowStreamError> =>
+): Effect.Effect<FileSinkConfig, LiveStreakError> =>
   Effect.gen(function* () {
     if (typeof config.path !== "string") {
       return yield* Effect.fail(configError("File sink path is required"));
@@ -128,7 +128,7 @@ export const createFileSinkDriver = (
         }).pipe(Effect.catchAll(() => Effect.void))
       );
 
-      const deliver = (item: SinkDeliveryItem): Effect.Effect<void, FlowStreamError> =>
+      const deliver = (item: SinkDeliveryItem): Effect.Effect<void, LiveStreakError> =>
         Effect.gen(function* () {
           if (item.kind === "marker") {
             return;
@@ -151,7 +151,7 @@ export const createFileSinkDriver = (
           stats.deliveredItems += 1;
         });
 
-      const finalize: Effect.Effect<SinkFinalizeResult, FlowStreamError> = Effect.gen(function* () {
+      const finalize: Effect.Effect<SinkFinalizeResult, LiveStreakError> = Effect.gen(function* () {
         if (finalized) {
           return {
             deliveredItems: stats.deliveredItems,
@@ -179,7 +179,7 @@ export const createFileSinkDriver = (
         };
       });
 
-      const health: Effect.Effect<SinkStageHealth, FlowStreamError> = Effect.sync(() => ({
+      const health: Effect.Effect<SinkStageHealth, LiveStreakError> = Effect.sync(() => ({
         stage: "publish",
         descriptorId: fileSinkDescriptor.id,
         status: stats.status,
@@ -246,7 +246,7 @@ const readVideoPayload = (
   payload: unknown
 ): Effect.Effect<
   CaptureVideoPayload & { readonly expectedFps: number; readonly inputFormat: Mp4EncoderInputFormat },
-  FlowStreamError
+  LiveStreakError
 > =>
   Effect.gen(function* () {
     if (payload === null) {
@@ -283,7 +283,7 @@ const readVideoPayload = (
 
 const resolveMp4InputFormat = (
   byteFormat: CaptureVideoPayload["byteFormat"]
-): Effect.Effect<Mp4EncoderInputFormat, FlowStreamConfigError> => {
+): Effect.Effect<Mp4EncoderInputFormat, LiveStreakConfigError> => {
   if (byteFormat === "rgb") {
     return Effect.succeed("rgb");
   }

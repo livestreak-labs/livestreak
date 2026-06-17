@@ -1,4 +1,4 @@
-import { FlowStreamConfigError } from "@flowstream-re2/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 import type {
   ObserveRunConfig,
   ObserveRunProcessConfig,
@@ -8,7 +8,7 @@ import type {
 
 export type ObserveRunConfigValidationResult =
   | { readonly ok: true; readonly value: ObserveRunConfig }
-  | { readonly ok: false; readonly error: FlowStreamConfigError };
+  | { readonly ok: false; readonly error: LiveStreakConfigError };
 
 export const parseObserveRunConfig = (input: unknown): ObserveRunConfigValidationResult => {
   const root = requirePlainObject(input, "observe run config");
@@ -50,12 +50,12 @@ export const parseObserveRunConfig = (input: unknown): ObserveRunConfigValidatio
 // --- helpers ---
 
 type ValidationSuccess<T> = { readonly ok: true; readonly value: T };
-type ValidationFailure = { readonly ok: false; readonly error: FlowStreamConfigError };
+type ValidationFailure = { readonly ok: false; readonly error: LiveStreakConfigError };
 type ValidationResult<T> = ValidationSuccess<T> | ValidationFailure;
 
 const configError = (message: string): ValidationFailure => ({
   ok: false,
-  error: new FlowStreamConfigError({ message })
+  error: new LiveStreakConfigError({ message })
 });
 
 const requirePlainObject = (

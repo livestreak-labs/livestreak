@@ -1,4 +1,4 @@
-import { FlowStreamConfigError } from "@flowstream-re2/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 import { createObserveRegistry } from "./pipeline/registry.js";
 import {
   createFileCaptureDriver,
@@ -53,13 +53,13 @@ export const getBuiltInSinkDriver = (
 // --- helpers ---
 
 const missingCaptureDriver = (id: string): never => {
-  throw new FlowStreamConfigError({
+  throw new LiveStreakConfigError({
     message: `Unknown built-in capture driver: ${id}`
   });
 };
 
 const missingSinkDriver = (id: string): never => {
-  throw new FlowStreamConfigError({
+  throw new LiveStreakConfigError({
     message: `Unknown built-in sink driver: ${id}`
   });
 };

@@ -1,9 +1,9 @@
 import { Effect, Scope } from "effect";
-import type { FlowStreamError } from "@flowstream-re2/core";
-import type { FrameSource } from "#pipeline/capture/types.js";
-import { applyWorkerSnapshotToBoard } from "#run/control/board/worker-snapshot.js";
-import { projectWorkerControlView } from "#run/control/board/worker-view.js";
-import type { ControlBus } from "#run/control/bus/types.js";
+import type { LiveStreakError } from "@livestreak/core";
+import type { FrameSource } from "#pipeline/capture/index.js";
+import { applyWorkerSnapshotToBoard } from "#run/control/board/index.js";
+import { projectWorkerControlView } from "#run/control/board/index.js";
+import type { ControlBus } from "#run/control/bus/index.js";
 import { createCaptureStageState, createEmptyWorkerState, failWorker, type PublishManifest, type SinkStageState } from "./state.js";
 import { validateWorkerPrepare } from "./prepare.js";
 import { supervisorTurn } from "./supervisor.js";
@@ -37,13 +37,13 @@ export interface RunScopedWorkerUntilStoppedInput {
   readonly sinks: Record<string, SinkStageState>;
   readonly bus: ControlBus;
   readonly boardWake: WorkerBoardWake;
-  readonly prepareCapture: Effect.Effect<FrameSource, FlowStreamError, Scope.Scope>;
+  readonly prepareCapture: Effect.Effect<FrameSource, LiveStreakError, Scope.Scope>;
   readonly maxTurns?: number;
 }
 
 export const runWorkerUntilStopped = (
   input: RunWorkerUntilStoppedInput
-): Effect.Effect<WorkerRunResult, FlowStreamError> => {
+): Effect.Effect<WorkerRunResult, LiveStreakError> => {
   return Effect.gen(function* () {
     const loop = yield* runWorkerLoop({
       state: input.state,
@@ -57,7 +57,7 @@ export const runWorkerUntilStopped = (
 
 export const runWorkerUntilStoppedWithBoard = (
   input: RunWorkerUntilStoppedInput
-): Effect.Effect<WorkerRunWithBoardResult, FlowStreamError> => {
+): Effect.Effect<WorkerRunWithBoardResult, LiveStreakError> => {
   return Effect.gen(function* () {
     const loop = yield* runWorkerLoop({
       state: input.state,
@@ -77,7 +77,7 @@ export const runWorkerUntilStoppedWithBoard = (
 
 export const runScopedWorkerUntilStoppedWithBoard = (
   input: RunScopedWorkerUntilStoppedInput
-): Effect.Effect<WorkerRunWithBoardResult, FlowStreamError, Scope.Scope> => {
+): Effect.Effect<WorkerRunWithBoardResult, LiveStreakError, Scope.Scope> => {
   return Effect.gen(function* () {
     const source = yield* input.prepareCapture;
 
@@ -128,7 +128,7 @@ interface WorkerLoopOutcome {
 
 const runWorkerLoop = (
   input: WorkerLoopInput
-): Effect.Effect<WorkerLoopOutcome, FlowStreamError> => {
+): Effect.Effect<WorkerLoopOutcome, LiveStreakError> => {
   return Effect.gen(function* () {
     const initialBoard = yield* input.bus.readBoard();
     yield* validateWorkerPrepare(input.state, projectWorkerControlView(initialBoard));

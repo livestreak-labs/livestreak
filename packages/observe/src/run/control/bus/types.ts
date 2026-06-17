@@ -43,7 +43,7 @@ export interface ControlCellDefinition {
 
 export interface ControlFunctionContext {
   readonly boardRevision: number;
-  readonly board: import("#run/control/board/model.js").Board;
+  readonly board: import("#run/control/board/index.js").Board;
 }
 
 export interface ControlFunctionArtifactDraft {
@@ -66,7 +66,7 @@ export interface ControlFunctionEntry {
   readonly call: (
     envelope: ControlCallEnvelope,
     context: ControlFunctionContext
-  ) => import("effect").Effect.Effect<ControlFunctionResult, import("@flowstream-re2/core").FlowStreamError>;
+  ) => import("effect").Effect.Effect<ControlFunctionResult, import("@livestreak/core").LiveStreakError>;
 }
 
 export interface ControlSurface {
@@ -75,7 +75,7 @@ export interface ControlSurface {
 }
 
 export interface ControlPanel {
-  readonly board: import("#run/control/board/model.js").Board;
+  readonly board: import("#run/control/board/index.js").Board;
   readonly catalog?: import("#run/control/catalog.js").ControlCatalog;
 }
 
@@ -90,47 +90,47 @@ export interface ArtifactSubscription {
 export interface ControlBus {
   readonly readPanel: (options?: {
     readonly includeCatalog?: boolean;
-  }) => import("effect").Effect.Effect<ControlPanel, import("@flowstream-re2/core").FlowStreamError>;
+  }) => import("effect").Effect.Effect<ControlPanel, import("@livestreak/core").LiveStreakError>;
   readonly readBoard: () => import("effect").Effect.Effect<
-    import("#run/control/board/model.js").Board,
-    import("@flowstream-re2/core").FlowStreamError
+    import("#run/control/board/index.js").Board,
+    import("@livestreak/core").LiveStreakError
   >;
   readonly readCatalog: () => import("effect").Effect.Effect<
     import("#run/control/catalog.js").ControlCatalog,
-    import("@flowstream-re2/core").FlowStreamError
+    import("@livestreak/core").LiveStreakError
   >;
   readonly callFunction: (
     envelope: ControlCallEnvelope
-  ) => import("effect").Effect.Effect<ControlCallResult, import("@flowstream-re2/core").FlowStreamError>;
+  ) => import("effect").Effect.Effect<ControlCallResult, import("@livestreak/core").LiveStreakError>;
   readonly getArtifact: (
     id: string
   ) => import("effect").Effect.Effect<
     ControlArtifact | undefined,
-    import("@flowstream-re2/core").FlowStreamError
+    import("@livestreak/core").LiveStreakError
   >;
   readonly subscribeBoard: (
-    listener: (board: import("#run/control/board/model.js").Board) => void
-  ) => import("effect").Effect.Effect<BoardSubscription, import("@flowstream-re2/core").FlowStreamError>;
+    listener: (board: import("#run/control/board/index.js").Board) => void
+  ) => import("effect").Effect.Effect<BoardSubscription, import("@livestreak/core").LiveStreakError>;
   readonly subscribeArtifacts: (
     listener: (artifact: ControlArtifact) => void
   ) => import("effect").Effect.Effect<
     ArtifactSubscription,
-    import("@flowstream-re2/core").FlowStreamError
+    import("@livestreak/core").LiveStreakError
   >;
   readonly mountSurface: (
     surface: ControlSurface
-  ) => import("effect").Effect.Effect<void, import("@flowstream-re2/core").FlowStreamError>;
+  ) => import("effect").Effect.Effect<void, import("@livestreak/core").LiveStreakError>;
   readonly applyBoardPatch: (
     patch: BoardPatch
   ) => import("effect").Effect.Effect<
-    { readonly board: import("#run/control/board/model.js").Board; readonly changed: boolean },
-    import("@flowstream-re2/core").FlowStreamError
+    { readonly board: import("#run/control/board/index.js").Board; readonly changed: boolean },
+    import("@livestreak/core").LiveStreakError
   >;
   readonly commitBoard: (
-    nextBoard: import("#run/control/board/model.js").Board
+    nextBoard: import("#run/control/board/index.js").Board
   ) => import("effect").Effect.Effect<
-    import("#run/control/board/model.js").Board,
-    import("@flowstream-re2/core").FlowStreamError
+    import("#run/control/board/index.js").Board,
+    import("@livestreak/core").LiveStreakError
   >;
   readonly registerWakeWorker: (
     wakeWorker: () => import("effect").Effect.Effect<void>
@@ -139,7 +139,7 @@ export interface ControlBus {
 
 export interface CreateControlBusInput {
   readonly runId: string;
-  readonly board: import("#run/control/board/model.js").Board;
+  readonly board: import("#run/control/board/index.js").Board;
   readonly catalog: import("#run/control/catalog.js").ControlCatalog;
   readonly surfaces?: readonly ControlSurface[];
   readonly wakeWorker?: () => import("effect").Effect.Effect<void>;

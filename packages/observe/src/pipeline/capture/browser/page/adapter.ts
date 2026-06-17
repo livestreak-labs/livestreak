@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 import {
-  FlowStreamCapabilityError,
-  FlowStreamRuntimeError,
-  type FlowStreamError
-} from "@flowstream-re2/core";
+  LiveStreakCapabilityError,
+  LiveStreakRuntimeError,
+  type LiveStreakError
+} from "@livestreak/core";
 import type {
   BrowserCaptureAdapter,
   BrowserCaptureCrop,
@@ -28,7 +28,7 @@ export type ResolvedBrowserPageCaptureAdapterKind = Exclude<
 
 export type BrowserCaptureReadinessErrorCode = "missing-method" | "unsupported-page";
 
-export interface BrowserCaptureReadinessError extends FlowStreamCapabilityError {
+export interface BrowserCaptureReadinessError extends LiveStreakCapabilityError {
   readonly readinessCode: BrowserCaptureReadinessErrorCode;
   readonly adapterKind?: BrowserPageCaptureAdapterKind;
   readonly requiredMethod?: string;
@@ -38,7 +38,7 @@ export type BrowserCaptureBridgeErrorCode =
   | "browser-call-failed"
   | "unsupported-screenshot-result";
 
-export interface BrowserCaptureBridgeError extends FlowStreamRuntimeError {
+export interface BrowserCaptureBridgeError extends LiveStreakRuntimeError {
   readonly bridgeCode: BrowserCaptureBridgeErrorCode;
   readonly adapterKind: ResolvedBrowserPageCaptureAdapterKind;
   readonly method?: string;
@@ -59,7 +59,7 @@ export interface BrowserPageCaptureAdapterOptions {
 
 export type BrowserPageCaptureFactory = (
   options: BrowserCaptureOpenOptions
-) => Effect.Effect<unknown, FlowStreamError>;
+) => Effect.Effect<unknown, LiveStreakError>;
 
 type UnknownRecord = Record<PropertyKey, unknown>;
 
@@ -161,7 +161,7 @@ const readinessError = (options: {
   readonly requiredMethod?: string;
 }): BrowserCaptureReadinessError =>
   Object.assign(
-    new FlowStreamCapabilityError({
+    new LiveStreakCapabilityError({
       message: options.message,
       requiredScope:
         options.requiredMethod === undefined
@@ -186,7 +186,7 @@ const bridgeError = (options: {
   readonly cause?: unknown;
 }): BrowserCaptureBridgeError =>
   Object.assign(
-    new FlowStreamRuntimeError({
+    new LiveStreakRuntimeError({
       message: options.message,
       metadata: {
         cause: options.cause,
@@ -303,7 +303,7 @@ const setViewport = (
   page: unknown,
   kind: ResolvedBrowserPageCaptureAdapterKind,
   options: BrowserCaptureOpenOptions
-): Effect.Effect<void, FlowStreamError> => {
+): Effect.Effect<void, LiveStreakError> => {
   if (kind === "playwright") {
     return callBrowserMethod(methodReference(page, "setViewportSize")!, kind, [
       options.viewport
@@ -331,7 +331,7 @@ const navigate = (
   page: unknown,
   kind: ResolvedBrowserPageCaptureAdapterKind,
   options: BrowserCaptureOpenOptions
-): Effect.Effect<void, FlowStreamError> => {
+): Effect.Effect<void, LiveStreakError> => {
   if (kind === "cdp") {
     return callBrowserMethod(cdpSendReference(page)!, kind, [
       "Page.navigate",
@@ -405,7 +405,7 @@ const browserPageScreenshot = (
   page: unknown,
   kind: ResolvedBrowserPageCaptureAdapterKind,
   options: BrowserCaptureScreenshotOptions
-): Effect.Effect<BrowserCaptureScreenshot, FlowStreamError> =>
+): Effect.Effect<BrowserCaptureScreenshot, LiveStreakError> =>
   Effect.gen(function* () {
     if (kind === "cdp") {
       const clip = screenshotClip(options.crop);
@@ -456,7 +456,7 @@ const browserPageInspectTargets = (
   page: unknown,
   kind: ResolvedBrowserPageCaptureAdapterKind,
   viewport: BrowserCaptureOpenOptions["viewport"]
-): (() => Effect.Effect<readonly BrowserCaptureTarget[], FlowStreamError>) | undefined => {
+): (() => Effect.Effect<readonly BrowserCaptureTarget[], LiveStreakError>) | undefined => {
   if (kind === "cdp") {
     const send = cdpSendReference(page);
     if (send === undefined) {
@@ -499,7 +499,7 @@ const closeBrowserPage = (
   page: unknown,
   kind: ResolvedBrowserPageCaptureAdapterKind,
   closePage: boolean
-): Effect.Effect<void, FlowStreamError> => {
+): Effect.Effect<void, LiveStreakError> => {
   const close = methodReference(page, "close");
   if (!closePage || close === undefined) {
     return Effect.void;
@@ -523,7 +523,7 @@ const openBrowserCapturePage = (
   page: unknown,
   openOptions: BrowserCaptureOpenOptions,
   adapterOptions: BrowserPageCaptureAdapterOptions
-): Effect.Effect<BrowserCapturePage, FlowStreamError> =>
+): Effect.Effect<BrowserCapturePage, LiveStreakError> =>
   Effect.gen(function* () {
     const readiness = yield* validateBrowserCapturePageReadiness(page, adapterOptions);
     yield* setViewport(page, readiness.kind, openOptions);

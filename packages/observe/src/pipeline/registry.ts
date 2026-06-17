@@ -1,6 +1,6 @@
 import type { CaptureDriverDescriptor } from "./capture/types.js";
 import { Effect } from "effect";
-import { FlowStreamConfigError } from "@flowstream-re2/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 import {
   createCaptureRegistry,
   type CaptureRegistry,
@@ -191,12 +191,12 @@ export const assertRegistryCommandAdvertised = (
   kind: RegistryDescriptorKind,
   descriptorId: string,
   scope: RegistryCommandScope
-): Effect.Effect<void, FlowStreamConfigError> => {
+): Effect.Effect<void, LiveStreakConfigError> => {
   const descriptor = lookupRegistryDescriptor(registry, kind, descriptorId);
 
   if (descriptor === undefined) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: `Registry descriptor ${kind}/${descriptorId} is not registered`
       })
     );
@@ -205,7 +205,7 @@ export const assertRegistryCommandAdvertised = (
   return descriptorSupportsCommand(descriptor, scope)
     ? Effect.void
     : Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: `Registry descriptor ${descriptorId} does not advertise command scope ${scope}`,
           metadata: {
             cause: {

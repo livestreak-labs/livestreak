@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { FlowStreamRuntimeError, type FlowStreamError } from "@flowstream-re2/core";
+import { LiveStreakRuntimeError, type LiveStreakError } from "@livestreak/core";
 import type { BrowserCaptureTarget } from "#pipeline/capture/browser/control/preview.js";
 
 export type BrowserCaptureImageEncoding = "jpeg" | "png";
@@ -36,21 +36,21 @@ export interface BrowserCaptureScreenshot {
 export interface BrowserCapturePage {
   readonly screenshot: (
     options: BrowserCaptureScreenshotOptions
-  ) => Effect.Effect<BrowserCaptureScreenshot, FlowStreamError>;
-  readonly inspectTargets?: () => Effect.Effect<readonly BrowserCaptureTarget[], FlowStreamError>;
-  readonly close: Effect.Effect<void, FlowStreamError>;
+  ) => Effect.Effect<BrowserCaptureScreenshot, LiveStreakError>;
+  readonly inspectTargets?: () => Effect.Effect<readonly BrowserCaptureTarget[], LiveStreakError>;
+  readonly close: Effect.Effect<void, LiveStreakError>;
 }
 
 export interface BrowserCaptureAdapter {
   readonly openPage: (
     options: BrowserCaptureOpenOptions
-  ) => Effect.Effect<BrowserCapturePage, FlowStreamError>;
+  ) => Effect.Effect<BrowserCapturePage, LiveStreakError>;
 }
 
 export const missingBrowserCaptureAdapter: BrowserCaptureAdapter = {
   openPage: () =>
     Effect.fail(
-      new FlowStreamRuntimeError({
+      new LiveStreakRuntimeError({
         message: "Browser capture requires an injected browser capture adapter",
         metadata: {
           details:

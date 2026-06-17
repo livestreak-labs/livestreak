@@ -1,4 +1,4 @@
-import type { BoardCellStatus } from "#run/control/board/model.js";
+import type { BoardCellStatus } from "#run/control/board/index.js";
 import type { JsonSchema } from "#run/control/catalog.js";
 
 export interface ControlsView {

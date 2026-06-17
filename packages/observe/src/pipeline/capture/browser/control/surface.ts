@@ -1,5 +1,5 @@
 import { Effect, pipe } from "effect";
-import { FlowStreamRuntimeError, type FlowStreamError } from "@flowstream-re2/core";
+import { LiveStreakRuntimeError, type LiveStreakError } from "@livestreak/core";
 import type { ControlCallEnvelope } from "#run/control/bus/calls.js";
 import type {
   BoardPatch,
@@ -127,7 +127,7 @@ const previewFunction = (
       preview: BrowserPreviewTargetsArtifactPayload["preview"];
       targets: BrowserPreviewTargetsArtifactPayload["targets"];
     },
-    FlowStreamError
+    LiveStreakError
   >
 ): ControlFunctionEntry => ({
   name,
@@ -153,7 +153,7 @@ const previewFunction = (
 const mutatingFunction = (
   name: string,
   scope: string,
-  run: (envelope: ControlCallEnvelope) => Effect.Effect<BoardPatch, FlowStreamError>
+  run: (envelope: ControlCallEnvelope) => Effect.Effect<BoardPatch, LiveStreakError>
 ): ControlFunctionEntry => ({
   name,
   scope,
@@ -207,9 +207,9 @@ const boardPatchForSetCrop = (
 
 export const failUnsupportedBrowserFunction = (
   scope: string
-): Effect.Effect<never, FlowStreamRuntimeError> =>
+): Effect.Effect<never, LiveStreakRuntimeError> =>
   Effect.fail(
-    new FlowStreamRuntimeError({
+    new LiveStreakRuntimeError({
       message: `Unsupported browser capture function scope: ${scope}`
     })
   );

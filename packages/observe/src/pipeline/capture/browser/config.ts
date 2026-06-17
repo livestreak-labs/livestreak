@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { FlowStreamConfigError, type FlowStreamError } from "@flowstream-re2/core";
+import { LiveStreakConfigError, type LiveStreakError } from "@livestreak/core";
 import type {
   BrowserCaptureCrop,
   BrowserCaptureImageEncoding,
@@ -25,8 +25,8 @@ export const defaultBrowserCaptureViewport: BrowserCaptureViewport = {
   height: 720
 };
 
-const configError = (message: string, details?: string): FlowStreamConfigError =>
-  new FlowStreamConfigError({
+const configError = (message: string, details?: string): LiveStreakConfigError =>
+  new LiveStreakConfigError({
     message,
     metadata: details === undefined ? undefined : { details }
   });
@@ -39,7 +39,7 @@ const isNonNegativeInteger = (value: unknown): value is number =>
 
 export const validateViewport = (
   viewport: BrowserCaptureViewport | undefined
-): Effect.Effect<BrowserCaptureViewport, FlowStreamConfigError> => {
+): Effect.Effect<BrowserCaptureViewport, LiveStreakConfigError> => {
   if (viewport === undefined) {
     return Effect.succeed(defaultBrowserCaptureViewport);
   }
@@ -56,7 +56,7 @@ export const validateViewport = (
 export const validateCrop = (
   crop: BrowserCaptureCrop | undefined,
   viewport: BrowserCaptureViewport
-): Effect.Effect<BrowserCaptureCrop | undefined, FlowStreamConfigError> => {
+): Effect.Effect<BrowserCaptureCrop | undefined, LiveStreakConfigError> => {
   if (crop === undefined) {
     return Effect.succeed(crop);
   }
@@ -81,7 +81,7 @@ export const validateCrop = (
 
 export const validateEncoding = (
   encoding: BrowserCaptureImageEncoding | undefined
-): Effect.Effect<BrowserCaptureImageEncoding, FlowStreamConfigError> => {
+): Effect.Effect<BrowserCaptureImageEncoding, LiveStreakConfigError> => {
   if (encoding === undefined) {
     return Effect.succeed("jpeg");
   }
@@ -94,14 +94,14 @@ export const validateEncoding = (
 
 export const validateCaptureFps = (
   captureFps: unknown
-): Effect.Effect<number, FlowStreamConfigError> =>
+): Effect.Effect<number, LiveStreakConfigError> =>
   typeof captureFps === "number" && Number.isFinite(captureFps) && captureFps > 0
     ? Effect.succeed(captureFps)
     : Effect.fail(configError("Browser capture captureFps must be greater than zero"));
 
 const validateMaxFrames = (
   maxFrames: number | undefined
-): Effect.Effect<number | undefined, FlowStreamConfigError> => {
+): Effect.Effect<number | undefined, LiveStreakConfigError> => {
   if (maxFrames === undefined) {
     return Effect.succeed(maxFrames);
   }
@@ -115,7 +115,7 @@ const validateMaxFrames = (
 
 export const validateBrowserCaptureConfig = (
   config: BrowserCaptureConfig
-): Effect.Effect<BrowserCaptureConfig, FlowStreamError> =>
+): Effect.Effect<BrowserCaptureConfig, LiveStreakError> =>
   Effect.gen(function* () {
     if (typeof config.url !== "string" || config.url.trim().length === 0) {
       return yield* Effect.fail(configError("Browser capture url is required"));

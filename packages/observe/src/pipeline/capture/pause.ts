@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { FlowStreamConfigError } from "@flowstream-re2/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 
 export const pausePresentationValues = ["hold", "slate"] as const;
 
@@ -27,10 +27,10 @@ export const formatPauseAllowedValues = (values: readonly string[]): string => v
 export const assertPausePresentationValue = (
   value: unknown,
   field: string
-): Effect.Effect<PausePresentation, FlowStreamConfigError> => {
+): Effect.Effect<PausePresentation, LiveStreakConfigError> => {
   if (typeof value !== "string") {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: `${field} must be a string`
       })
     );
@@ -38,7 +38,7 @@ export const assertPausePresentationValue = (
 
   if (!isPausePresentation(value)) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: `${field} must be one of: ${formatPauseAllowedValues(pausePresentationValues)}`
       })
     );

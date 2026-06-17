@@ -1,4 +1,4 @@
-import type { PausePresentation } from "#pipeline/capture/pause.js";
+import type { PausePresentation } from "#pipeline/capture/index.js";
 
 export type TimelineMarkerKind =
   | "eos"

@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 import {
-  FlowStreamConfigError,
-  FlowStreamRuntimeError,
-  type FlowStreamError
-} from "@flowstream-re2/core";
+  LiveStreakConfigError,
+  LiveStreakRuntimeError,
+  type LiveStreakError
+} from "@livestreak/core";
 import { bytesToUtf8, concatBytes } from "./bytes.js";
 
 // --- exports ---
@@ -50,14 +50,14 @@ export interface NodeChildProcess {
 export const runChild = (
   binary: string,
   commandArguments: readonly string[]
-): Effect.Effect<ChildResult, FlowStreamError> =>
+): Effect.Effect<ChildResult, LiveStreakError> =>
   Effect.flatMap(
     Effect.tryPromise({
       try: childProcessModule,
       catch: (cause) => runtimeFailure("Could not load Node child_process", String(cause))
     }),
     ({ spawn }) =>
-      Effect.async<ChildResult, FlowStreamError>((resume) => {
+      Effect.async<ChildResult, LiveStreakError>((resume) => {
         const child = spawn(binary, commandArguments, {
           stdio: ["ignore", "pipe", "pipe"]
         });
@@ -65,7 +65,7 @@ export const runChild = (
         const stderr: Uint8Array[] = [];
         let settled = false;
 
-        const settle = (effect: Effect.Effect<ChildResult, FlowStreamError>) => {
+        const settle = (effect: Effect.Effect<ChildResult, LiveStreakError>) => {
           if (settled) {
             return;
           }
@@ -99,14 +99,14 @@ export const spawnChild = (
   binary: string,
   commandArguments: readonly string[],
   stdio: "pipe" | "ignore-stdout" = "pipe"
-): Effect.Effect<NodeChildProcess, FlowStreamError> =>
+): Effect.Effect<NodeChildProcess, LiveStreakError> =>
   Effect.flatMap(
     Effect.tryPromise({
       try: childProcessModule,
       catch: (cause) => runtimeFailure("Could not load Node child_process", String(cause))
     }),
     ({ spawn }) =>
-      Effect.async<NodeChildProcess, FlowStreamError>((resume) => {
+      Effect.async<NodeChildProcess, LiveStreakError>((resume) => {
         const child = spawn(
           binary,
           commandArguments,
@@ -161,11 +161,11 @@ export const writeStdinWithBackpressure = (
   stdin: NodeWritable,
   chunk: Uint8Array,
   label: string
-): Effect.Effect<void, FlowStreamError> =>
-  Effect.async<void, FlowStreamError>((resume) => {
+): Effect.Effect<void, LiveStreakError> =>
+  Effect.async<void, LiveStreakError>((resume) => {
     let settled = false;
 
-    const finish = (effect: Effect.Effect<void, FlowStreamError>) => {
+    const finish = (effect: Effect.Effect<void, LiveStreakError>) => {
       if (settled) {
         return;
       }
@@ -198,8 +198,8 @@ export const waitForProcessClose = (
   child: NodeChildProcess,
   stderrChunks: readonly Uint8Array[],
   label: string
-): Effect.Effect<void, FlowStreamError> =>
-  Effect.async<void, FlowStreamError>((resume) => {
+): Effect.Effect<void, LiveStreakError> =>
+  Effect.async<void, LiveStreakError>((resume) => {
     child.on("close", (code, signal) => {
       if (code === 0) {
         resume(Effect.void);
@@ -241,8 +241,8 @@ const importNode = (specifier: string): Promise<unknown> => import(/* @vite-igno
 const childProcessModule = async (): Promise<NodeChildProcessModule> =>
   importNode("node:child_process") as Promise<NodeChildProcessModule>;
 
-const missingDependency = (binary: string, cause: unknown): FlowStreamConfigError =>
-  new FlowStreamConfigError({
+const missingDependency = (binary: string, cause: unknown): LiveStreakConfigError =>
+  new LiveStreakConfigError({
     message: `${binary} is required for ffmpeg media operations`,
     metadata: {
       details: `Install ${binary} or configure a compatible binary on PATH.`,
@@ -250,8 +250,8 @@ const missingDependency = (binary: string, cause: unknown): FlowStreamConfigErro
     }
   });
 
-const runtimeFailure = (message: string, details?: string): FlowStreamRuntimeError =>
-  new FlowStreamRuntimeError({
+const runtimeFailure = (message: string, details?: string): LiveStreakRuntimeError =>
+  new LiveStreakRuntimeError({
     message,
     metadata: details === undefined ? undefined : { details }
   });

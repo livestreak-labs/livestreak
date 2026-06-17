@@ -1,6 +1,6 @@
 import { Effect, Stream } from "effect";
-import { FlowStreamConfigError } from "@flowstream-re2/core";
-import { nowTimePoint } from "@flowstream-re2/schema";
+import { LiveStreakConfigError } from "@livestreak/core";
+import { nowTimePoint } from "@livestreak/schema";
 import type {
   CaptureDriver,
   CaptureDriverDescriptor,
@@ -40,10 +40,10 @@ const defaultConfig: SyntheticCaptureConfig = {
 
 export const validateSyntheticCaptureConfig = (
   config: SyntheticCaptureConfig
-): Effect.Effect<SyntheticCaptureConfig, FlowStreamConfigError> => {
+): Effect.Effect<SyntheticCaptureConfig, LiveStreakConfigError> => {
   if (config.frameCount < 1) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: "Synthetic capture frameCount must be at least 1"
       })
     );
@@ -51,7 +51,7 @@ export const validateSyntheticCaptureConfig = (
 
   if (config.width < 1) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: "Synthetic capture width must be at least 1"
       })
     );
@@ -59,7 +59,7 @@ export const validateSyntheticCaptureConfig = (
 
   if (config.height < 1) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: "Synthetic capture height must be at least 1"
       })
     );
@@ -67,7 +67,7 @@ export const validateSyntheticCaptureConfig = (
 
   if (config.fps < 1) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: "Synthetic capture fps must be at least 1"
       })
     );

@@ -1,4 +1,4 @@
-import type { FlowStreamError } from "@flowstream-re2/core";
+import type { LiveStreakError } from "@livestreak/core";
 import type { Effect, Scope } from "effect";
 import type { RegistryDescriptorBase, StageHealthSnapshotBase } from "#pipeline/shared.js";
 import type { ControlCellDefinition, ControlSurface, DescribeControlContext } from "#run/control/bus/types.js";
@@ -57,17 +57,17 @@ export interface ProcessStageHealth extends StageHealthSnapshotBase<"process"> {
 
 export interface ProcessAdapter {
   readonly descriptor: ProcessPackDescriptor;
-  readonly process: (batch: ProcessBatch) => Effect.Effect<ProcessResult, FlowStreamError>;
-  readonly health: Effect.Effect<ProcessStageHealth, FlowStreamError>;
+  readonly process: (batch: ProcessBatch) => Effect.Effect<ProcessResult, LiveStreakError>;
+  readonly health: Effect.Effect<ProcessStageHealth, LiveStreakError>;
   readonly control?: ControlSurface;
 }
 
 export interface ProcessPack<Config = unknown> {
   readonly descriptor: ProcessPackDescriptor;
-  readonly validate: (config: Config) => Effect.Effect<Config, FlowStreamError>;
-  readonly createAdapter: (config: Config) => Effect.Effect<ProcessAdapter, FlowStreamError, Scope.Scope>;
+  readonly validate: (config: Config) => Effect.Effect<Config, LiveStreakError>;
+  readonly createAdapter: (config: Config) => Effect.Effect<ProcessAdapter, LiveStreakError, Scope.Scope>;
   readonly describeControl?: (
     config: Config,
     context: DescribeControlContext
-  ) => Effect.Effect<ControlCellDefinition, FlowStreamError>;
+  ) => Effect.Effect<ControlCellDefinition, LiveStreakError>;
 }

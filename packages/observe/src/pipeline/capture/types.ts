@@ -1,6 +1,6 @@
 import type { Effect, Scope, Stream } from "effect";
-import type { FlowStreamError } from "@flowstream-re2/core";
-import type { TimePoint } from "@flowstream-re2/schema";
+import type { LiveStreakError } from "@livestreak/core";
+import type { TimePoint } from "@livestreak/schema";
 import type { RegistryDescriptorBase, StageHealthSnapshotBase } from "#pipeline/shared.js";
 import type { CaptureLivePauseState } from "./pause.js";
 import type {
@@ -37,11 +37,11 @@ export interface CaptureDriverDescriptor extends RegistryDescriptorBase<"capture
 }
 
 export interface CaptureLiveControls {
-  readonly pause: () => Effect.Effect<CaptureLivePauseState, FlowStreamError>;
+  readonly pause: () => Effect.Effect<CaptureLivePauseState, LiveStreakError>;
 
-  readonly resume: () => Effect.Effect<CaptureLivePauseState, FlowStreamError>;
+  readonly resume: () => Effect.Effect<CaptureLivePauseState, LiveStreakError>;
 
-  readonly snapshot: Effect.Effect<CaptureLivePauseState, FlowStreamError>;
+  readonly snapshot: Effect.Effect<CaptureLivePauseState, LiveStreakError>;
 }
 
 export interface CaptureStageHealth extends StageHealthSnapshotBase<"capture"> {
@@ -93,18 +93,18 @@ export interface RawFrame {
 
 export interface FrameSource {
   readonly descriptor: CaptureDriverDescriptor;
-  readonly frames: Stream.Stream<RawFrame, FlowStreamError>;
-  readonly health: Effect.Effect<CaptureStageHealth, FlowStreamError>;
+  readonly frames: Stream.Stream<RawFrame, LiveStreakError>;
+  readonly health: Effect.Effect<CaptureStageHealth, LiveStreakError>;
   readonly live?: CaptureLiveControls;
   readonly control?: ControlSurface;
 }
 
 export interface CaptureDriver<Config = unknown> {
   readonly descriptor: CaptureDriverDescriptor;
-  readonly validate: (config: Config) => Effect.Effect<Config, FlowStreamError>;
-  readonly create: (config: Config) => Effect.Effect<FrameSource, FlowStreamError, Scope.Scope>;
+  readonly validate: (config: Config) => Effect.Effect<Config, LiveStreakError>;
+  readonly create: (config: Config) => Effect.Effect<FrameSource, LiveStreakError, Scope.Scope>;
   readonly describeControl: (
     config: Config,
     context: DescribeControlContext
-  ) => Effect.Effect<ControlCellDefinition, FlowStreamError>;
+  ) => Effect.Effect<ControlCellDefinition, LiveStreakError>;
 }

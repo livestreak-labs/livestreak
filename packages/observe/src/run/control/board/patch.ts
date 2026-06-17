@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { FlowStreamConfigError } from "@flowstream-re2/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 import {
   incrementBoardRevision,
   type Board,
@@ -12,9 +12,9 @@ import type {
   BoardCellStatus,
   BoardPatch,
   BoardSectionPatch
-} from "#run/control/bus/types.js";
+} from "#run/control/bus/index.js";
 
-export type { BoardPatch, BoardCellPatch, BoardSectionPatch } from "#run/control/bus/types.js";
+export type { BoardPatch, BoardCellPatch, BoardSectionPatch } from "#run/control/bus/index.js";
 
 export interface ApplyBoardPatchResult {
   readonly board: Board;
@@ -24,7 +24,7 @@ export interface ApplyBoardPatchResult {
 export const applyBoardPatch = (
   board: Board,
   patch: BoardPatch
-): Effect.Effect<ApplyBoardPatchResult, FlowStreamConfigError> =>
+): Effect.Effect<ApplyBoardPatchResult, LiveStreakConfigError> =>
   Effect.gen(function* () {
     const cellPatches = patch.cells;
     if (cellPatches === undefined || Object.keys(cellPatches).length === 0) {
@@ -38,7 +38,7 @@ export const applyBoardPatch = (
       const currentCell = nextCells[cellId];
       if (currentCell === undefined) {
         return yield* Effect.fail(
-          new FlowStreamConfigError({
+          new LiveStreakConfigError({
             message: `Board patch targets unknown cell ${cellId}`
           })
         );
@@ -146,7 +146,7 @@ const applySectionPatch = (
 
 const validateCellPatch = (
   patch: BoardCellPatch
-): Effect.Effect<void, FlowStreamConfigError> => {
+): Effect.Effect<void, LiveStreakConfigError> => {
   const overlaps = [
     ...findPatchKeyOverlap(patch.settings),
     ...findPatchKeyOverlap(patch.readonly),
@@ -155,7 +155,7 @@ const validateCellPatch = (
 
   if (overlaps.length > 0) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: "Board patch cannot set and unset the same keys",
         metadata: { cause: { keys: overlaps } }
       })

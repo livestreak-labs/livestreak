@@ -1,5 +1,5 @@
 import { Effect, Ref } from "effect";
-import { FlowStreamConfigError, type FlowStreamError } from "@flowstream-re2/core";
+import { LiveStreakConfigError, type LiveStreakError } from "@livestreak/core";
 import type {
   BrowserCaptureCrop,
   BrowserCapturePage,
@@ -75,19 +75,19 @@ export const makeBrowserPreviewControls = (options: {
   readonly validateCrop: (
     crop: BrowserCaptureCrop | undefined,
     viewport: BrowserCaptureViewport
-  ) => Effect.Effect<BrowserCaptureCrop | undefined, FlowStreamConfigError>;
+  ) => Effect.Effect<BrowserCaptureCrop | undefined, LiveStreakConfigError>;
 }): {
-  readonly getPreview: Effect.Effect<BrowserCapturePreview, FlowStreamError>;
-  readonly inspectTargets: Effect.Effect<BrowserCaptureTargetInspection, FlowStreamError>;
+  readonly getPreview: Effect.Effect<BrowserCapturePreview, LiveStreakError>;
+  readonly inspectTargets: Effect.Effect<BrowserCaptureTargetInspection, LiveStreakError>;
   readonly setTarget: (
     payload: BrowserCaptureSetTargetPayload
-  ) => Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, FlowStreamConfigError>;
+  ) => Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, LiveStreakConfigError>;
   readonly capturePreviewArtifact: (
     targets: readonly BrowserCaptureTarget[]
-  ) => Effect.Effect<BrowserCapturePreview, FlowStreamError>;
+  ) => Effect.Effect<BrowserCapturePreview, LiveStreakError>;
   readonly validatePreviewRevision: (
     previewRevision: number
-  ) => Effect.Effect<number, FlowStreamConfigError>;
+  ) => Effect.Effect<number, LiveStreakConfigError>;
 } => ({
   getPreview: capturePreviewOnly(options),
   inspectTargets: inspectTargetsWithPreview(options),
@@ -103,7 +103,7 @@ const capturePreviewOnly = (options: {
   readonly configRef: Ref.Ref<BrowserCaptureRuntimeConfigSnapshot>;
   readonly previewSessionRef: Ref.Ref<BrowserPreviewSession>;
   readonly page: BrowserCapturePage;
-}): Effect.Effect<BrowserCapturePreview, FlowStreamError> =>
+}): Effect.Effect<BrowserCapturePreview, LiveStreakError> =>
   Effect.gen(function* () {
     const preview = yield* captureFreshPreview(options, []);
     return preview;
@@ -113,7 +113,7 @@ const inspectTargetsWithPreview = (options: {
   readonly configRef: Ref.Ref<BrowserCaptureRuntimeConfigSnapshot>;
   readonly previewSessionRef: Ref.Ref<BrowserPreviewSession>;
   readonly page: BrowserCapturePage;
-}): Effect.Effect<BrowserCaptureTargetInspection, FlowStreamError> =>
+}): Effect.Effect<BrowserCaptureTargetInspection, LiveStreakError> =>
   Effect.gen(function* () {
     const targets =
       options.page.inspectTargets === undefined
@@ -134,7 +134,7 @@ const captureFreshPreview = (
     readonly page: BrowserCapturePage;
   },
   targets: readonly BrowserCaptureTarget[]
-): Effect.Effect<BrowserCapturePreview, FlowStreamError> =>
+): Effect.Effect<BrowserCapturePreview, LiveStreakError> =>
   Effect.gen(function* () {
     const config = yield* Ref.get(options.configRef);
     const screenshot = yield* options.page.screenshot({
@@ -168,10 +168,10 @@ const applyTargetSelection = (
     readonly validateCrop: (
       crop: BrowserCaptureCrop | undefined,
       viewport: BrowserCaptureViewport
-    ) => Effect.Effect<BrowserCaptureCrop | undefined, FlowStreamConfigError>;
+    ) => Effect.Effect<BrowserCaptureCrop | undefined, LiveStreakConfigError>;
   },
   payload: BrowserCaptureSetTargetPayload
-): Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, FlowStreamConfigError> =>
+): Effect.Effect<BrowserCaptureRuntimeConfigSnapshot, LiveStreakConfigError> =>
   Effect.gen(function* () {
     yield* validatePreviewRevision(options.previewSessionRef, payload.previewRevision);
     const session = yield* Ref.get(options.previewSessionRef);
@@ -200,7 +200,7 @@ const applyTargetSelection = (
 export const validatePreviewRevision = (
   previewSessionReference: Ref.Ref<BrowserPreviewSession>,
   previewRevision: number
-): Effect.Effect<number, FlowStreamConfigError> =>
+): Effect.Effect<number, LiveStreakConfigError> =>
   Effect.gen(function* () {
     const session = yield* Ref.get(previewSessionReference);
     if (session.revision !== previewRevision) {
@@ -213,8 +213,8 @@ export const validatePreviewRevision = (
 export const stalePreviewRevisionError = (
   expectedRevision: number,
   receivedRevision: number
-): FlowStreamConfigError =>
-  new FlowStreamConfigError({
+): LiveStreakConfigError =>
+  new LiveStreakConfigError({
     message: "Browser capture preview revision is stale",
     metadata: {
       cause: {
@@ -227,8 +227,8 @@ export const stalePreviewRevisionError = (
 export const targetUnavailableError = (
   previewRevision: number,
   targetId: string
-): FlowStreamConfigError =>
-  new FlowStreamConfigError({
+): LiveStreakConfigError =>
+  new LiveStreakConfigError({
     message: "Browser capture target is not available for the current preview",
     metadata: {
       cause: {

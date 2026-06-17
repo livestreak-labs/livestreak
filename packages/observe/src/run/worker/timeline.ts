@@ -12,8 +12,8 @@ export type {
   TimelineMarkerPayload
 } from "#pipeline/timeline/index.js";
 
-export type { CaptureVideoPayload } from "#pipeline/capture/types.js";
-import type { CaptureVideoPayload } from "#pipeline/capture/types.js";
+export type { CaptureVideoPayload } from "#pipeline/capture/index.js";
+import type { CaptureVideoPayload } from "#pipeline/capture/index.js";
 import type { TimelineMarkerPayload } from "#pipeline/timeline/index.js";
 
 export type VideoTrackItem = {

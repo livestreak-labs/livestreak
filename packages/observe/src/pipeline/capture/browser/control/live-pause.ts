@@ -1,5 +1,5 @@
 import { Deferred, Effect, Ref } from "effect";
-import type { FlowStreamError } from "@flowstream-re2/core";
+import type { LiveStreakError } from "@livestreak/core";
 import type { CaptureLiveControls, CaptureLivePauseState } from "#pipeline/capture/types.js";
 
 export interface BrowserLivePauseRuntime {
@@ -25,14 +25,14 @@ export const createBrowserLivePauseRuntime = (): Effect.Effect<BrowserLivePauseR
       };
     });
 
-    const pause = (): Effect.Effect<CaptureLivePauseState, FlowStreamError> =>
+    const pause = (): Effect.Effect<CaptureLivePauseState, LiveStreakError> =>
       Effect.gen(function* () {
         yield* Ref.set(pausedReference, true);
         yield* Ref.update(revisionReference, (revision) => revision + 1);
         return yield* snapshot;
       });
 
-    const resume = (): Effect.Effect<CaptureLivePauseState, FlowStreamError> =>
+    const resume = (): Effect.Effect<CaptureLivePauseState, LiveStreakError> =>
       Effect.gen(function* () {
         yield* Ref.set(pausedReference, false);
         yield* Ref.update(revisionReference, (revision) => revision + 1);
@@ -62,7 +62,7 @@ export const createBrowserLivePauseRuntime = (): Effect.Effect<BrowserLivePauseR
 
 export const awaitBrowserLiveResume = (
   runtime: BrowserLivePauseRuntime
-): Effect.Effect<void, FlowStreamError> =>
+): Effect.Effect<void, LiveStreakError> =>
   Effect.gen(function* () {
     const paused = yield* Ref.get(runtime.pausedRef);
     if (!paused) {

@@ -1,13 +1,13 @@
 import { Effect } from "effect";
-import type { FlowStreamError } from "@flowstream-re2/core";
-import type { SinkPausePresentation } from "#pipeline/publish/types.js";
-import type { WorkerControlView } from "#run/control/board/worker-view.js";
+import type { LiveStreakError } from "@livestreak/core";
+import type { SinkPausePresentation } from "#pipeline/publish/index.js";
+import type { WorkerControlView } from "#run/control/board/index.js";
 import { failWorker, type WorkerLifecycle, type WorkerState } from "./state.js";
 
 export const applySinkPausePresentation = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<void, FlowStreamError> =>
+): Effect.Effect<void, LiveStreakError> =>
   Effect.gen(function* () {
     if (state.pauseCycle?.presentationApplied === true) {
       return;
@@ -52,7 +52,7 @@ export const applySinkPausePresentation = (
 export const resumeSinkPresentation = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<void, FlowStreamError> =>
+): Effect.Effect<void, LiveStreakError> =>
   Effect.gen(function* () {
     if (state.pauseCycle?.presentationApplied !== true) {
       return;
@@ -96,7 +96,7 @@ const toSinkPausePresentation = (control: WorkerControlView): SinkPausePresentat
     : { whilePaused: "hold" };
 
 const sinkPresentationErrorMessage = (
-  error: FlowStreamError,
+  error: LiveStreakError,
   action: "pause" | "resume"
 ): string => {
   if ("message" in error && typeof error.message === "string") {

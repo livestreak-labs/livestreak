@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { FlowStreamConfigError } from "@flowstream-re2/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 import type { BrowserCaptureCrop } from "#pipeline/capture/browser/page/types.js";
 import type {
   BrowserCaptureSetCaptureFpsPayload,
@@ -7,13 +7,13 @@ import type {
 } from "./controls.js";
 import type { BrowserCaptureSetTargetPayload } from "./preview.js";
 
-const payloadError = (message: string): FlowStreamConfigError =>
-  new FlowStreamConfigError({ message });
+const payloadError = (message: string): LiveStreakConfigError =>
+  new LiveStreakConfigError({ message });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
-const decodeCrop = (value: unknown): Effect.Effect<BrowserCaptureCrop, FlowStreamConfigError> => {
+const decodeCrop = (value: unknown): Effect.Effect<BrowserCaptureCrop, LiveStreakConfigError> => {
   if (!isRecord(value)) {
     return Effect.fail(payloadError("Browser capture crop payload must be an object"));
   }
@@ -45,7 +45,7 @@ const decodeCrop = (value: unknown): Effect.Effect<BrowserCaptureCrop, FlowStrea
 
 export const decodeSetTargetPayload = (
   payload: unknown
-): Effect.Effect<BrowserCaptureSetTargetPayload, FlowStreamConfigError> => {
+): Effect.Effect<BrowserCaptureSetTargetPayload, LiveStreakConfigError> => {
   if (!isRecord(payload)) {
     return Effect.fail(payloadError("Browser capture setTarget payload is required"));
   }
@@ -67,7 +67,7 @@ export const decodeSetTargetPayload = (
 
 export const decodeSetCropPayload = (
   payload: unknown
-): Effect.Effect<BrowserCaptureSetCropPayload, FlowStreamConfigError> => {
+): Effect.Effect<BrowserCaptureSetCropPayload, LiveStreakConfigError> => {
   if (payload === undefined || payload === null) {
     return Effect.fail(payloadError("Browser capture setCrop payload is required"));
   }
@@ -91,7 +91,7 @@ export const decodeSetCropPayload = (
 
 export const decodeSetCaptureFpsPayload = (
   payload: unknown
-): Effect.Effect<BrowserCaptureSetCaptureFpsPayload, FlowStreamConfigError> => {
+): Effect.Effect<BrowserCaptureSetCaptureFpsPayload, LiveStreakConfigError> => {
   if (typeof payload === "number") {
     if (!Number.isFinite(payload)) {
       return Effect.fail(payloadError("Browser capture setCaptureFps payload must be a finite number"));

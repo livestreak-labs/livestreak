@@ -1,23 +1,23 @@
 import { Effect } from "effect";
-import { FlowStreamConfigError, type FlowStreamError } from "@flowstream-re2/core";
-import type { ControlCallEnvelope } from "#run/control/bus/calls.js";
+import { LiveStreakConfigError, type LiveStreakError } from "@livestreak/core";
+import type { ControlCallEnvelope } from "#run/control/bus/index.js";
 import type {
   ControlFunctionContext,
   ControlFunctionEntry,
   ControlSurface
-} from "#run/control/bus/types.js";
-import type { BoardPatch } from "#run/control/bus/types.js";
-import type { BoardSectionPatch } from "#run/control/bus/types.js";
+} from "#run/control/bus/index.js";
+import type { BoardPatch } from "#run/control/bus/index.js";
+import type { BoardSectionPatch } from "#run/control/bus/index.js";
 import {
   assertPausePresentationValue,
   capturePausePresentationEqual,
   type CapturePausePresentation,
   type PausePresentation
-} from "#pipeline/capture/pause.js";
+} from "#pipeline/capture/index.js";
 import {
   projectWorkerControlView,
   type WorkerControlPause
-} from "#run/control/board/worker-view.js";
+} from "#run/control/board/index.js";
 
 export const systemPausePauseScope = "system:pause:pause" as const;
 export const systemPauseResumeScope = "system:pause:resume" as const;
@@ -84,12 +84,12 @@ const resumeCall = (_envelope: ControlCallEnvelope, context: ControlFunctionCont
 const setPresentationCall = (
   envelope: ControlCallEnvelope,
   context: ControlFunctionContext
-): Effect.Effect<{ readonly boardPatch: BoardPatch }, FlowStreamError> =>
+): Effect.Effect<{ readonly boardPatch: BoardPatch }, LiveStreakError> =>
   Effect.gen(function* () {
     const pauseSettings = context.board.cells["system:pause"]?.settings ?? {};
     if (pauseSettings.requested === true) {
       return yield* Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: "system:pause:setPresentation cannot change presentation while pause is active"
         })
       );
@@ -134,7 +134,7 @@ const decodePausePresentationPayload = (
   payload: unknown
 ): Effect.Effect<
   Partial<CapturePausePresentation>,
-  FlowStreamConfigError
+  LiveStreakConfigError
 > =>
   Effect.gen(function* () {
     if (payload === undefined) {
@@ -143,7 +143,7 @@ const decodePausePresentationPayload = (
 
     if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
       return yield* Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: "system:pause:setPresentation payload must be an object"
         })
       );
@@ -154,7 +154,7 @@ const decodePausePresentationPayload = (
     for (const legacyField of legacyPauseFields) {
       if (record[legacyField] !== undefined) {
         return yield* Effect.fail(
-          new FlowStreamConfigError({
+          new LiveStreakConfigError({
             message: `system:pause:setPresentation ${legacyField} is no longer supported`
           })
         );
@@ -174,7 +174,7 @@ const decodePausePresentationPayload = (
     if (record.slateAssetId !== undefined) {
       if (typeof record.slateAssetId !== "string" || record.slateAssetId.trim().length === 0) {
         return yield* Effect.fail(
-          new FlowStreamConfigError({
+          new LiveStreakConfigError({
             message: "system:pause:setPresentation slateAssetId must be a non-empty string"
           })
         );
@@ -190,10 +190,10 @@ const decodePausePresentationPayload = (
 
 const validateMergedPresentation = (
   presentation: CapturePausePresentation
-): Effect.Effect<CapturePausePresentation, FlowStreamConfigError> => {
+): Effect.Effect<CapturePausePresentation, LiveStreakConfigError> => {
   if (presentation.whilePaused === "slate" && presentation.slateAssetId === undefined) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: 'system:pause:setPresentation requires slateAssetId when whilePaused is "slate"'
       })
     );
@@ -201,7 +201,7 @@ const validateMergedPresentation = (
 
   if (presentation.whilePaused !== "slate" && presentation.slateAssetId !== undefined) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message:
           'system:pause:setPresentation cannot set slateAssetId unless whilePaused is "slate"'
       })

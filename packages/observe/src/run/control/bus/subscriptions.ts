@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import type { Board } from "#run/control/board/model.js";
+import type { Board } from "#run/control/board/index.js";
 import type { ControlArtifact } from "#run/control/bus/calls.js";
 import type { ArtifactSubscription, BoardSubscription } from "./types.js";
 

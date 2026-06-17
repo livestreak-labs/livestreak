@@ -1,4 +1,4 @@
-import { FlowStreamConfigError } from "@flowstream-re2/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 import { Effect } from "effect";
 import type { ControlSurface, ControlFunctionEntry } from "./types.js";
 
@@ -9,7 +9,7 @@ export interface SurfaceFunctionMatch {
 
 export const buildSurfaceFunctionIndex = (
   surfaces: readonly ControlSurface[]
-): Effect.Effect<ReadonlyMap<string, SurfaceFunctionMatch>, FlowStreamConfigError> => {
+): Effect.Effect<ReadonlyMap<string, SurfaceFunctionMatch>, LiveStreakConfigError> => {
   const index = new Map<string, SurfaceFunctionMatch>();
 
   for (const surface of surfaces) {
@@ -17,7 +17,7 @@ export const buildSurfaceFunctionIndex = (
       const existing = index.get(entry.scope);
       if (existing !== undefined) {
         return Effect.fail(
-          new FlowStreamConfigError({
+          new LiveStreakConfigError({
             message: `Duplicate live surface function scope ${entry.scope}`,
             metadata: {
               cause: {
@@ -39,11 +39,11 @@ export const buildSurfaceFunctionIndex = (
 export const findSurfaceFunctionByScope = (
   index: ReadonlyMap<string, SurfaceFunctionMatch>,
   scope: string
-): Effect.Effect<SurfaceFunctionMatch, FlowStreamConfigError> => {
+): Effect.Effect<SurfaceFunctionMatch, LiveStreakConfigError> => {
   const match = index.get(scope);
   if (match === undefined) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: `No live surface advertises function scope ${scope}`
       })
     );
@@ -55,7 +55,7 @@ export const findSurfaceFunctionByScope = (
 export const mountSurfaceRegistry = (
   surfaces: readonly ControlSurface[],
   surface: ControlSurface
-): Effect.Effect<readonly ControlSurface[], FlowStreamConfigError> => {
+): Effect.Effect<readonly ControlSurface[], LiveStreakConfigError> => {
   const cellId = surface.cell.id;
   const existingIndex = surfaces.findIndex((entry) => entry.cell.id === cellId);
   const nextSurfaces =

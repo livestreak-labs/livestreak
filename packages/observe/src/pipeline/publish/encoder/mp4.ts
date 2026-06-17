@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 import {
-  FlowStreamConfigError,
-  FlowStreamRuntimeError,
-  type FlowStreamError
-} from "@flowstream-re2/core";
+  LiveStreakConfigError,
+  LiveStreakRuntimeError,
+  type LiveStreakError
+} from "@livestreak/core";
 import {
   concatBytes,
   bytesToUtf8,
@@ -35,15 +35,15 @@ export interface RgbMp4EncoderConfig {
 }
 
 export interface Mp4VideoEncoder {
-  readonly writeFrame: (data: Uint8Array) => Effect.Effect<void, FlowStreamError>;
-  readonly finalize: Effect.Effect<{ readonly outputPath: string }, FlowStreamError>;
+  readonly writeFrame: (data: Uint8Array) => Effect.Effect<void, LiveStreakError>;
+  readonly finalize: Effect.Effect<{ readonly outputPath: string }, LiveStreakError>;
 }
 
 export type RgbMp4Encoder = Mp4VideoEncoder;
 
 export const createMp4VideoEncoder = (
   config: Mp4VideoEncoderConfig
-): Effect.Effect<Mp4VideoEncoder, FlowStreamError> => {
+): Effect.Effect<Mp4VideoEncoder, LiveStreakError> => {
   if (config.inputFormat === "rgb") {
     return createRgbMp4Encoder(config);
   }
@@ -53,7 +53,7 @@ export const createMp4VideoEncoder = (
 
 export const createRgbMp4Encoder = (
   config: RgbMp4EncoderConfig
-): Effect.Effect<RgbMp4Encoder, FlowStreamError> =>
+): Effect.Effect<RgbMp4Encoder, LiveStreakError> =>
   Effect.gen(function* () {
     yield* validateVideoDimensions(config.width, config.height);
     yield* validateFps(config.fps);
@@ -68,13 +68,13 @@ export const createRgbMp4Encoder = (
 
     child.stderr.on("data", (chunk) => stderr.push(chunk));
 
-    const writeFrame = (data: Uint8Array): Effect.Effect<void, FlowStreamError> => {
+    const writeFrame = (data: Uint8Array): Effect.Effect<void, LiveStreakError> => {
       if (finalized) {
-        return Effect.fail(new FlowStreamRuntimeError({ message: "MP4 encoder is finalized" }));
+        return Effect.fail(new LiveStreakRuntimeError({ message: "MP4 encoder is finalized" }));
       }
       if (data.byteLength !== frameSize) {
         return Effect.fail(
-          new FlowStreamRuntimeError({
+          new LiveStreakRuntimeError({
             message: "MP4 encoder received a frame with the wrong byte length",
             metadata: {
               details: `expected ${frameSize}, received ${data.byteLength}`
@@ -109,14 +109,14 @@ export const createRgbMp4Encoder = (
 
 export const createImageSequenceMp4Encoder = (
   config: Mp4VideoEncoderConfig
-): Effect.Effect<Mp4VideoEncoder, FlowStreamError> =>
+): Effect.Effect<Mp4VideoEncoder, LiveStreakError> =>
   Effect.gen(function* () {
     yield* validateVideoDimensions(config.width, config.height);
     yield* validateFps(config.fps);
 
     if (config.inputFormat !== "jpeg" && config.inputFormat !== "png") {
       return yield* Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: "Image sequence MP4 encoder requires jpeg or png input"
         })
       );
@@ -131,13 +131,13 @@ export const createImageSequenceMp4Encoder = (
 
     child.stderr.on("data", (chunk) => stderr.push(chunk));
 
-    const writeFrame = (data: Uint8Array): Effect.Effect<void, FlowStreamError> => {
+    const writeFrame = (data: Uint8Array): Effect.Effect<void, LiveStreakError> => {
       if (finalized) {
-        return Effect.fail(new FlowStreamRuntimeError({ message: "MP4 encoder is finalized" }));
+        return Effect.fail(new LiveStreakRuntimeError({ message: "MP4 encoder is finalized" }));
       }
       if (data.byteLength === 0) {
         return Effect.fail(
-          new FlowStreamRuntimeError({
+          new LiveStreakRuntimeError({
             message: "MP4 encoder received an empty image frame"
           })
         );
@@ -229,17 +229,17 @@ export const makeFfmpegMp4EncodeArguments = (config: RgbMp4EncoderConfig): reado
 
 // --- helpers ---
 
-const validateFps = (fps: number): Effect.Effect<void, FlowStreamConfigError> => {
+const validateFps = (fps: number): Effect.Effect<void, LiveStreakConfigError> => {
   if (!Number.isFinite(fps)) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: "MP4 encoder fps must be a finite number"
       })
     );
   }
   if (fps <= 0) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: "MP4 encoder fps must be greater than zero"
       })
     );
@@ -252,8 +252,8 @@ export const readProcessFailure = (
   child: NodeChildProcess,
   stderrChunks: readonly Uint8Array[],
   label: string
-): FlowStreamRuntimeError =>
-  new FlowStreamRuntimeError({
+): LiveStreakRuntimeError =>
+  new LiveStreakRuntimeError({
     message: `${label} failed`,
     metadata: {
       details: bytesToUtf8(concatBytes(stderrChunks)).trim()

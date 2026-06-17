@@ -1,7 +1,7 @@
 import { Effect } from "effect";
-import { FlowStreamConfigError, type FlowStreamError } from "@flowstream-re2/core";
+import { LiveStreakConfigError, type LiveStreakError } from "@livestreak/core";
 import { projectControlPanelControls } from "#bridge/panel/project.js";
-import { systemRunStopScope } from "#run/control/system/run.js";
+import { systemRunStopScope } from "#run/control/index.js";
 import { requireAnyScope, type CapabilityScope } from "#scope/scopes.js";
 import type {
   BridgeCaller,
@@ -42,7 +42,7 @@ export {
 export const evaluateBridgeAuthorization = (
   caller: BridgeCaller,
   requiredScope: string
-): Effect.Effect<void, FlowStreamError> =>
+): Effect.Effect<void, LiveStreakError> =>
   Effect.gen(function* () {
     yield* validateBridgeCaller(caller);
     yield* validateBridgeScope(requiredScope);
@@ -118,10 +118,10 @@ export const createObserveBridge = (input: CreateObserveBridgeInput): ObserveBri
 
 const validateBridgeCaller = (
   caller: BridgeCaller
-): Effect.Effect<void, FlowStreamConfigError> => {
+): Effect.Effect<void, LiveStreakConfigError> => {
   if (caller.id.trim().length === 0) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: "Bridge caller id is required"
       })
     );
@@ -132,10 +132,10 @@ const validateBridgeCaller = (
 
 const validateBridgeScope = (
   requiredScope: string
-): Effect.Effect<void, FlowStreamConfigError> => {
+): Effect.Effect<void, LiveStreakConfigError> => {
   if (requiredScope.trim().length === 0) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: "Bridge authorization scope is required"
       })
     );
@@ -146,13 +146,13 @@ const validateBridgeScope = (
 
 const validateBridgeCallInput = (
   bridgeInput: BridgeCallInput
-): Effect.Effect<void, FlowStreamConfigError> =>
+): Effect.Effect<void, LiveStreakConfigError> =>
   Effect.gen(function* () {
     yield* validateBridgeCaller(bridgeInput.caller);
 
     if (bridgeInput.envelope.scope.trim().length === 0) {
       return yield* Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: "Control call envelope scope is required"
         })
       );

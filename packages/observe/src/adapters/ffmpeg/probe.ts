@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 import {
-  FlowStreamConfigError,
-  FlowStreamRuntimeError,
-  type FlowStreamError
-} from "@flowstream-re2/core";
+  LiveStreakConfigError,
+  LiveStreakRuntimeError,
+  type LiveStreakError
+} from "@livestreak/core";
 import { runChild, type FfmpegBinaries } from "./process.js";
 
 // --- exports ---
@@ -53,7 +53,7 @@ export const parseFraction = (value: string | undefined): number | undefined => 
 
 export const parseFfprobeStreamInfo = (
   json: string
-): Effect.Effect<FfprobeStreamInfo, FlowStreamError> =>
+): Effect.Effect<FfprobeStreamInfo, LiveStreakError> =>
   Effect.try({
     try: () => JSON.parse(json) as ProbeJson,
     catch: (cause) =>
@@ -108,7 +108,7 @@ export const parseFfprobeStreamInfo = (
 export const probeMedia = (
   path: string,
   binaries: FfmpegBinaries = {}
-): Effect.Effect<FfprobeStreamInfo, FlowStreamError> => {
+): Effect.Effect<FfprobeStreamInfo, LiveStreakError> => {
   const ffprobe = binaries.ffprobePath ?? "ffprobe";
 
   return runChild(ffprobe, [
@@ -140,31 +140,31 @@ export const probeMedia = (
 export const validateVideoDimensions = (
   width: number,
   height: number
-): Effect.Effect<void, FlowStreamConfigError> => {
+): Effect.Effect<void, LiveStreakConfigError> => {
   if (!isPositiveInteger(width)) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: "Video width must be a positive integer"
       })
     );
   }
   if (!isPositiveInteger(height)) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: "Video height must be a positive integer"
       })
     );
   }
   if (width > maxVideoDimension) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: `Video width must be at most ${maxVideoDimension}`
       })
     );
   }
   if (height > maxVideoDimension) {
     return Effect.fail(
-      new FlowStreamConfigError({
+      new LiveStreakConfigError({
         message: `Video height must be at most ${maxVideoDimension}`
       })
     );
@@ -188,8 +188,8 @@ interface ProbeJson {
 const isPositiveInteger = (value: unknown): value is number =>
   typeof value === "number" && Number.isInteger(value) && value > 0;
 
-const runtimeFailure = (message: string, details?: string): FlowStreamRuntimeError =>
-  new FlowStreamRuntimeError({
+const runtimeFailure = (message: string, details?: string): LiveStreakRuntimeError =>
+  new LiveStreakRuntimeError({
     message,
     metadata: details === undefined ? undefined : { details }
   });

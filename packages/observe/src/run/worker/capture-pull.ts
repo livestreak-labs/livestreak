@@ -1,10 +1,10 @@
 import { Chunk, Effect, Option, Scope, Stream } from "effect";
-import { FlowStreamRuntimeError, type FlowStreamError } from "@flowstream-re2/core";
-import type { CaptureLiveControls, FrameSource, RawFrame } from "#pipeline/capture/types.js";
+import { LiveStreakRuntimeError, type LiveStreakError } from "@livestreak/core";
+import type { CaptureLiveControls, FrameSource, RawFrame } from "#pipeline/capture/index.js";
 import type { CaptureStageState } from "./state.js";
 
 export interface CaptureFramePull {
-  readonly pullNext: () => Effect.Effect<RawFrame | undefined, FlowStreamError>;
+  readonly pullNext: () => Effect.Effect<RawFrame | undefined, LiveStreakError>;
 }
 
 export interface CaptureLivePauseStageState {
@@ -14,13 +14,13 @@ export interface CaptureLivePauseStageState {
 }
 
 export const createCaptureFramePull = (
-  frames: Stream.Stream<RawFrame, FlowStreamError>
+  frames: Stream.Stream<RawFrame, LiveStreakError>
 ): Effect.Effect<CaptureFramePull, never, Scope.Scope> => {
   return Effect.gen(function* () {
     const pullChunk = yield* Stream.toPull(frames);
     const pending: RawFrame[] = [];
 
-    const pullNext = (): Effect.Effect<RawFrame | undefined, FlowStreamError> => {
+    const pullNext = (): Effect.Effect<RawFrame | undefined, LiveStreakError> => {
       return pullNextFrame(pullChunk, pending);
     };
 
@@ -32,11 +32,11 @@ export const createCaptureFramePull = (
 
 export const createCaptureStageState = (
   source: FrameSource
-): Effect.Effect<CaptureStageState, FlowStreamRuntimeError, Scope.Scope> => {
+): Effect.Effect<CaptureStageState, LiveStreakRuntimeError, Scope.Scope> => {
   return Effect.gen(function* () {
     if (source.descriptor.sourceMode === "live" && source.live === undefined) {
       return yield* Effect.fail(
-        new FlowStreamRuntimeError({
+        new LiveStreakRuntimeError({
           message: `Live capture source ${source.descriptor.id} is missing CaptureLiveControls`
         })
       );
@@ -64,9 +64,9 @@ export const createCaptureStageState = (
 };
 
 const pullNextFrame = (
-  pullChunk: Effect.Effect<Chunk.Chunk<RawFrame>, Option.Option<FlowStreamError>>,
+  pullChunk: Effect.Effect<Chunk.Chunk<RawFrame>, Option.Option<LiveStreakError>>,
   pending: RawFrame[]
-): Effect.Effect<RawFrame | undefined, FlowStreamError> =>
+): Effect.Effect<RawFrame | undefined, LiveStreakError> =>
   Effect.gen(function* () {
     if (pending.length > 0) {
       return pending.shift();

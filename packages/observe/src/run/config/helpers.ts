@@ -1,4 +1,4 @@
-import type { BrowserCaptureConfig } from "#pipeline/capture/browser/driver.js";
+import type { BrowserCaptureConfig } from "#pipeline/capture/browser/index.js";
 import type { ObserveRunConfig } from "./types.js";
 
 export type {
@@ -6,7 +6,7 @@ export type {
   BrowserCaptureCrop,
   BrowserCaptureImageEncoding,
   BrowserCaptureViewport
-} from "#pipeline/capture/browser/driver.js";
+} from "#pipeline/capture/browser/index.js";
 
 /** Typed helper for browser capture config without widening the whole run config. */
 export const browserCaptureRunConfig = (

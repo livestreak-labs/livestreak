@@ -1,12 +1,12 @@
 import { Effect } from "effect";
-import { FlowStreamConfigError, type FlowStreamError } from "@flowstream-re2/core";
-import type { ControlCallEnvelope } from "#run/control/bus/calls.js";
+import { LiveStreakConfigError, type LiveStreakError } from "@livestreak/core";
+import type { ControlCallEnvelope } from "#run/control/bus/index.js";
 import type {
   BoardPatch,
   ControlFunctionContext,
   ControlFunctionEntry,
   ControlSurface
-} from "#run/control/bus/types.js";
+} from "#run/control/bus/index.js";
 
 export const systemRunStopScope = "system:run:stop" as const;
 
@@ -33,7 +33,7 @@ const stopFunctionEntry = (): ControlFunctionEntry => ({
 const stopCall = (
   envelope: ControlCallEnvelope,
   context: ControlFunctionContext
-): Effect.Effect<{ readonly boardPatch: BoardPatch }, FlowStreamError> =>
+): Effect.Effect<{ readonly boardPatch: BoardPatch }, LiveStreakError> =>
   Effect.gen(function* () {
     const reason = yield* decodeStopPayload(envelope.payload);
     const runCell = context.board.cells["system:run"];
@@ -63,7 +63,7 @@ const stopPatch = (_envelope: ControlCallEnvelope, reason: string | undefined): 
 
 const decodeStopPayload = (
   payload: unknown
-): Effect.Effect<string | undefined, FlowStreamConfigError> =>
+): Effect.Effect<string | undefined, LiveStreakConfigError> =>
   Effect.gen(function* () {
     if (payload === undefined) {
       return;
@@ -71,7 +71,7 @@ const decodeStopPayload = (
 
     if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
       return yield* Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: "system:run:stop payload must be an object"
         })
       );
@@ -87,7 +87,7 @@ const decodeStopPayload = (
     for (const key of keys) {
       if (key !== "reason") {
         return yield* Effect.fail(
-          new FlowStreamConfigError({
+          new LiveStreakConfigError({
             message: `system:run:stop payload has unknown property ${key}`
           })
         );
@@ -100,7 +100,7 @@ const decodeStopPayload = (
 
     if (typeof record.reason !== "string") {
       return yield* Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: "system:run:stop reason must be a string"
         })
       );
@@ -109,7 +109,7 @@ const decodeStopPayload = (
     const trimmed = record.reason.trim();
     if (trimmed.length === 0) {
       return yield* Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: "system:run:stop reason must be a non-empty string when provided"
         })
       );

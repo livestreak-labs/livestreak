@@ -1,6 +1,6 @@
 import { Effect } from "effect";
-import type { FlowStreamError } from "@flowstream-re2/core";
-import type { WorkerControlView } from "#run/control/board/worker-view.js";
+import type { LiveStreakError } from "@livestreak/core";
+import type { WorkerControlView } from "#run/control/board/index.js";
 import {
   appendPauseEndMarker,
   appendPauseStartMarker,
@@ -95,7 +95,7 @@ export const promoteResumeIfRequested = (state: WorkerState, control: WorkerCont
 export const completeResumeIfNeeded = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<boolean, FlowStreamError> =>
+): Effect.Effect<boolean, LiveStreakError> =>
   Effect.gen(function* () {
     if (state.lifecycle !== "resuming") {
       return false;
@@ -138,7 +138,7 @@ export const promotePauseIfRequested = (state: WorkerState, control: WorkerContr
 export const reconcilePauseLiveControls = (
   state: WorkerState,
   control: WorkerControlView
-): Effect.Effect<void, FlowStreamError> =>
+): Effect.Effect<void, LiveStreakError> =>
   Effect.gen(function* () {
     if (state.lifecycle !== "pausing" && state.lifecycle !== "paused") {
       return;

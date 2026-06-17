@@ -1,10 +1,10 @@
 import type { Effect } from "effect";
-import type { FlowStreamError } from "@flowstream-re2/core";
+import type { LiveStreakError } from "@livestreak/core";
 import type { ControlsView } from "#bridge/panel/types.js";
 import type { ObserveRunResult } from "#run/kernel.js";
-import type { Board } from "#run/control/board/model.js";
-import type { ControlArtifact, ControlCallEnvelope, ControlCallResult } from "#run/control/bus/calls.js";
-import type { ArtifactSubscription, BoardSubscription } from "#run/control/bus/types.js";
+import type { Board } from "#run/control/board/index.js";
+import type { ControlArtifact, ControlCallEnvelope, ControlCallResult } from "#run/control/bus/index.js";
+import type { ArtifactSubscription, BoardSubscription } from "#run/control/bus/index.js";
 import type { ObserveRuntime } from "#run/runtime.js";
 import type { CapabilityGrant } from "#scope/scopes.js";
 
@@ -64,23 +64,23 @@ export interface CreateObserveBridgeInput {
 export interface ObserveBridge {
   readonly runtime: ObserveRuntime;
 
-  readonly readBoard: (input: BridgeRunInput) => Effect.Effect<Board, FlowStreamError>;
+  readonly readBoard: (input: BridgeRunInput) => Effect.Effect<Board, LiveStreakError>;
 
-  readonly readControls: (input: BridgeRunInput) => Effect.Effect<ControlsView, FlowStreamError>;
+  readonly readControls: (input: BridgeRunInput) => Effect.Effect<ControlsView, LiveStreakError>;
 
-  readonly callFunction: (input: BridgeCallInput) => Effect.Effect<ControlCallResult, FlowStreamError>;
+  readonly callFunction: (input: BridgeCallInput) => Effect.Effect<ControlCallResult, LiveStreakError>;
 
-  readonly getArtifact: (input: BridgeArtifactInput) => Effect.Effect<ControlArtifact, FlowStreamError>;
+  readonly getArtifact: (input: BridgeArtifactInput) => Effect.Effect<ControlArtifact, LiveStreakError>;
 
   readonly subscribeBoard: (
     input: BridgeSubscribeBoardInput
-  ) => Effect.Effect<BoardSubscription, FlowStreamError>;
+  ) => Effect.Effect<BoardSubscription, LiveStreakError>;
 
   readonly subscribeArtifacts: (
     input: BridgeSubscribeArtifactsInput
-  ) => Effect.Effect<ArtifactSubscription, FlowStreamError>;
+  ) => Effect.Effect<ArtifactSubscription, LiveStreakError>;
 
-  readonly awaitRun: (input: BridgeRunInput) => Effect.Effect<ObserveRunResult, FlowStreamError>;
+  readonly awaitRun: (input: BridgeRunInput) => Effect.Effect<ObserveRunResult, LiveStreakError>;
 
-  readonly stopRun: (input: BridgeStopRunInput) => Effect.Effect<ObserveRunResult, FlowStreamError>;
+  readonly stopRun: (input: BridgeStopRunInput) => Effect.Effect<ObserveRunResult, LiveStreakError>;
 }

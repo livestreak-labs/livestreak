@@ -1,8 +1,8 @@
 /* eslint-disable unicorn/no-null -- BoardCell.status tuple uses null for absent message */
-import type { BoardCell, BoardCellId } from "#run/control/bus/types.js";
+import type { BoardCell, BoardCellId } from "#run/control/bus/index.js";
 import { defaultControlPause, defaultControlRun } from "./settings.js";
 
-export type { BoardCell, BoardCellId, BoardCellStatus } from "#run/control/bus/types.js";
+export type { BoardCell, BoardCellId, BoardCellStatus } from "#run/control/bus/index.js";
 
 export interface Board {
   readonly revision: number;

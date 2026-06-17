@@ -1,4 +1,4 @@
-import { FlowStreamCapabilityError } from "@flowstream-re2/core";
+import { LiveStreakCapabilityError } from "@livestreak/core";
 import { Effect } from "effect";
 
 export type CapabilityScope =
@@ -54,13 +54,13 @@ export const hasAnyScope = (
 export const requireScope = (
   grant: CapabilityGrant,
   requiredScope: CapabilityScope
-): Effect.Effect<void, FlowStreamCapabilityError> => {
+): Effect.Effect<void, LiveStreakCapabilityError> => {
   if (hasScope(grant, requiredScope)) {
     return Effect.void;
   }
 
   return Effect.fail(
-    new FlowStreamCapabilityError({
+    new LiveStreakCapabilityError({
       message: `Capability ${grant.id} cannot use ${requiredScope}`,
       requiredScope
     })
@@ -71,13 +71,13 @@ export const requireAnyScope = (
   grants: readonly CapabilityGrant[],
   requiredScope: CapabilityScope,
   now = Date.now()
-): Effect.Effect<void, FlowStreamCapabilityError> => {
+): Effect.Effect<void, LiveStreakCapabilityError> => {
   if (hasAnyScope(grants, requiredScope, now)) {
     return Effect.void;
   }
 
   return Effect.fail(
-    new FlowStreamCapabilityError({
+    new LiveStreakCapabilityError({
       message: `No capability grant authorizes ${requiredScope}`,
       requiredScope
     })
