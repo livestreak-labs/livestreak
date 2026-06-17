@@ -1,5 +1,5 @@
 {
-  "name": "@flowstream-re2/options",
+  "name": "@livestreak/options",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
@@ -14,12 +14,12 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "tsc -p tsconfig.build.json",
-    "check": "tsc -p tsconfig.json --noEmit",
+    "check": "tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@flowstream-re2/core": "file:../core",
-    "@flowstream-re2/schema": "file:../schema"
+    "@livestreak/core": "file:../core",
+    "@flowstream/contracts": "file:../contracts"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
