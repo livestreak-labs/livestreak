@@ -1,8 +1,8 @@
-# @flowstream-re2/schema — TODO
+# @livestreak/schema — TODO
 
 Architecture: **pending** — schema does not need a full architecture doc until first cross-package wire format is chosen.
 
-See [repo TODO](../../../TODO.md).
+See [repo TODO](../../../README.md).
 
 **Conservative rule:** schema is for **shared JSON on the wire** only. It is **not** a dumping ground for every internal TypeScript type. When in doubt, keep the type in the owning package until a second consumer needs the same serialized shape.
 
@@ -14,7 +14,7 @@ Before adding anything to schema, ask:
 
 1. Is this JSON crossing a package or process boundary (CLI output, host HTTP, chain-adjacent wire)?
 2. Do two or more packages need the **exact same** serialized shape?
-3. Can `@flowstream-re2/contracts` decoders or package-local view types handle it instead?
+3. Can `@flowstream/contracts` generated ABI/types, tiny decode helpers, or package-local view types handle it instead?
 
 If any answer is no → **do not add to schema.**
 
@@ -33,7 +33,7 @@ Add **one at a time** when a concrete integration needs it:
 
 - [ ] Chain / protocol references (if not owned solely by contracts package exports)
 - [ ] Endpoint manifest JSON (if host + observe + CLI all serialize the same envelope)
-- [ ] Host descriptor / policy / session JSON (if duplicated outside `packages-re2/host`)
+- [ ] Host descriptor / policy / session JSON (if duplicated outside `packages/host`)
 - [ ] Evidence refs / cache receipt JSON (if shared beyond host types package)
 - [ ] CLI JSON output envelopes (error + command result shells)
 
@@ -49,7 +49,7 @@ Add **one at a time** when a concrete integration needs it:
 
 ## Mapping notes
 
-- [ ] Contract enum → product strings: prefer `@flowstream-re2/contracts` decoders first
+- [ ] Contract enum → product strings: prefer `@flowstream/contracts` generated ABI/types or tiny decode helpers first
 - [ ] Schema enters only when multiple packages emit/consume the same JSON enum strings
 - [ ] Reconcile legacy `packages-re/schema` drift only when contracts v0 enums lock
 
@@ -65,9 +65,9 @@ Add **one at a time** when a concrete integration needs it:
 
 ## Hardening (every slice)
 
-Run when schema types change. Full checklist: [repo TODO § Hardening loop](../../../TODO.md#hardening-loop-every-slice).
+Run when schema types change. Full checklist: [repo TODO § Hardening loop](../../../README.md#hardening-loop).
 
-- [ ] check / build / test for `packages-re2/schema`
+- [ ] check / build / test for `packages/schema`
 - [ ] Boundary test: schema modules import no package runtime code
 - [ ] Negative-path decode/encode test for every new public schema export
 - [ ] Update this `docs/TODO.md`

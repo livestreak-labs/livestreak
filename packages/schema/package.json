@@ -1,5 +1,5 @@
 {
-  "name": "@flowstream-re2/schema",
+  "name": "@livestreak/schema",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
