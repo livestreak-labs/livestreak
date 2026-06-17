@@ -1,4 +1,5 @@
-import type { Detection, VaultDraft } from "./vault-draft.js";
+import type { Detection } from "./detection.js";
+import type { VaultDraft } from "./vault-draft.js";
 
 // --- exports ---
 

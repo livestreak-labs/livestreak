@@ -1,14 +1,28 @@
 import type { BookmakerDecision } from "./decision.js";
+import type { VaultDraft } from "./vault-draft.js";
 
 // --- exports ---
 
 export interface BookmakerWritePlan {
   readonly decision: BookmakerDecision;
-  readonly calls: readonly BookmakerContractCall[];
+  readonly intents: readonly BookmakerWriteIntent[];
 }
 
-export interface BookmakerContractCall {
-  readonly contract: "vault" | "vaultFactory" | "agentRegistry";
-  readonly functionName: string;
-  readonly args: readonly unknown[];
+export type BookmakerWriteIntent =
+  | {
+      readonly action: "createVault";
+      readonly marketId: string;
+      readonly draft: VaultDraft;
+    }
+  | {
+      readonly action: "joinExistingVault";
+      readonly marketId: string;
+      readonly vaultId: string;
+      readonly draft: VaultDraft;
+    };
+
+export interface BookmakerContractsSurface {
+  readonly vaultAddress: string;
+  readonly marketRegistryAddress?: string;
+  readonly agentRegistryAddress?: string;
 }
