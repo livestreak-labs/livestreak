@@ -1,5 +1,5 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.source.json",
   "compilerOptions": {
     "noEmit": false,
     "outDir": "dist",

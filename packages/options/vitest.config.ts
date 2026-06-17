@@ -7,6 +7,7 @@ const sourceDirectory = path.resolve(packageDirectory, "src");
 
 export default defineConfig({
   test: {
+    pool: "threads",
     testTimeout: 30_000
   },
   resolve: {
