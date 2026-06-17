@@ -1,5 +1,5 @@
 {
-  "name": "@flowstream-re2/observe",
+  "name": "@livestreak/observe",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
@@ -30,8 +30,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@flowstream-re2/core": "file:../core",
-    "@flowstream-re2/schema": "file:../schema",
+    "@livestreak/core": "file:../core",
+    "@livestreak/schema": "file:../schema",
     "effect": "3.21.3"
   },
   "devDependencies": {
