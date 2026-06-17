@@ -1,8 +1,8 @@
-# @flowstream-re2/options Architecture
+# @livestreak/options Architecture
 
 This document is for the developer who arrives with no conversation history and needs to move. It explains the architecture we want, why the folders exist, what should not be built, and how a running options runtime ties chain reads, user positions, funding streams, and UI/CLI panel projection together.
 
-The short version: **`packages-re2/options` is the market/vault consumer workflow package**. It does not create markets. It does not create vaults. It lets a user discover markets and vaults, inspect vault state, stream funds into YES/NO sides, track positions, check **resolved** outcome stats for vaults they funded, surface when the user can claim or release winnings, and manage the consumer $FLOW state that comes from loss claims and staking. The UI never reads contract storage directly — it asks options for `MarketView` / `VaultView` / `ResolvedVaultView` / `FlowAccountView`, and options does the read and projection.
+The short version: **`packages/options` is the market/vault consumer workflow package**. It does not create markets. It does not create vaults. It lets a user discover markets and vaults, inspect vault state, stream funds into YES/NO sides, track positions, check **resolved** outcome stats for vaults they funded, surface when the user can claim or release winnings, and manage the consumer $LVST state that comes from loss claims and staking. The UI never reads contract storage directly — it asks options for `MarketView` / `VaultView` / `ResolvedVaultView` / `LvstAccountView`, and options does the read and projection.
 
 ## Vocabulary
 
@@ -16,14 +16,14 @@ Use these terms in code and docs:
 | `Position` | User exposure keyed by `account + vault + side`. Separate YES and NO positions per vault. |
 | `Funding stream` | Contract-level streaming/drip mechanism. Slider controls rate. Rate `0` means stopped/paused — no separate pause protocol. |
 | `Claim` / `Release` | Post-resolution value recovery. Options watches vault/user state and surfaces availability through panel/actions. |
-| `Loss claim` | $FLOW reward made available because the user lost value in a resolved vault. Options reads, projects, and can claim/stake it for the consumer. |
-| `FLOW account` | User-facing $FLOW balance, staked amount, pending dividends, and loss-claim availability. This is consumer token state, not steward governance state. |
-| `Stake loss claim` | Claim available loss $FLOW and stake it through the token/staking contract flow. Options owns this consumer action surface. |
+| `Loss claim` | $LVST reward made available because the user lost value in a resolved vault. Options reads, projects, and can claim/stake it for the consumer. |
+| `LVST account` | User-facing $LVST balance, staked amount, pending dividends, and loss-claim availability. This is consumer token state, not steward governance state. |
+| `Stake loss claim` | Claim available loss $LVST and stake it through the token/staking contract flow. Options owns this consumer action surface. |
 | `Resolved` | Post-resolution vault state for vaults the user funded. The read model for outcome, final pools, per-side results, PnL, and claim/release status — not live odds or streaming controls. |
 | `OptionsVaultSnapshot` | Normalized in-package vault state after chain read + decode. |
 | `OptionsVaultView` | UI/CLI-ready projection for **live/open** vaults: string USDC amounts and computed odds. |
 | `OptionsResolvedVaultView` | UI/CLI-ready projection for **resolved** vaults: winning side, final pools, user result stats, claimability. |
-| `OptionsFlowAccountView` | UI/CLI-ready projection for $FLOW balance, staked amount, pending dividends, and loss-claim actions. |
+| `OptionsLvstAccountView` | UI/CLI-ready projection for $LVST balance, staked amount, pending dividends, and loss-claim actions. |
 | `OptionsRuntime` | In-memory owner of snapshots, polling, and callable workflow functions. |
 | `OptionsBridge` | Authorized callable edge for CLI/UI/gateway (later slice; mirrors observe Bridge pattern). |
 | `OptionsPanel` | Projected read model: markets, vaults, user positions, funding rates, available actions. |
@@ -42,7 +42,7 @@ Do not use these as options architecture terms:
 ## What Options Is
 
 ```text
-packages-re2/options = market/vault consumer workflow
+packages/options = market/vault consumer workflow
 ```
 
 It is the bridge between the UI's prediction-market experience and on-chain contracts.
@@ -55,7 +55,7 @@ VaultSnapshot
 ResolvedVaultSnapshot
 UserVaultState
 FundingStreamState
-FlowAccountState
+LvstAccountState
 OptionsPanel / View
 ```
 
@@ -91,11 +91,11 @@ Claim / release
   options watches vault/user state
   when user wins or funds become releasable, options surfaces that through panel/state
 
-Loss claim / FLOW staking
-  when user loses, contracts may mint or unlock $FLOW loss rewards
-  options reads available loss claims, FLOW balance, staked amount, pending dividends
+Loss claim / LVST staking
+  when user loses, contracts may mint or unlock $LVST loss rewards
+  options reads available loss claims, LVST balance, staked amount, pending dividends
   options exposes claim/stake actions so losers can become protocol owners
-  consumer FLOW staking belongs here; steward proposal staking belongs to steward
+  consumer LVST staking belongs here; steward proposal staking belongs to steward
 
 Resolved
   vault status is resolved or disputed-with-known-outcome
@@ -122,7 +122,7 @@ ContractMarketState   ->  OptionsMarketSnapshot    ->  OptionsMarketView
 ContractVaultState    ->  OptionsVaultSnapshot     ->  OptionsVaultView        (live/open)
 ContractVaultState    ->  OptionsResolvedVaultSnapshot -> OptionsResolvedVaultView (resolved)
 ContractPosition      ->  OptionsUserVaultState    ->  OptionsUserVaultView
-ContractFlowState     ->  OptionsFlowAccountState  ->  OptionsFlowAccountView
+ContractFlowState     ->  OptionsLvstAccountState  ->  OptionsLvstAccountView
 ```
 
 Use `readVault` + `projectVaultView` while a vault is open, hot, or locked. Use `readResolvedVault` + `projectResolvedVaultView` once resolution is final — that path owns outcome stats and post-resolution user results. Do not overload live `VaultView` with resolved-only fields; keep resolved as its own projection.
@@ -355,12 +355,12 @@ export interface OptionsSidePositionView {
 }
 ```
 
-### FLOW account state
+### LVST account state
 
-Consumer $FLOW state is part of options because it comes from the market/vault experience. This is not steward governance staking.
+Consumer $LVST state is part of options because it comes from the market/vault experience. This is not steward governance staking.
 
 ```ts
-export interface OptionsFlowAccountState {
+export interface OptionsLvstAccountState {
   readonly account: string;
   readonly balance: bigint;
   readonly staked: bigint;
@@ -373,17 +373,17 @@ export interface OptionsFlowAccountState {
   };
 }
 
-export interface OptionsFlowAccountView {
+export interface OptionsLvstAccountView {
   readonly account: string;
-  readonly balanceFLOW: string;
-  readonly stakedFLOW: string;
-  readonly unstakedFLOW: string;
+  readonly balanceLVST: string;
+  readonly stakedLVST: string;
+  readonly unstakedLVST: string;
   readonly pendingDividendsUSDC: string;
-  readonly totalEarnedFLOW?: string;
+  readonly totalEarnedLVST?: string;
   readonly lossClaims: {
-    readonly claimableFLOW: string;
-    readonly claimedFLOW: string;
-    readonly stakedFromClaimsFLOW: string;
+    readonly claimableLVST: string;
+    readonly claimedLVST: string;
+    readonly stakedFromClaimsLVST: string;
   };
   readonly actions: {
     readonly canStake: boolean;
@@ -655,7 +655,7 @@ Resolved stats       = only in ResolvedVaultView; live VaultView omits final out
 User result          = win | loss | mixed | break_even from per-side won + netPnl
 listResolvedVaults   = vaults user funded that reached resolved/disputed terminal state
 Loss FLOW            = resolved user loss claim; options surfaces claim/stake actions
-FLOW staking         = consumer balance/stake/dividend flow; steward proposal staking is separate
+LVST staking         = consumer balance/stake/dividend flow; steward proposal staking is separate
 ```
 
 ## Reference Shape
@@ -663,7 +663,7 @@ FLOW staking         = consumer balance/stake/dividend flow; steward proposal st
 Target package layout (slice 1 ships `model/`, `read/`, `panel/`; `project/` is an alias target for later refactors):
 
 ```text
-packages-re2/options/src/
+packages/options/src/
   index.ts              re-exports only
 
   model/
@@ -672,7 +672,7 @@ packages-re2/options/src/
     resolved.ts         resolved vault snapshot + view types
     position.ts         user position + side types
     funding.ts          funding stream state types
-    flow.ts             FLOW account + loss claim state types
+    flow.ts             LVST account + loss claim state types
     odds.ts             pure odds/multiplier math
     index.ts
 
@@ -682,14 +682,14 @@ packages-re2/options/src/
     vaults.ts           listVaults, readVault, readVaultPositions
     resolved.ts         listResolvedVaults, readResolvedVault
     funding.ts          readFundingStreams
-    flow.ts             readFlowAccount, readLossClaims
+    flow.ts             readLvstAccount, readLossClaims
     index.ts
 
   project/
     market.ts           snapshot -> MarketView
     vault.ts            snapshot -> VaultView (+ odds, live actions)
     resolved.ts         snapshot -> ResolvedVaultView (+ outcome stats)
-    flow.ts             FlowAccountState -> FlowAccountView
+    flow.ts             LvstAccountState -> LvstAccountView
     panel.ts            projectOptionsPanel
     index.ts
 
@@ -734,10 +734,10 @@ External callers (app, `cli-re2`, tests) should import from the package root.
 
 **Root exports should include:**
 
-- **Model types** — `OptionsMarketSnapshot`, `OptionsMarketView`, `OptionsVaultSnapshot`, `OptionsVaultView`, `OptionsResolvedVaultSnapshot`, `OptionsResolvedVaultView`, `OptionsUserVaultState`, `OptionsUserVaultView`, `OptionsUserResolvedVaultView`, `OptionsFlowAccountState`, `OptionsFlowAccountView`, funding and position types.
-- **Read functions** — `listMarkets`, `readMarket`, `listVaults`, `readVault`, `listResolvedVaults`, `readResolvedVault`, `readVaultPositions`, `readFundingStreams`, `readFlowAccount`, `readLossClaims` (Effect blueprints with injected transport).
-- **Write functions** — `setFundingRate`, `stopFundingStream`, `claimVault`, `releaseVault`, `stakeFlow`, `unstakeFlow`, `claimFlowDividends`, `claimAndStakeLossFlow` (Effect blueprints with injected write transport).
-- **Projection** — `projectMarketView`, `projectVaultView`, `projectResolvedVaultView`, `projectFlowAccountView`, `projectOptionsPanel`.
+- **Model types** — `OptionsMarketSnapshot`, `OptionsMarketView`, `OptionsVaultSnapshot`, `OptionsVaultView`, `OptionsResolvedVaultSnapshot`, `OptionsResolvedVaultView`, `OptionsUserVaultState`, `OptionsUserVaultView`, `OptionsUserResolvedVaultView`, `OptionsLvstAccountState`, `OptionsLvstAccountView`, funding and position types.
+- **Read functions** — `listMarkets`, `readMarket`, `listVaults`, `readVault`, `listResolvedVaults`, `readResolvedVault`, `readVaultPositions`, `readFundingStreams`, `readLvstAccount`, `readLossClaims` (Effect blueprints with injected transport).
+- **Write functions** — `setFundingRate`, `stopFundingStream`, `claimLossFlow`, `stakeFlow`, `unstakeFlow` (vanilla async over injected `ContractWriter`). **Blocked until contracts ship:** `claimVault`, `releaseVault`, `claimFlowDividends`, `claimAndStakeLossFlow`.
+- **Projection** — `projectMarketView`, `projectVaultView`, `projectResolvedVaultView`, `projectLvstAccountView`, `projectOptionsPanel`.
 - **Runtime** — `createOptionsRuntime`, `OptionsRuntimeConfig`, store helpers, poll controls.
 - **Pure math** — odds/multiplier helpers from `model/odds.ts`.
 
@@ -758,7 +758,7 @@ listResolvedVaults
 readResolvedVault
 readVaultPositions
 readFundingStreams
-readFlowAccount
+readLvstAccount
 readLossClaims
 setFundingRate
 stopFundingStream
@@ -770,7 +770,7 @@ claimFlowDividends
 claimAndStakeLossFlow
 projectOptionsPanel
 projectResolvedVaultView
-projectFlowAccountView
+projectLvstAccountView
 ```
 
 Not:
@@ -778,7 +778,7 @@ Not:
 ```ts
 createVault
 createOption
-makeFlowStreamClient   // legacy -re framing; do not revive as options center
+makeLiveStreakClient   // legacy -re framing; do not revive as options center
 ```
 
 ## Top-Level Model
@@ -789,7 +789,7 @@ APP / CLI / GATEWAY
   readPanel / projectOptionsPanel
   listMarkets / readVault
   listResolvedVaults / readResolvedVault   # vaults you funded — outcome stats
-  readFlowAccount                          # FLOW balance, stake, dividends, loss claims
+  readLvstAccount                          # LVST balance, stake, dividends, loss claims
   setFundingRate / stopFundingStream
   claimVault when actions.canClaim
   claimAndStakeLossFlow when actions.canStakeLossFlow
@@ -800,14 +800,14 @@ OPTIONS RUNTIME
   last poll time, errors, available functions
   no durable hidden storage
   separate live vault cache vs resolved vault cache (or status-keyed entries)
-  FLOW balance/staked/dividend + loss-claim cache
+  LVST balance/staked/dividend + loss-claim cache
 
 READ LAYER
-  contract reads via @flowstream-re2/contracts + injected transport
-  decode -> MarketSnapshot / VaultSnapshot / ResolvedVaultSnapshot / UserVaultState / FlowAccountState
+  contract reads via @livestreak/contracts + injected transport
+  decode -> MarketSnapshot / VaultSnapshot / ResolvedVaultSnapshot / UserVaultState / LvstAccountState
 
 PROJECT LAYER
-  snapshot -> MarketView / VaultView / ResolvedVaultView / FlowAccountView / OptionsPanel
+  snapshot -> MarketView / VaultView / ResolvedVaultView / LvstAccountView / OptionsPanel
   derive totals, odds (live only), resolved outcome stats, actions
 
 WRITE LAYER
@@ -852,7 +852,7 @@ First version can ship with state model + polling loop before full Bridge transp
 
 ## Ownership
 
-### `packages-re2/options` owns
+### `packages/options` owns
 
 ```text
 read market list
@@ -863,19 +863,19 @@ read resolved vault detail (outcome stats for vaults you funded)
 list resolved vaults for account
 read user positions for both YES and NO
 read active funding stream state
-read consumer FLOW balance, staked amount, and pending dividends
+read consumer LVST balance, staked amount, and pending dividends
 read loss-claim availability after losing resolved vaults
 set/update funding stream rate into a vault side
 set funding stream rate to 0
 claim/release winnings or resolved value
 claim and stake loss FLOW
-stake/unstake FLOW and claim FLOW dividends
+stake/unstake LVST and claim LVST dividends
 compute consumer-facing display state
 emit panel/state for UI/CLI
 watch/poll enough state to know when action is available
 ```
 
-### `packages-re2/options` does not own
+### `packages/options` does not own
 
 ```text
 market creation
@@ -895,9 +895,9 @@ session keys (v0)
 | Market/vault creation | Bookmaker + contracts |
 | Steward hot/dispute decisions | Steward package + contracts |
 | Steward governance staking | Steward package + contracts |
-| Consumer FLOW balance/staking/loss claims | `packages-re2/options` |
-| Media capture and evidence | `packages-re2/observe` |
-| Hosted cache/manifests | `host/` + `packages-re2/host` |
+| Consumer LVST balance/staking/loss claims | `packages/options` |
+| Media capture and evidence | `packages/observe` |
+| Hosted cache/manifests | `host/` + `packages/host` |
 | Wallet/AA execution wiring | Caller/gateway/host — injected into options |
 | UI layout and icons | `app/` |
 
@@ -957,13 +957,13 @@ get vault
 get user position by vault + side
 get user funding stream by vault + side
 set stream rate / drip into vault
-resolve/finalize/claim/release
+resolve/finalize/claim/release   # claimVault/releaseVault BLOCKED — not on Vault.sol yet
 hot/steward state if on-chain for v0
-get FLOW balance / staked / pending dividends
+get LVST balance / staked / pending dividends
 get loss claim by account + vault, or aggregate loss-claim totals
-claim loss FLOW
-stake / unstake FLOW
-claim FLOW dividends
+claim loss FLOW                # claimLossFlow — available
+stake / unstake LVST           # skeletonStake / skeletonUnstake — available
+claim LVST dividends           # BLOCKED — no LvstToken function yet
 ```
 
 Critical for hedging:
@@ -975,7 +975,7 @@ position(user, vault, NO)
 
 must be separate reads. Options always models YES and NO as distinct positions.
 
-`@flowstream-re2/contracts` owns ABI artifacts and low-level call encoding. Options owns decode → snapshot → view.
+`@livestreak/contracts` owns ABI artifacts and low-level call encoding. Options owns decode → snapshot → view.
 
 ## Boundary With Other Packages
 
@@ -999,10 +999,11 @@ Same rule as observe:
 | Kind | Pattern | Use for |
 | --- | --- | --- |
 | Vanilla pure | plain TS functions | `projectVaultView`, odds math, action flags, panel projection |
-| Effect blueprint | returns `Effect`, never runs it | `readVault`, `setFundingRate`, `createOptionsRuntime`, polling lifecycle |
-| Execution | `Effect.runPromise`, app edge | `app/`, `cli-re2`, tests only |
+| Vanilla async | async functions over injected transport | `setFundingRate`, `stopFundingStream`, `claimLossFlow`, `stakeFlow`, `unstakeFlow` via `ContractWriter` (mirror `ContractReader`) |
+| Effect blueprint | returns `Effect`, never runs it | **not used in options v0** — `createOptionsRuntime` and reads are vanilla Promise + injected transport |
+| Execution | `Effect.runPromise`, app edge | **not in options `src/`** — app/cli/tests only if a caller chooses Effect |
 
-Do not call `Effect.run*` inside `packages-re2/options` library code.
+Do not call `Effect.run*` inside `packages/options` library code.
 
 Inject read/write transport via config or `Context.Tag` at boundaries.
 
@@ -1019,7 +1020,7 @@ Panel answers:
 - **resolved outcome, final pools, win/loss, net PnL** (resolved vaults)
 - user positions on YES and NO
 - active funding rates per side
-- $FLOW balance, staked amount, pending dividends, and loss-claim actions
+- $LVST balance, staked amount, pending dividends, and loss-claim actions
 - which actions are enabled and why others are disabled
 
 Route live vault UI to `readVault` / `VaultView`. Route history and "how did my vault do?" UI to `readResolvedVault` / `ResolvedVaultView`. Do not show live streaming controls on resolved vaults.
@@ -1038,14 +1039,14 @@ Panel does **not** answer:
 - `model/odds.ts` — pure multiplier/probability math from pool bigints.
 - `read/vaults.ts` — one place that turns contract output into `OptionsVaultSnapshot`.
 - `read/resolved.ts` — `listResolvedVaults`, `readResolvedVault` for vaults the account funded.
-- `read/flow.ts` — FLOW balance, staked amount, dividends, and loss-claim reads.
+- `read/flow.ts` — LVST balance, staked amount, dividends, and loss-claim reads.
 - `project/resolved.ts` — snapshot → `ResolvedVaultView` with outcome, PnL, claim actions.
-- `project/flow.ts` — FLOW account snapshot → `FlowAccountView` with staking/loss actions.
+- `project/flow.ts` — LVST account snapshot → `LvstAccountView` with staking/loss actions.
 - `project/vault.ts` — snapshot + optional user state → `OptionsVaultView` with string amounts (live only).
 - `runtime/store.ts` — keyed snapshots, revision counter, last poll metadata.
 - `runtime/poll.ts` — refresh scheduler; failures recorded on runtime, not thrown into UI uncaught.
-- `write/funding.ts` — `setFundingRate` and `stopFundingStream` (rate `0`) only.
-- `write/flow.ts` — `stakeFlow`, `unstakeFlow`, `claimFlowDividends`, `claimAndStakeLossFlow`.
+- `write/funding.ts` — `setFundingRate` and `stopFundingStream` only.
+- `write/flow.ts` — `claimLossFlow`, `stakeFlow`, `unstakeFlow`. **Blocked:** `claimFlowDividends`, `claimAndStakeLossFlow`.
 
 Good code follows these rules:
 
@@ -1054,7 +1055,7 @@ Good code follows these rules:
 - Hedging is first-class, not an edge case.
 - Resolved vaults use `ResolvedVaultView`, not live `VaultView` with extra fields.
 - Loss claims are part of resolved consumer state, not steward-only state.
-- Consumer FLOW staking lives in options; steward proposal/challenge staking lives in steward.
+- Consumer LVST staking lives in options; steward proposal/challenge staking lives in steward.
 - Hot/steward fields are read-only in options.
 - No market/vault creation in this package.
 - Polling updates snapshots; projection is cheap and repeatable.
@@ -1068,7 +1069,7 @@ Do not embed bookmaker or steward decision logic — read their on-chain results
 
 Do not overload `VaultView` with resolved outcome/PnL — use `ResolvedVaultView`.
 
-Do not put consumer FLOW staking in steward just because stewards also stake — options owns user balance/loss-claim staking, steward owns governance staking.
+Do not put consumer LVST staking in steward just because stewards also stake — options owns user balance/loss-claim staking, steward owns governance staking.
 
 Do not duplicate observe run lifecycle or host manifest flows.
 
@@ -1093,7 +1094,7 @@ model/market.ts, vault.ts, resolved.ts, position.ts, funding.ts, flow.ts, odds.t
 project/market.ts, vault.ts, resolved.ts, flow.ts, panel.ts
 ```
 
-Acceptance: unit tests project mock snapshots to views; totals, odds, resolved outcome stats, FLOW balances, staked amounts, and loss-claim action flags match derivation rules.
+Acceptance: unit tests project mock snapshots to views; totals, odds, resolved outcome stats, LVST balances, staked amounts, and loss-claim action flags match derivation rules.
 
 ### Step B — read layer (injected fake transport)
 
@@ -1144,30 +1145,43 @@ no bridge auth
 ### Slice 2 — real chain reads (v0 contracts)
 
 ```text
-wire @flowstream-re2/contracts
+wire @livestreak/contracts
 listMarkets / readVault against testnet/local
 panel driven from live reads
 ```
 
-### Slice 3 — funding writes
+### Slice 3 — runtime + polling (shipped)
+
+```text
+createOptionsRuntime, manual refresh, opt-in polling
+in-memory store + panel projection
+```
+
+### Slice 4a — funding + FLOW writes (shipped)
 
 ```text
 setFundingRate / stopFundingStream
-injected AA/wallet write transport
-refresh positions after tx
+claimLossFlow / stakeFlow / unstakeFlow
+injected ContractWriter (no viem in package)
 ```
 
-### Slice 4 — claim/release + resolved reads + bridge
+### Slice 4b — claim/release + dividends (blocked on contracts)
 
 ```text
-claimVault / releaseVault
-readFlowAccount / claimAndStakeLossFlow
+claimVault / releaseVault        # no user claim/release on Vault.sol yet
+claimFlowDividends               # no LvstToken function
+claimAndStakeLossFlow            # no combined function; use claimLossFlow + stakeFlow separately
+```
+
+### Slice 5 — bridge + resolved reads
+
+```text
 listResolvedVaults / readResolvedVault
 action flags from live + resolved projections
 OptionsBridge for CLI/UI
 ```
 
-### Slice 5 — host indexer (optional)
+### Slice 6 — host indexer (optional)
 
 ```text
 market index off-chain for cheaper contracts
@@ -1182,8 +1196,8 @@ This file is the **source of truth for options architecture**: consumer workflow
 
 | Document | Role |
 | --- | --- |
-| `packages-re2/options/docs/architecture.md` (this file) | Options runtime model, ownership, phased delivery |
-| `packages-re2/observe/docs/architecture.md` | Media pipeline — complementary pattern reference for runtime/Bridge |
+| `packages/options/docs/architecture.md` (this file) | Options runtime model, ownership, phased delivery |
+| `packages/observe/docs/architecture.md` | Media pipeline — complementary pattern reference for runtime/Bridge |
 | `host/docs/architecture.md` | Hosted distribution — not options read path for v0 |
 | `AGENTS.md` (repo root) | Observe package style; same Effect purity applies here |
 
@@ -1209,11 +1223,11 @@ Useful to port:
 
 - viem transport patterns from `protocol-viem.ts`, `protocol-transport.ts`
 - call naming ideas from `protocol-calls.ts`, `protocol-actions.ts`
-- FLOW balance/stake/reward calls from `protocol-actions.ts`, rearranged into `read/flow.ts` and `write/flow.ts`
+- LVST balance/stake/reward calls from `protocol-actions.ts`, rearranged into `read/flow.ts` and `write/flow.ts`
 
 Do not port:
 
-- `CreateVaultParams` / `makeFlowStreamClient` as the public center
+- `CreateVaultParams` / `makeLiveStreakClient` as the public center
 - `createVault` ownership into options — that is bookmaker + contracts
 - monolithic client that mixes create + consume
 
@@ -1230,7 +1244,7 @@ browser-safe protocol-state runtime
 direct-chain reads for v0
 AA/wallet execution injected
 in-memory board/panel state
-consumer FLOW balance/staking/loss-claim actions
+consumer LVST balance/staking/loss-claim actions
 no durable hidden storage
 no market/vault creation
 ```
