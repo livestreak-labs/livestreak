@@ -1,9 +1,9 @@
 /* eslint-disable unicorn/no-null -- BoardCell.status tuple uses null for absent message */
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
-import { nowTimePoint } from "@flowstream-re2/schema";
-import type { RawFrame } from "#pipeline/capture/types.js";
-import { projectWorkerControlView } from "#run/control/board/worker-view.js";
+import { nowTimePoint } from "@livestreak/schema";
+import type { RawFrame } from "#pipeline/capture/index.js";
+import { projectWorkerControlView } from "#run/control/board/index.js";
 import { supervisorTurn } from "#run/worker/supervisor.js";
 import {
   CAPTURE_VIDEO_RAW_TRACK_ID,
@@ -15,7 +15,7 @@ import {
   type SinkStageState,
   type WorkerState
 } from "#run/worker/state.js";
-import type { SinkAttachment } from "#pipeline/publish/types.js";
+import type { SinkAttachment } from "#pipeline/publish/index.js";
 import { systemMemoryBoardCell, systemTickBoardCell } from "#test/helpers/board.js";
 
 describe("worker pause lifecycle", () => {

@@ -6,8 +6,8 @@ import {
 } from "#pipeline/capture/file/driver.js";
 import { makeFfmpegRawVideoDecodeArguments } from "#pipeline/capture/file/decode.js";
 import { parseFraction } from "#adapters/ffmpeg/index.js";
-import type { CaptureStageHealth } from "#pipeline/capture/types.js";
-import type { RawFrame } from "#pipeline/capture/types.js";
+import type { CaptureStageHealth } from "#pipeline/capture/index.js";
+import type { RawFrame } from "#pipeline/capture/index.js";
 import { makeTinyMp4Fixture, removeFixtureDirectory, skipUnlessFfmpegIntegration } from "#test/helpers/ffmpeg.js";
 
 describe("file capture driver", () => {

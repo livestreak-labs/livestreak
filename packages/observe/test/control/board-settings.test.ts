@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Exit } from "effect";
 import { createBrowserBoardFixture, createFileBoardFixture } from "#test/helpers/board.js";
-import { validateBoardSettings } from "#run/control/board/settings.js";
-import type { Board } from "#run/control/board/model.js";
-import { projectWorkerControlView } from "#run/control/board/worker-view.js";
+import { validateBoardSettings } from "#run/control/board/index.js";
+import type { Board } from "#run/control/board/index.js";
+import { projectWorkerControlView } from "#run/control/board/index.js";
 
 const baseBoard = createBrowserBoardFixture("run_settings", {
   url: "https://example.com",

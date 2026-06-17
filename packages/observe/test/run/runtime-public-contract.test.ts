@@ -214,7 +214,7 @@ describe("ObserveRuntime public contract", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+      expect(exit.cause.toString()).toContain("LiveStreakConfigError");
       expect(exit.cause.toString()).toContain("Artifact art_missing not found for run run_public_missing_artifact");
     }
   });
@@ -243,17 +243,17 @@ describe("ObserveRuntime public contract", () => {
       expect(Exit.isFailure(exit.value.artifactExit)).toBe(true);
 
       if (Exit.isFailure(exit.value.getExit)) {
-        expect(exit.value.getExit.cause.toString()).toContain("FlowStreamConfigError");
+        expect(exit.value.getExit.cause.toString()).toContain("LiveStreakConfigError");
         expect(exit.value.getExit.cause.toString()).toContain("Run run_missing not found in store");
       }
 
       if (Exit.isFailure(exit.value.boardExit)) {
-        expect(exit.value.boardExit.cause.toString()).toContain("FlowStreamConfigError");
+        expect(exit.value.boardExit.cause.toString()).toContain("LiveStreakConfigError");
         expect(exit.value.boardExit.cause.toString()).toContain("Run run_missing not found in store");
       }
 
       if (Exit.isFailure(exit.value.artifactExit)) {
-        expect(exit.value.artifactExit.cause.toString()).toContain("FlowStreamConfigError");
+        expect(exit.value.artifactExit.cause.toString()).toContain("LiveStreakConfigError");
         expect(exit.value.artifactExit.cause.toString()).toContain("Run run_missing not found in store");
       }
     }

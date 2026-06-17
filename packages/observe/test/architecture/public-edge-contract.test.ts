@@ -22,7 +22,7 @@ describe("public edge contract architecture guard", () => {
 
     expect(edgeContractSource).toMatch(/from\s+["']#index\.js["']/);
     expect(edgeContractSource).toMatch(/from\s+["']#test\/helpers\//);
-    expect(edgeContractSource).toMatch(/from\s+["']@flowstream-re2\/core["']/);
+    expect(edgeContractSource).toMatch(/from\s+["']@livestreak\/core["']/);
     expect(edgeContractSource).not.toMatch(/cause\.toString\(\)/);
   });
 });

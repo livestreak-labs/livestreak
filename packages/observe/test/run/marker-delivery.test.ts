@@ -2,7 +2,7 @@
 import { Effect, Exit } from "effect";
 import { describe, expect, it } from "vitest";
 import { createFileSinkDriver } from "#pipeline/publish/sinks/file/driver.js";
-import { projectWorkerControlView } from "#run/control/board/worker-view.js";
+import { projectWorkerControlView } from "#run/control/board/index.js";
 import {
   advanceStoppingToDraining,
   completeResumeIfNeeded

@@ -1,11 +1,11 @@
 /* eslint-disable unicorn/no-null -- BoardCell.status tuple uses null for absent message */
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
-import { FlowStreamRuntimeError } from "@flowstream-re2/core";
-import { projectWorkerControlView } from "#run/control/board/worker-view.js";
+import { LiveStreakRuntimeError } from "@livestreak/core";
+import { projectWorkerControlView } from "#run/control/board/index.js";
 import {
   defaultControlPause
-} from "#run/control/board/settings.js";
+} from "#run/control/board/index.js";
 import { supervisorTurn } from "#run/worker/supervisor.js";
 import {
   createEmptyWorkerState,
@@ -35,7 +35,7 @@ describe("supervisor capture health failure", () => {
         sourceMode: "file"
       },
       readHealth: Effect.fail(
-        new FlowStreamRuntimeError({
+        new LiveStreakRuntimeError({
           message: "capture health read failed in test"
         })
       ),

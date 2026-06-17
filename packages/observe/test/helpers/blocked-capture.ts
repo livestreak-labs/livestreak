@@ -5,7 +5,7 @@ import type {
   CaptureStageHealth,
   FrameSource,
   RawFrame
-} from "#pipeline/capture/types.js";
+} from "#pipeline/capture/index.js";
 import type { RuntimeKernelOptions } from "#run/runtime.js";
 import { createSyntheticKernelOptions } from "#test/helpers/runtime.js";
 import type { ObserveRunConfig } from "#run/config/types.js";

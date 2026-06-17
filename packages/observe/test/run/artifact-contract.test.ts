@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { Cause, Effect, Exit, Option } from "effect";
 import {
-  isFlowStreamError,
+  isLiveStreakError,
   serializeUnknownError,
   type SerializedError
-} from "@flowstream-re2/core";
+} from "@livestreak/core";
 import {
   bridgeArtifactReadScope,
   bridgeBoardReadScope,
@@ -68,7 +68,7 @@ const configErrorFromExit = (exit: Exit.Exit<unknown, unknown>): string | undefi
   }
 
   const failure = Cause.failureOption(exit.cause);
-  if (Option.isSome(failure) && isFlowStreamError(failure.value)) {
+  if (Option.isSome(failure) && isLiveStreakError(failure.value)) {
     return failure.value.message;
   }
 
@@ -348,7 +348,7 @@ describe("artifact contract", () => {
       if (Exit.isSuccess(exit)) {
         expect(Exit.isFailure(exit.value.denied)).toBe(true);
         if (Exit.isFailure(exit.value.denied)) {
-          expect(exit.value.denied.cause.toString()).toContain("FlowStreamCapabilityError");
+          expect(exit.value.denied.cause.toString()).toContain("LiveStreakCapabilityError");
           expect(exit.value.denied.cause.toString()).toContain(bridgeArtifactReadScope);
         }
         expect(exit.value.getArtifactCalled).toBe(false);
@@ -387,7 +387,7 @@ describe("artifact contract", () => {
       if (Exit.isSuccess(exit)) {
         expect(Exit.isFailure(exit.value.deniedBlank)).toBe(true);
         if (Exit.isFailure(exit.value.deniedBlank)) {
-          expect(exit.value.deniedBlank.cause.toString()).toContain("FlowStreamCapabilityError");
+          expect(exit.value.deniedBlank.cause.toString()).toContain("LiveStreakCapabilityError");
         }
         expect(exit.value.getArtifactCalled).toBe(false);
       }
@@ -445,7 +445,7 @@ describe("artifact contract", () => {
       if (Exit.isSuccess(exit)) {
         expect(Exit.isFailure(exit.value.deniedNumeric)).toBe(true);
         if (Exit.isFailure(exit.value.deniedNumeric)) {
-          expect(exit.value.deniedNumeric.cause.toString()).toContain("FlowStreamCapabilityError");
+          expect(exit.value.deniedNumeric.cause.toString()).toContain("LiveStreakCapabilityError");
         }
         expect(exit.value.getArtifactCalled).toBe(false);
       }

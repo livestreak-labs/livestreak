@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { RuntimeKernelOptions } from "#run/runtime.js";
-import type { Board, BoardRunStatus } from "#run/control/board/model.js";
+import type { Board, BoardRunStatus } from "#run/control/board/index.js";
 import {
   createFakeLiveCaptureDriver,
   type FakeLiveCaptureCounters,

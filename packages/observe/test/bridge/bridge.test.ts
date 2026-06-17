@@ -324,7 +324,7 @@ describe("ObserveBridge", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamCapabilityError");
+      expect(exit.cause.toString()).toContain("LiveStreakCapabilityError");
       expect(exit.cause.toString()).toContain("bridge:board:read");
     }
   });
@@ -377,7 +377,7 @@ describe("ObserveBridge", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamCapabilityError");
+      expect(exit.cause.toString()).toContain("LiveStreakCapabilityError");
       expect(exit.cause.toString()).toContain(systemPauseSetPresentationScope);
     }
   });
@@ -427,7 +427,7 @@ describe("ObserveBridge", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamCapabilityError");
+      expect(exit.cause.toString()).toContain("LiveStreakCapabilityError");
       expect(exit.cause.toString()).toContain(bridgeArtifactReadScope);
     }
   });
@@ -449,7 +449,7 @@ describe("ObserveBridge", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+      expect(exit.cause.toString()).toContain("LiveStreakConfigError");
       expect(exit.cause.toString()).toContain("Run run_missing_after_auth not found in store");
     }
   });
@@ -555,7 +555,7 @@ describe("ObserveBridge", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+      expect(exit.cause.toString()).toContain("LiveStreakConfigError");
       expect(exit.cause.toString()).toContain("Bridge caller id is required");
     }
   });
@@ -629,7 +629,7 @@ describe("ObserveBridge", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamCapabilityError");
+      expect(exit.cause.toString()).toContain("LiveStreakCapabilityError");
       expect(exit.cause.toString()).toContain(bridgeBoardReadScope);
     }
   });

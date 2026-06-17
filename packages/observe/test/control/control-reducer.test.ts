@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- BoardCell.status tuple uses null for absent message */
 import { describe, expect, it } from "vitest";
-import { applyWorkerSnapshotToBoard } from "#run/control/board/worker-snapshot.js";
-import { createInitialBoard } from "#run/control/board/model.js";
+import { applyWorkerSnapshotToBoard } from "#run/control/board/index.js";
+import { createInitialBoard } from "#run/control/board/index.js";
 import type { WorkerSnapshot } from "#run/worker/snapshot.js";
 
 describe("applyWorkerSnapshotToBoard", () => {

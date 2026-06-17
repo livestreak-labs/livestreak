@@ -70,13 +70,13 @@ describe("public API barrel", () => {
     }
   });
 
-  it("exports product APIs through explicit lists rather than bus/board barrels", () => {
+  it("exports product APIs through curated barrels without internal bus/board modules", () => {
     expect(indexSource).toMatch(/createObserveRuntime/);
     expect(indexSource).toMatch(/createObserveBridge/);
     expect(indexSource).toMatch(/evaluateBridgeAuthorization/);
-    expect(indexSource).toMatch(/from "\.\/run\/control\/board\/model\.js"/);
-    expect(indexSource).toMatch(/from "\.\/run\/control\/bus\/calls\.js"/);
-    expect(indexSource).toMatch(/from "\.\/run\/control\/bus\/types\.js"/);
+    expect(indexSource).toMatch(/from "\.\/run\/control\/board\/index\.js"/);
+    expect(indexSource).toMatch(/from "\.\/run\/control\/bus\/index\.js"/);
+    expect(indexSource).toMatch(/from "\.\/run\/control\/index\.js"/);
     expect(indexSource).not.toMatch(/from "\.\/run\/control\/bus\/bus\.js"/);
     expect(indexSource).not.toMatch(/from "\.\/run\/control\/board\/patch\.js"/);
     expect(indexSource).not.toMatch(/from "\.\/run\/control\/board\/settings\.js"/);

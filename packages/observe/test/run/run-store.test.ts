@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Exit } from "effect";
-import { buildControlCatalog } from "#run/control/catalog.js";
-import { createControlBus } from "#run/control/bus/bus.js";
+import { buildControlCatalog } from "#run/control/index.js";
+import { createControlBus } from "#run/control/bus/index.js";
 import { createBrowserBoardFixture } from "#test/helpers/board.js";
-import { createSystemPauseSurface } from "#run/control/system/pause.js";
+import { createSystemPauseSurface } from "#run/control/index.js";
 import { makeObserveRunSync } from "#test/helpers/observe-run.js";
 import { createRunStore } from "#run/store.js";
 import { browserCaptureRunConfig } from "#test/helpers/run-config.js";
@@ -35,7 +35,7 @@ describe("RunStore", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+      expect(exit.cause.toString()).toContain("LiveStreakConfigError");
       expect(exit.cause.toString()).toContain("already exists in store");
     }
   });
@@ -46,7 +46,7 @@ describe("RunStore", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+      expect(exit.cause.toString()).toContain("LiveStreakConfigError");
       expect(exit.cause.toString()).toContain("not found in store");
     }
   });

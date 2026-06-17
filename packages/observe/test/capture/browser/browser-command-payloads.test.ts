@@ -6,15 +6,15 @@ import {
   browserCaptureSetCropScope,
   browserCaptureSetTargetScope,
   createBrowserCaptureDriver
-} from "#pipeline/capture/browser/driver.js";
+} from "#pipeline/capture/browser/index.js";
 import {
   decodeSetCaptureFpsPayload,
   decodeSetCropPayload,
   decodeSetTargetPayload
 } from "#pipeline/capture/browser/control/payloads.js";
-import { buildControlCatalog } from "#run/control/catalog.js";
-import { createControlBus } from "#run/control/bus/bus.js";
-import { createInitialBoard } from "#run/control/board/model.js";
+import { buildControlCatalog } from "#run/control/index.js";
+import { createControlBus } from "#run/control/bus/index.js";
+import { createInitialBoard } from "#run/control/board/index.js";
 import { makeFakeBrowserCaptureAdapter } from "#test/helpers/browser-adapter.js";
 
 const testBoard = createInitialBoard({
@@ -30,7 +30,7 @@ const expectConfigFailure = async (effect: Effect.Effect<unknown, unknown>): Pro
   }
 
   const rendered = exit.cause.toString();
-  expect(rendered).toContain("FlowStreamConfigError");
+  expect(rendered).toContain("LiveStreakConfigError");
   return rendered;
 };
 
@@ -100,19 +100,19 @@ describe("browser command payload decoders", () => {
 });
 
 describe("browser surface payload failures", () => {
-  it("malformed setTarget payload fails with FlowStreamConfigError", async () => {
+  it("malformed setTarget payload fails with LiveStreakConfigError", async () => {
     const rendered = await expectConfigFailure(
       runBrowserSurfaceFunction(browserCaptureSetTargetScope, {})
     );
     expect(rendered).toContain("setTarget");
   });
 
-  it("malformed setCrop payload fails with FlowStreamConfigError", async () => {
+  it("malformed setCrop payload fails with LiveStreakConfigError", async () => {
     const rendered = await expectConfigFailure(runBrowserSurfaceFunction(browserCaptureSetCropScope, {}));
     expect(rendered).toContain("crop payload");
   });
 
-  it("malformed setCaptureFps payload fails with FlowStreamConfigError", async () => {
+  it("malformed setCaptureFps payload fails with LiveStreakConfigError", async () => {
     const rendered = await expectConfigFailure(
       runBrowserSurfaceFunction(browserCaptureSetCaptureFpsScope, { fps: 30 })
     );

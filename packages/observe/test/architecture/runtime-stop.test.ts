@@ -7,7 +7,7 @@ const packageRoot = new URL("../..", import.meta.url).pathname;
 describe("runtime stop architecture guards", () => {
   it("routes runtime stop through bus callFunction without worker mutation", () => {
     const runtimeSource = readFileSync(path.join(packageRoot, "src/run/runtime.ts"), "utf8");
-    const stopSource = readFileSync(path.join(packageRoot, "src/run/stop.ts"), "utf8");
+    const stopSource = readFileSync(path.join(packageRoot, "src/run/kernel.ts"), "utf8");
     const bridgeSource = readFileSync(path.join(packageRoot, "src/bridge/bridge.ts"), "utf8");
     const storeSource = readFileSync(path.join(packageRoot, "src/run/store.ts"), "utf8");
 

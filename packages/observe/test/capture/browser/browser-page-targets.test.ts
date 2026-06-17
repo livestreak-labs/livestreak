@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
-import { makeBrowserPageCaptureAdapter } from "#pipeline/capture/browser/driver.js";
+import { makeBrowserPageCaptureAdapter } from "#pipeline/capture/browser/index.js";
 
 const noopAsync = async (): Promise<void> => {};
 

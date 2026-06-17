@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/no-null -- BoardCell.status tuple uses null for absent message */
 import { Effect, Stream } from "effect";
-import type { CaptureDriver, CaptureDriverDescriptor, FrameSource } from "#pipeline/capture/types.js";
-import type { ControlCellDefinition, ControlSurface } from "#run/control/bus/types.js";
+import type { CaptureDriver, CaptureDriverDescriptor, FrameSource } from "#pipeline/capture/index.js";
+import type { ControlCellDefinition, ControlSurface } from "#run/control/bus/index.js";
 
 export const fakeControlCaptureScope = "capture:fake:ping" as const;
 

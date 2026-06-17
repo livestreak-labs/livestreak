@@ -5,7 +5,7 @@ import {
   browserCaptureClearCropScope,
   browserCaptureSetCropScope,
   createBrowserCaptureDriver
-} from "#pipeline/capture/browser/driver.js";
+} from "#pipeline/capture/browser/index.js";
 import { builtInObserveRegistry, getRegistryDescriptor } from "#index.js";
 import { makeFakeBrowserCaptureAdapter } from "#test/helpers/browser-adapter.js";
 

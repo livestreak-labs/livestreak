@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Exit } from "effect";
 import { prepareObserveRun, startObserveRun, startObserveRunAsync } from "#run/kernel.js";
-import { systemRunStopScope } from "#run/control/system/run.js";
+import { systemRunStopScope } from "#run/control/index.js";
 import {
   callStoredRunFunction,
   createRunStore,

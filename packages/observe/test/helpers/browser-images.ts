@@ -14,7 +14,7 @@ export interface BrowserImageFixture {
 }
 
 export const makeBrowserImageFixtures = async (): Promise<BrowserImageFixture> => {
-  const directory = await mkdtemp(path.join(tmpdir(), "flowstream-browser-image-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "livestreak-browser-image-"));
   const jpegPath = path.join(directory, "frame.jpg");
   const pngPath = path.join(directory, "frame.png");
 

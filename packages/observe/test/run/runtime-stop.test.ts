@@ -158,7 +158,7 @@ describe("ObserveRuntime stopRun", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+      expect(exit.cause.toString()).toContain("LiveStreakConfigError");
       expect(exit.cause.toString()).toContain("Active handle for run run_missing_handle not found");
     }
   });
@@ -181,7 +181,7 @@ describe("ObserveRuntime stopRun", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+      expect(exit.cause.toString()).toContain("LiveStreakConfigError");
       expect(exit.cause.toString()).toContain("stopRun timeoutMs must be a finite number");
     }
   });
@@ -372,7 +372,7 @@ describe("ObserveBridge stopRun", () => {
     if (Exit.isSuccess(exit)) {
       expect(Exit.isFailure(exit.value.denied)).toBe(true);
       if (Exit.isFailure(exit.value.denied)) {
-        expect(exit.value.denied.cause.toString()).toContain("FlowStreamCapabilityError");
+        expect(exit.value.denied.cause.toString()).toContain("LiveStreakCapabilityError");
         expect(exit.value.denied.cause.toString()).toContain(systemRunStopScope);
       }
       expect(exit.value.stopCalled).toBe(false);
@@ -396,7 +396,7 @@ describe("ObserveBridge stopRun", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+      expect(exit.cause.toString()).toContain("LiveStreakConfigError");
     }
   });
 
@@ -457,7 +457,7 @@ describe("ObserveBridge stopRun", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+      expect(exit.cause.toString()).toContain("LiveStreakConfigError");
       expect(exit.cause.toString()).toContain(
         "stopRun timeoutMs must be greater than or equal to 0"
       );

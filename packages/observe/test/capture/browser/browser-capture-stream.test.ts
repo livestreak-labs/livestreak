@@ -3,7 +3,7 @@ import { Chunk, Effect, Stream } from "effect";
 import {
   browserCaptureDescriptor,
   createBrowserCaptureDriver,
-} from "#pipeline/capture/browser/driver.js";
+} from "#pipeline/capture/browser/index.js";
 import { makeFakeBrowserCaptureAdapter } from "#test/helpers/browser-adapter.js";
 
 describe("browser capture stream", () => {

@@ -5,7 +5,7 @@ import { prepareObserveRun } from "#run/kernel.js";
 import { browserCaptureRunConfig } from "#test/helpers/run-config.js";
 
 describe("observe run kernel config", () => {
-  it("prepareObserveRun fails with FlowStreamConfigError when browser driver is not injected", async () => {
+  it("prepareObserveRun fails with LiveStreakConfigError when browser driver is not injected", async () => {
     const run = makeObserveRunSync(
       browserCaptureRunConfig("run_missing_browser_driver", {
         url: "https://example.com",
@@ -19,7 +19,7 @@ describe("observe run kernel config", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+      expect(exit.cause.toString()).toContain("LiveStreakConfigError");
       expect(exit.cause.toString()).toContain('Unknown capture driver "browser"');
     }
   });

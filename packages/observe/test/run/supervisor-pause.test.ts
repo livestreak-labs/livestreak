@@ -1,10 +1,10 @@
 /* eslint-disable unicorn/no-null -- BoardCell.status tuple uses null for absent message */
 import { Effect, Either, Stream } from "effect";
 import { describe, expect, it } from "vitest";
-import { FlowStreamRuntimeError } from "@flowstream-re2/core";
-import { nowTimePoint } from "@flowstream-re2/schema";
-import type { CaptureLiveControls, FrameSource, RawFrame } from "#pipeline/capture/types.js";
-import { projectWorkerControlView } from "#run/control/board/worker-view.js";
+import { LiveStreakRuntimeError } from "@livestreak/core";
+import { nowTimePoint } from "@livestreak/schema";
+import type { CaptureLiveControls, FrameSource, RawFrame } from "#pipeline/capture/index.js";
+import { projectWorkerControlView } from "#run/control/board/index.js";
 import { createCaptureStageState } from "#run/worker/capture-pull.js";
 import { supervisorTurn } from "#run/worker/supervisor.js";
 import {
@@ -16,7 +16,7 @@ import {
   type CaptureStageState,
   type SinkStageState
 } from "#run/worker/state.js";
-import type { SinkAttachment } from "#pipeline/publish/types.js";
+import type { SinkAttachment } from "#pipeline/publish/index.js";
 import { systemMemoryBoardCell, systemTickBoardCell } from "#test/helpers/board.js";
 
 describe("supervisor live pause", () => {
@@ -51,7 +51,7 @@ describe("supervisor live pause", () => {
 
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result)) {
-      expect(result.left).toBeInstanceOf(FlowStreamRuntimeError);
+      expect(result.left).toBeInstanceOf(LiveStreakRuntimeError);
       expect(result.left.message).toContain("missing CaptureLiveControls");
     }
   });

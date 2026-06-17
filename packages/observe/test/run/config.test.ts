@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { Cause, Effect, Exit, Option } from "effect";
 import {
-  serializeFlowStreamError,
-  type FlowStreamConfigError
-} from "@flowstream-re2/core";
+  serializeLiveStreakError,
+  type LiveStreakConfigError
+} from "@livestreak/core";
 import {
   browserCaptureRunConfig,
   createObserveRuntime,
@@ -256,7 +256,7 @@ describe("observe run config contract", () => {
     expect(Exit.isSuccess(exit)).toBe(true);
   });
 
-  it("runtime.prepareRun returns FlowStreamConfigError for malformed config", async () => {
+  it("runtime.prepareRun returns LiveStreakConfigError for malformed config", async () => {
     const exit = await Effect.runPromiseExit(
       Effect.scoped(
         Effect.gen(function* () {
@@ -270,7 +270,7 @@ describe("observe run config contract", () => {
     expectConfigFailureMessage(exit, "runId must be a non-empty string");
   });
 
-  it("serializeFlowStreamError produces CLI-safe JSON for malformed config failure", async () => {
+  it("serializeLiveStreakError produces CLI-safe JSON for malformed config failure", async () => {
     const exit = await Effect.runPromiseExit(
       validateObserveRunConfig({ ...canonicalFileConfig, sink: { driverId: "file" } })
     );
@@ -279,9 +279,9 @@ describe("observe run config contract", () => {
     const error = configErrorFromExit(exit);
     expect(error).toBeDefined();
 
-    const serialized = serializeFlowStreamError(error!);
+    const serialized = serializeLiveStreakError(error!);
     expect(serialized).toMatchObject({
-      tag: "FlowStreamConfigError",
+      tag: "LiveStreakConfigError",
       shortName: "config",
       message: "sink.config is required"
     });
@@ -322,7 +322,7 @@ const expectConfigFailureMessage = (exit: Exit.Exit<unknown, unknown>, message: 
   expect(error?.message).toBe(message);
 };
 
-const configErrorFromExit = (exit: Exit.Exit<unknown, unknown>): FlowStreamConfigError | undefined => {
+const configErrorFromExit = (exit: Exit.Exit<unknown, unknown>): LiveStreakConfigError | undefined => {
   if (Exit.isFailure(exit) === false) {
     return undefined;
   }
@@ -337,9 +337,9 @@ const configErrorFromExit = (exit: Exit.Exit<unknown, unknown>): FlowStreamConfi
     typeof error === "object" &&
     error !== null &&
     "_tag" in error &&
-    error._tag === "FlowStreamConfigError"
+    error._tag === "LiveStreakConfigError"
   ) {
-    return error as FlowStreamConfigError;
+    return error as LiveStreakConfigError;
   }
 
   return undefined;

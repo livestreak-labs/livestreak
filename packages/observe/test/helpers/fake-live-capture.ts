@@ -7,8 +7,8 @@ import type {
   FrameSource,
   RawFrame,
   RawFrameCadence
-} from "#pipeline/capture/types.js";
-import { nowTimePoint } from "@flowstream-re2/schema";
+} from "#pipeline/capture/index.js";
+import { nowTimePoint } from "@livestreak/schema";
 
 export interface FakeLiveCaptureCounters {
   pauseCalls: number;

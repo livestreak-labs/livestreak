@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Exit } from "effect";
-import { applyBoardPatch } from "#run/control/board/patch.js";
+import { applyBoardPatch } from "#run/control/board/index.js";
 import { createBrowserBoardFixture } from "#test/helpers/board.js";
 
 const baseBoard = createBrowserBoardFixture("run_patch", {

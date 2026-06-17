@@ -1,27 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Exit } from "effect";
-import { buildControlCatalog, findCatalogFunctionByScope } from "#run/control/catalog.js";
-import { createControlBus } from "#run/control/bus/bus.js";
+import { buildControlCatalog, findCatalogFunctionByScope } from "#run/control/index.js";
+import { createControlBus } from "#run/control/bus/index.js";
 import {
   createInitialBoard,
   setBoardRunStatus,
   type BoardCellStatus
-} from "#run/control/board/model.js";
-import { applyWorkerSnapshotToBoard } from "#run/control/board/worker-snapshot.js";
+} from "#run/control/board/index.js";
+import { applyWorkerSnapshotToBoard } from "#run/control/board/index.js";
 import {
   createSystemPauseSurface,
   systemPauseSetPresentationScope
-} from "#run/control/system/pause.js";
-import { createSystemRunSurface, systemRunStopScope } from "#run/control/system/run.js";
+} from "#run/control/index.js";
+import { createSystemRunSurface, systemRunStopScope } from "#run/control/index.js";
 import {
   defaultControlPause,
   defaultControlRun,
   pausePresentationValues
-} from "#run/control/board/settings.js";
-import { projectWorkerControlView } from "#run/control/board/worker-view.js";
+} from "#run/control/board/index.js";
+import { projectWorkerControlView } from "#run/control/board/index.js";
 import { browserCaptureClearCropScope } from "#pipeline/capture/browser/control/controls.js";
 import { browserCaptureInspectTargetsScope } from "#pipeline/capture/browser/control/preview.js";
-import { createBrowserCaptureDriver } from "#pipeline/capture/browser/driver.js";
+import { createBrowserCaptureDriver } from "#pipeline/capture/browser/index.js";
 import { makeFakeBrowserCaptureAdapter } from "#test/helpers/browser-adapter.js";
 import { createBrowserBoardFixture } from "#test/helpers/board.js";
 
@@ -113,7 +113,7 @@ describe("control bus", () => {
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
       expect(exit.cause.toString()).toContain("Duplicate live surface function scope");
-      expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+      expect(exit.cause.toString()).toContain("LiveStreakConfigError");
     }
   });
 
@@ -870,7 +870,7 @@ describe("control bus", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+      expect(exit.cause.toString()).toContain("LiveStreakConfigError");
       expect(exit.cause.toString()).toContain("does not match bus runId");
     }
   });

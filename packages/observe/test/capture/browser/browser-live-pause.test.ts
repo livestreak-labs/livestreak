@@ -1,6 +1,6 @@
 import { Effect, Fiber, Ref, Stream } from "effect";
 import { describe, expect, it } from "vitest";
-import { createBrowserCaptureDriver } from "#pipeline/capture/browser/driver.js";
+import { createBrowserCaptureDriver } from "#pipeline/capture/browser/index.js";
 import { makeFakeBrowserCaptureAdapter } from "#test/helpers/browser-adapter.js";
 
 describe("browser live pause", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Exit } from "effect";
-import { systemRunStopScope } from "#run/control/system/run.js";
+import { systemRunStopScope } from "#run/control/index.js";
 import { createObserveRuntime } from "#run/runtime.js";
 import { createRunStore } from "#run/store.js";
 import {
@@ -36,7 +36,7 @@ describe("ObserveRuntime", () => {
     }
   });
 
-  it("duplicate prepareRun with same runId fails cleanly as FlowStreamConfigError", async () => {
+  it("duplicate prepareRun with same runId fails cleanly as LiveStreakConfigError", async () => {
     const { options } = createSyntheticKernelOptions(4);
     const config = makeSyntheticObserveRun("run_dup_prepare", "/tmp/run_dup_prepare.mp4").config;
 
@@ -52,7 +52,7 @@ describe("ObserveRuntime", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+      expect(exit.cause.toString()).toContain("LiveStreakConfigError");
       expect(exit.cause.toString()).toContain("already exists in store");
     }
   });

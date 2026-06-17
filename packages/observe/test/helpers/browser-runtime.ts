@@ -1,14 +1,14 @@
 import { Effect, Scope } from "effect";
-import type { FlowStreamError } from "@flowstream-re2/core";
+import type { LiveStreakError } from "@livestreak/core";
 import {
   browserCaptureInspectTargetsScope,
   createBrowserCaptureDriver
 } from "#index.js";
-import { buildControlCatalog } from "#run/control/catalog.js";
-import { createControlBus } from "#run/control/bus/bus.js";
-import type { Board } from "#run/control/board/model.js";
-import type { ControlBus } from "#run/control/bus/types.js";
-import type { ControlCallResult } from "#run/control/bus/calls.js";
+import { buildControlCatalog } from "#run/control/index.js";
+import { createControlBus } from "#run/control/bus/index.js";
+import type { Board } from "#run/control/board/index.js";
+import type { ControlBus } from "#run/control/bus/index.js";
+import type { ControlCallResult } from "#run/control/bus/index.js";
 import type { RuntimeKernelOptions } from "#run/runtime.js";
 import { makeFakeBrowserCaptureAdapter } from "#test/helpers/browser-adapter.js";
 import { createSyntheticKernelOptions } from "./runtime.js";
@@ -60,7 +60,7 @@ export const createBrowserPreviewHandleBus = (input: {
   readonly runId: string;
   readonly board: Board;
   readonly url: string;
-}): Effect.Effect<BrowserHandleBusPreviewResult, Error | FlowStreamError, Scope.Scope> =>
+}): Effect.Effect<BrowserHandleBusPreviewResult, Error | LiveStreakError, Scope.Scope> =>
   Effect.gen(function* () {
     const adapter = makeFakeBrowserCaptureAdapter({
       frameBytes: new Uint8Array([255, 216, 255, 217]),

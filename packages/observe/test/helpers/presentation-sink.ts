@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import type { FlowStreamError } from "@flowstream-re2/core";
+import type { LiveStreakError } from "@livestreak/core";
 import type { TimelineMarkerKind } from "#pipeline/timeline/index.js";
 import type {
   MarkerSinkDeliveryItem,
@@ -9,7 +9,7 @@ import type {
   SinkPausePresentation,
   SinkPresentationControls,
   SinkStageHealth
-} from "#pipeline/publish/types.js";
+} from "#pipeline/publish/index.js";
 
 export type MarkerSinkDeliveryLabel =
   | `video:${number}`
@@ -40,8 +40,8 @@ export interface PresentationRecordingSinkOptions {
   readonly deliveredVideos?: number[];
   readonly pausePresentation?: (
     presentation: SinkPausePresentation
-  ) => Effect.Effect<void, FlowStreamError>;
-  readonly resumePresentation?: Effect.Effect<void, FlowStreamError>;
+  ) => Effect.Effect<void, LiveStreakError>;
+  readonly resumePresentation?: Effect.Effect<void, LiveStreakError>;
   readonly deliver?: SinkAttachment["deliver"];
 }
 
@@ -167,7 +167,7 @@ export const createPresentationRecordingAttachment = (
 
 const defaultPausePresentationRecorder =
   (presentationCalls: string[]) =>
-  (presentation: SinkPausePresentation): Effect.Effect<void, FlowStreamError> =>
+  (presentation: SinkPausePresentation): Effect.Effect<void, LiveStreakError> =>
     Effect.sync(() => {
       if (presentation.whilePaused === "slate") {
         presentationCalls.push(`pause:slate:${presentation.slateAssetId ?? ""}`);

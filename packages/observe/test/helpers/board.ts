@@ -1,9 +1,9 @@
 /* eslint-disable unicorn/no-null -- BoardCell.status tuple uses null for absent message */
-import type { BrowserCaptureConfig } from "#pipeline/capture/browser/driver.js";
+import type { BrowserCaptureConfig } from "#pipeline/capture/browser/index.js";
 import { browserCaptureFunctionNames } from "#pipeline/capture/browser/control/surface.js";
-import { createInitialBoard, type Board } from "#run/control/board/model.js";
-import type { BoardCell } from "#run/control/bus/types.js";
-import { mergeBoardCellOnSurfaceMount } from "#run/control/bus/mount.js";
+import { createInitialBoard, type Board } from "#run/control/board/index.js";
+import type { BoardCell } from "#run/control/bus/index.js";
+import { mergeBoardCellOnSurfaceMount } from "#run/control/bus/index.js";
 
 export interface BrowserBoardCaptureSettings {
   readonly url: string;

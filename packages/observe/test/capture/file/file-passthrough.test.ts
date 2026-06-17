@@ -21,7 +21,7 @@ describe("file passthrough", () => {
     await skipUnlessFfmpegIntegration(context);
 
     const fixture = await makeTinyMp4Fixture();
-    const outputDirectory = await mkdtemp(path.join(tmpdir(), "flowstream-output-"));
+    const outputDirectory = await mkdtemp(path.join(tmpdir(), "livestreak-output-"));
     const outputPath = path.join(outputDirectory, "export.mp4");
 
     try {

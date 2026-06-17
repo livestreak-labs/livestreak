@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Exit } from "effect";
-import { buildControlCatalog } from "#run/control/catalog.js";
-import { createControlBus, stageCellSurface } from "#run/control/bus/bus.js";
-import { createInitialBoard } from "#run/control/board/model.js";
-import { createSystemPauseSurface } from "#run/control/system/pause.js";
-import { createSystemRunSurface } from "#run/control/system/run.js";
+import { buildControlCatalog } from "#run/control/index.js";
+import { createControlBus, stageCellSurface } from "#run/control/bus/index.js";
+import { createInitialBoard } from "#run/control/board/index.js";
+import { createSystemPauseSurface } from "#run/control/index.js";
+import { createSystemRunSurface } from "#run/control/index.js";
 import { browserCaptureClearCropScope } from "#pipeline/capture/browser/control/controls.js";
 import { browserCaptureInspectTargetsScope } from "#pipeline/capture/browser/control/preview.js";
-import { createBrowserCaptureDriver } from "#pipeline/capture/browser/driver.js";
+import { createBrowserCaptureDriver } from "#pipeline/capture/browser/index.js";
 import { makeFakeBrowserCaptureAdapter } from "#test/helpers/browser-adapter.js";
 import { createBrowserBoardFixture } from "#test/helpers/board.js";
 import { createFakeControlCaptureDriver } from "#test/helpers/fake-control-capture.js";
@@ -15,7 +15,7 @@ import { prepareObserveRun } from "#index.js";
 import { makeObserveRunSync } from "#test/helpers/observe-run.js";
 import { browserCaptureRunConfig } from "#test/helpers/run-config.js";
 import { createBrowserRuntimeKernelOptions } from "#test/helpers/browser-runtime.js";
-import type { ControlSurface } from "#run/control/bus/types.js";
+import type { ControlSurface } from "#run/control/bus/index.js";
 
 describe("control bus surfaces", () => {
   it("mountSurface inserts a missing Board cell", async () => {

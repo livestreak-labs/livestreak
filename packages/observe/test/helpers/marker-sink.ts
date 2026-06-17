@@ -6,7 +6,7 @@ import type {
   SinkDriver,
   SinkFinalizeResult,
   SinkStageHealth
-} from "#pipeline/publish/types.js";
+} from "#pipeline/publish/index.js";
 
 export interface MarkerSinkMarkerRecord {
   readonly kind: TimelineMarkerKind;

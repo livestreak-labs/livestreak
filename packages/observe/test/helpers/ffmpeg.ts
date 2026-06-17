@@ -46,7 +46,7 @@ export const makeTinyMp4Fixture = async (): Promise<{
   readonly directory: string;
   readonly path: string;
 }> => {
-  const directory = await mkdtemp(path.join(tmpdir(), "flowstream-file-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "livestreak-file-"));
   const fixturePath = path.join(directory, "tiny.mp4");
 
   await execFileAsync("ffmpeg", [

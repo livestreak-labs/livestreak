@@ -6,7 +6,7 @@ import { Cause, Effect, Exit, Option } from "effect";
 import {
   serializeUnknownError,
   type SerializedError
-} from "@flowstream-re2/core";
+} from "@livestreak/core";
 import {
   browserCaptureInspectTargetsScope,
   browserCaptureRunConfig,
@@ -174,7 +174,7 @@ describe("public edge contract", () => {
       await skipUnlessFfmpegIntegration(context);
 
       const fixture = await makeTinyMp4Fixture();
-      const outputDirectory = await mkdtemp(path.join(tmpdir(), "flowstream-edge-output-"));
+      const outputDirectory = await mkdtemp(path.join(tmpdir(), "livestreak-edge-output-"));
       const outputPath = path.join(outputDirectory, "edge-export.mp4");
       const runId = "run_edge_file_cli";
 
@@ -265,8 +265,8 @@ describe("public edge contract", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true);
       if (Exit.isSuccess(exit)) {
-        expect(exit.value.missingRunSerialized?.tag).toBe("FlowStreamConfigError");
-        expect(exit.value.deniedSerialized?.tag).toBe("FlowStreamCapabilityError");
+        expect(exit.value.missingRunSerialized?.tag).toBe("LiveStreakConfigError");
+        expect(exit.value.deniedSerialized?.tag).toBe("LiveStreakCapabilityError");
       }
     });
 

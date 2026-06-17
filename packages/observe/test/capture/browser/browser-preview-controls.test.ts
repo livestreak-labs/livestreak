@@ -7,9 +7,9 @@ import {
   browserCaptureSetTargetScope,
   browserPreviewTargetsArtifactKind,
   createBrowserCaptureDriver,
-} from "#pipeline/capture/browser/driver.js";
-import { buildControlCatalog } from "#run/control/catalog.js";
-import { createControlBus } from "#run/control/bus/bus.js";
+} from "#pipeline/capture/browser/index.js";
+import { buildControlCatalog } from "#run/control/index.js";
+import { createControlBus } from "#run/control/bus/index.js";
 import { createBrowserBoardFixture } from "#test/helpers/board.js";
 import { makeFakeBrowserCaptureAdapter } from "#test/helpers/browser-adapter.js";
 
@@ -514,7 +514,7 @@ describe("browser preview controls", () => {
 
 describe("browser descriptor command metadata", () => {
   it("advertises resultKind and artifact output for inspectTargets", async () => {
-    const { browserCaptureDescriptor } = await import("#pipeline/capture/browser/driver.js");
+    const { browserCaptureDescriptor } = await import("#pipeline/capture/browser/index.js");
     const command = browserCaptureDescriptor.commands.find(
       (entry) => entry.scope === browserCaptureInspectTargetsScope
     );

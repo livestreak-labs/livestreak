@@ -132,7 +132,7 @@ describe("scope authorization", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(exit.cause.toString()).toContain("FlowStreamCapabilityError");
+      expect(exit.cause.toString()).toContain("LiveStreakCapabilityError");
       expect(exit.cause.toString()).toContain("bridge:board:read");
       expect(exit.cause.toString()).toContain("No capability grant authorizes bridge:board:read");
     }

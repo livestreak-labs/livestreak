@@ -1,5 +1,5 @@
 import type { ObserveRunConfig } from "#run/config/types.js";
-import type { BrowserCaptureConfig } from "#pipeline/capture/browser/driver.js";
+import type { BrowserCaptureConfig } from "#pipeline/capture/browser/index.js";
 
 export { browserCaptureRunConfig, fileCaptureRunConfig } from "#run/config/index.js";
 

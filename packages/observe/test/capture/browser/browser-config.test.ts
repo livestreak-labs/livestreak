@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Exit } from "effect";
-import { validateBrowserCaptureConfig } from "#pipeline/capture/browser/driver.js";
+import { validateBrowserCaptureConfig } from "#pipeline/capture/browser/index.js";
 
 describe("browser capture config validation", () => {
   it("rejects invalid config with typed config errors", async () => {
@@ -24,7 +24,7 @@ describe("browser capture config validation", () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        expect(exit.cause.toString()).toContain("FlowStreamConfigError");
+        expect(exit.cause.toString()).toContain("LiveStreakConfigError");
       }
     }
   });

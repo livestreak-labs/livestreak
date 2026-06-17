@@ -1,7 +1,7 @@
 import { Effect, Stream } from "effect";
 import { describe, expect, it } from "vitest";
-import { nowTimePoint } from "@flowstream-re2/schema";
-import type { RawFrame } from "#pipeline/capture/types.js";
+import { nowTimePoint } from "@livestreak/schema";
+import type { RawFrame } from "#pipeline/capture/index.js";
 import { createCaptureFramePull } from "#run/worker/capture-pull.js";
 
 describe("capture frame pull", () => {

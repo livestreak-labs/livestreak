@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { Chunk, Effect, Either, Stream } from "effect";
-import { FlowStreamCapabilityError } from "@flowstream-re2/core";
+import { LiveStreakCapabilityError } from "@livestreak/core";
 import {
   createBrowserCaptureDriver,
   makeBrowserPageCaptureAdapter,
   makeBrowserPageFactoryCaptureAdapter,
   validateBrowserCapturePageReadiness
-} from "#pipeline/capture/browser/driver.js";
+} from "#pipeline/capture/browser/index.js";
 
 const bytes = (...values: readonly number[]): Uint8Array => new Uint8Array(values);
 
@@ -112,7 +112,7 @@ describe("browser page adapter", () => {
 
     expect(Either.isLeft(missingMethod)).toBe(true);
     if (Either.isLeft(missingMethod)) {
-      expect(missingMethod.left).toBeInstanceOf(FlowStreamCapabilityError);
+      expect(missingMethod.left).toBeInstanceOf(LiveStreakCapabilityError);
       expect(missingMethod.left.readinessCode).toBe("missing-method");
       expect(missingMethod.left.requiredScope).toBe("capture:browser:setViewportSize");
     }

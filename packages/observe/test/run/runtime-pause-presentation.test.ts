@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Exit } from "effect";
-import { FlowStreamRuntimeError } from "@flowstream-re2/core";
+import { LiveStreakRuntimeError } from "@livestreak/core";
 import {
   createObserveRuntime,
   projectControlPanelControls,
@@ -229,7 +229,7 @@ describe("ObserveRuntime pause presentation", () => {
       sink: {
         pausePresentation: () =>
           Effect.fail(
-            new FlowStreamRuntimeError({
+            new LiveStreakRuntimeError({
               message: "presentation hook failed"
             })
           )

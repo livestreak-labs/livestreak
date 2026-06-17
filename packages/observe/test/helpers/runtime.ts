@@ -9,8 +9,8 @@ import type {
   SinkDriver,
   SinkFinalizeResult,
   SinkStageHealth
-} from "#pipeline/publish/types.js";
-import type { CaptureDriver } from "#pipeline/capture/types.js";
+} from "#pipeline/publish/index.js";
+import type { CaptureDriver } from "#pipeline/capture/index.js";
 import type { RuntimeKernelOptions } from "#run/runtime.js";
 import { makeObserveRunSync } from "#test/helpers/observe-run.js";
 import { syntheticCaptureRunConfig } from "#test/helpers/run-config.js";

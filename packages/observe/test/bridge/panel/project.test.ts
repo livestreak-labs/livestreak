@@ -3,8 +3,8 @@ import {
   projectBoardControls,
   projectControlPanelControls
 } from "#index.js";
-import { buildControlCatalog, type ControlCatalog } from "#run/control/catalog.js";
-import type { Board } from "#run/control/board/model.js";
+import { buildControlCatalog, type ControlCatalog } from "#run/control/index.js";
+import type { Board } from "#run/control/board/index.js";
 import { createBrowserBoardFixture } from "#test/helpers/board.js";
 
 const browserBoardSettings = {

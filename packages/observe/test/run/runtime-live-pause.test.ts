@@ -4,8 +4,8 @@ import {
   systemPausePauseScope,
   systemPauseResumeScope,
   systemPauseSetPresentationScope
-} from "#run/control/system/pause.js";
-import { systemRunStopScope } from "#run/control/system/run.js";
+} from "#run/control/index.js";
+import { systemRunStopScope } from "#run/control/index.js";
 import { createObserveRuntime } from "#run/runtime.js";
 import {
   createFakeLiveRuntimeKernelOptions,

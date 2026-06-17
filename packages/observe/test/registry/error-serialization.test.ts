@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Cause, Effect, Exit, Option } from "effect";
 import {
-  isFlowStreamError,
-  serializeFlowStreamError,
-  type FlowStreamError,
-  type SerializedFlowStreamError
-} from "@flowstream-re2/core";
+  isLiveStreakError,
+  serializeLiveStreakError,
+  type LiveStreakError,
+  type SerializedLiveStreakError
+} from "@livestreak/core";
 import {
   bridgeBoardReadScope,
   browserCaptureRunConfig,
@@ -32,7 +32,7 @@ describe("observe error serialization", () => {
 
     expectSerialized(exit, {
       shortName: "config",
-      tag: "FlowStreamConfigError",
+      tag: "LiveStreakConfigError",
       message: "Run run_missing_serialize not found in store"
     });
   });
@@ -53,7 +53,7 @@ describe("observe error serialization", () => {
 
     expectSerialized(exit, {
       shortName: "config",
-      tag: "FlowStreamConfigError"
+      tag: "LiveStreakConfigError"
     });
     const serialized = serializedFromExit(exit);
     expect(serialized?.message).toContain("Artifact art_missing not found");
@@ -85,7 +85,7 @@ describe("observe error serialization", () => {
 
     expectSerialized(exit, {
       shortName: "capability",
-      tag: "FlowStreamCapabilityError",
+      tag: "LiveStreakCapabilityError",
       context: { requiredScope: systemPauseSetPresentationScope }
     });
   });
@@ -112,7 +112,7 @@ describe("observe error serialization", () => {
 
     expectSerialized(exit, {
       shortName: "config",
-      tag: "FlowStreamConfigError"
+      tag: "LiveStreakConfigError"
     });
     const serialized = serializedFromExit(exit);
     expect(serialized?.message).toContain("slateAssetId");
@@ -141,7 +141,7 @@ describe("observe error serialization", () => {
 
     expectSerialized(exit, {
       shortName: "config",
-      tag: "FlowStreamConfigError"
+      tag: "LiveStreakConfigError"
     });
     const serialized = serializedFromExit(exit);
     expect(serialized?.message).toContain('Unknown capture driver "browser"');
@@ -159,7 +159,7 @@ describe("observe error serialization", () => {
 
     expectSerialized(exit, {
       shortName: "config",
-      tag: "FlowStreamConfigError",
+      tag: "LiveStreakConfigError",
       message: "artifactId must be a non-empty string"
     });
   });
@@ -194,9 +194,9 @@ const callerWithScopes = (id: string, scopes: readonly CapabilityScope[]): Bridg
   ]
 });
 
-const flowStreamErrorFromCause = (cause: Cause.Cause<unknown>): FlowStreamError | undefined => {
+const flowStreamErrorFromCause = (cause: Cause.Cause<unknown>): LiveStreakError | undefined => {
   const failure = Cause.failureOption(cause);
-  if (Option.isSome(failure) && isFlowStreamError(failure.value)) {
+  if (Option.isSome(failure) && isLiveStreakError(failure.value)) {
     return failure.value;
   }
 
@@ -205,7 +205,7 @@ const flowStreamErrorFromCause = (cause: Cause.Cause<unknown>): FlowStreamError 
 
 const serializedFromExit = (
   exit: Exit.Exit<unknown, unknown>
-): SerializedFlowStreamError | undefined => {
+): SerializedLiveStreakError | undefined => {
   if (Exit.isFailure(exit) === false) {
     return undefined;
   }
@@ -215,12 +215,12 @@ const serializedFromExit = (
     return undefined;
   }
 
-  return serializeFlowStreamError(error);
+  return serializeLiveStreakError(error);
 };
 
 const expectSerialized = (
   exit: Exit.Exit<unknown, unknown>,
-  expected: Partial<SerializedFlowStreamError>
+  expected: Partial<SerializedLiveStreakError>
 ): void => {
   expect(Exit.isFailure(exit)).toBe(true);
   const serialized = serializedFromExit(exit);

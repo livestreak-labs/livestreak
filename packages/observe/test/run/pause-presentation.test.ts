@@ -1,14 +1,14 @@
 /* eslint-disable unicorn/no-null -- BoardCell.status tuple uses null for absent message */
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
-import { FlowStreamRuntimeError } from "@flowstream-re2/core";
-import { nowTimePoint } from "@flowstream-re2/schema";
-import type { RawFrame } from "#pipeline/capture/types.js";
+import { LiveStreakRuntimeError } from "@livestreak/core";
+import { nowTimePoint } from "@livestreak/schema";
+import type { RawFrame } from "#pipeline/capture/index.js";
 import type {
   SinkAttachment,
   SinkPresentationControls
-} from "#pipeline/publish/types.js";
-import { projectWorkerControlView } from "#run/control/board/worker-view.js";
+} from "#pipeline/publish/index.js";
+import { projectWorkerControlView } from "#run/control/board/index.js";
 import { shouldPumpSinks } from "#run/worker/lifecycle.js";
 import { supervisorTurn } from "#run/worker/supervisor.js";
 import {
@@ -181,7 +181,7 @@ describe("pause presentation runtime", () => {
     const state = makeRunningState({
       pausePresentation: () =>
         Effect.fail(
-          new FlowStreamRuntimeError({
+          new LiveStreakRuntimeError({
             message: "presentation hook failed"
           })
         )

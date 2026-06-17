@@ -3,7 +3,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
-import { createBrowserCaptureDriver } from "#pipeline/capture/browser/driver.js";
+import { createBrowserCaptureDriver } from "#pipeline/capture/browser/index.js";
 import type { ObserveRunResult } from "#run/kernel.js";
 import { prepareObserveRun, startObserveRun } from "#run/kernel.js";
 import { makeObserveRunSync } from "#test/helpers/observe-run.js";
@@ -26,7 +26,7 @@ describe("browser passthrough", () => {
     await skipUnlessFfmpegIntegration(context);
 
     const imageFixture = await makeBrowserImageFixtures();
-    const outputDirectory = await mkdtemp(path.join(tmpdir(), "flowstream-browser-output-"));
+    const outputDirectory = await mkdtemp(path.join(tmpdir(), "livestreak-browser-output-"));
     const outputPath = path.join(outputDirectory, "export.mp4");
     const frameBytes = await readFixtureBytes(imageFixture.jpegPath);
 

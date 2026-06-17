@@ -5,19 +5,19 @@ import {
   createSyntheticCaptureDriver,
   defaultSyntheticCaptureConfig
 } from "#pipeline/capture/synthetic/driver.js";
-import type { CaptureDriver } from "#pipeline/capture/types.js";
-import type { SinkAttachment, SinkFinalizeResult, SinkStageHealth } from "#pipeline/publish/types.js";
-import { buildControlCatalog } from "#run/control/catalog.js";
-import type { ControlBus } from "#run/control/bus/types.js";
-import { createControlBus } from "#run/control/bus/bus.js";
-import type { Board } from "#run/control/board/model.js";
-import { createSystemRunSurface, systemRunStopScope } from "#run/control/system/run.js";
+import type { CaptureDriver } from "#pipeline/capture/index.js";
+import type { SinkAttachment, SinkFinalizeResult, SinkStageHealth } from "#pipeline/publish/index.js";
+import { buildControlCatalog } from "#run/control/index.js";
+import type { ControlBus } from "#run/control/bus/index.js";
+import { createControlBus } from "#run/control/bus/index.js";
+import type { Board } from "#run/control/board/index.js";
+import { createSystemRunSurface, systemRunStopScope } from "#run/control/index.js";
 import {
   defaultControlPause,
   defaultControlRun,
   validateBoardSettings
-} from "#run/control/board/settings.js";
-import { projectWorkerControlView } from "#run/control/board/worker-view.js";
+} from "#run/control/board/index.js";
+import { projectWorkerControlView } from "#run/control/board/index.js";
 import { validateWorkerPrepare } from "#run/worker/prepare.js";
 import { systemMemoryBoardCell, systemTickBoardCell } from "#test/helpers/board.js";
 import {

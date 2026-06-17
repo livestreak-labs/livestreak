@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/no-null -- BoardCell.status tuple uses null for absent message */
 import { describe, expect, it } from "vitest";
-import { projectWorkerControlView } from "#run/control/board/worker-view.js";
+import { projectWorkerControlView } from "#run/control/board/index.js";
 import {
   beginPauseCycleIfNeeded,
   completePauseAfterSourcePaused
