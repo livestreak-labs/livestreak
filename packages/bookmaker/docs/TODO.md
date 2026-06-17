@@ -51,27 +51,13 @@ See [architecture.md](./architecture.md). See [repo TODO](../../../README.md).
 
 ---
 
-## Active follow-up — detector output throw-safety
-
-Prompt: [../../../temp-prompts/bookmaker.md](../../../temp-prompts/bookmaker.md)
-
-> Verification 2026-06-15: Slice C throw-safety covers *throwing* detectors but
-> `evaluate.ts:116` reads `raw.detectorId.trim()` outside the try, so a detector
-> returning a non-null malformed object (missing/non-string detectorId) crashes
-> `detectOpportunity`. Tests miss it. Fix + 3 negative tests issued.
-
-- [x] Null/type-safe detectorId normalization in `collectValidDetections` (landed: `evaluate.ts` guards `typeof raw === "object"`)
-- [x] Negative tests: missing detectorId, non-string detectorId, primitive return
-
----
-
 ## Slice D — write plan
 
 - [x] `planBookmakerWrite(decision, contracts)` as pure data intents
 - [x] No direct ABI fragments
 - [x] `createVault` and `joinExistingVault` intents only
 - [x] Map `createVault` intent → local `BookmakerContractWriteDescriptor` when `marketIdBytes` supplied
-- [ ] Blocker: `@flowstream/contracts` exports wagmi ABIs only — restore public TS write encoders before wiring descriptor mapping to contracts package
+- [ ] Blocker: `@livestreak/contracts` exports wagmi ABIs only — restore public TS write encoders before wiring descriptor mapping to contracts package
 - [ ] Wire full write execution via AA transport at CLI edge
 
 ---

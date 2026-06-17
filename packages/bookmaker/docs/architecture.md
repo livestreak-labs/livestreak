@@ -554,7 +554,7 @@ Panel does **not** answer: UI layout, user positions, vault odds (options), stew
 - Every write goes through `BookmakerWritePlan` — no surprise `createVault` in detectors.
 - Similarity is always queried with `marketId`.
 - Skip reasons are explicit and typed.
-- Write plans use `BookmakerContractWriteDescriptor` locally (`createVault` with `marketIdBytes` + `question`) until `@flowstream/contracts` restores wagmi-generated write encoders; bookmaker does not import ABI fragments today.
+- Write plans use `BookmakerContractWriteDescriptor` locally (`createVault` with `marketIdBytes` + `question`) until `@livestreak/contracts` restores wagmi-generated write encoders; bookmaker does not import ABI fragments today.
 - Bookmaker never imports options.
 
 ## What should not be built
