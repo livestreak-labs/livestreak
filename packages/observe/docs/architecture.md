@@ -1,4 +1,4 @@
-# @flowstream-re2/observe Architecture
+# @livestreak/observe Architecture
 
 This document is for the developer who arrives with no conversation history and needs to move. It explains the architecture we want, why the folders exist, what should not be built, and how a running observe process ties the control bus to the media worker.
 
@@ -153,6 +153,27 @@ src/
 
 This is the target house shape. It respects the current stage families under `pipeline/`, keeps run lifecycle under `run/`, keeps authorization in `scope/`, and keeps bridge panel projection under `bridge/panel/`.
 
+### Barrel rule
+
+A folder gets exactly one `index.ts` (re-exports only, zero logic) when code **outside** the folder imports it as a unit. That barrel is the sole external entry point — outside code imports `#path/folder/index.js`, never a deep file inside a barreled folder. Folders that are single-file, or leaf driver folders reached only through a parent registry, get no barrel. A barrel must not re-export anything the architecture marks internal beyond what its consumers actually use.
+
+| Folder | Barrel | Notes |
+| --- | --- | --- |
+| `adapters/ffmpeg` | yes | kept |
+| `bridge`, `bridge/panel` | yes | kept |
+| `pipeline/capture` | yes | stage root: `registry`, `types`, `pause` |
+| `pipeline/capture/browser` | yes | kept |
+| `pipeline/capture/file`, `synthetic`, `iptv` | no | registry-leaf drivers |
+| `pipeline/process`, `pipeline/publish` | yes | stage roots |
+| `pipeline/timeline` | yes | kept |
+| `run/config`, `run/control/board`, `run/control/bus` | yes | kept |
+| `run/control` | yes | root barrel for `catalog`, `board`, `bus`, `system` |
+| `run/control/system` | no | exported through `run/control/index.js` |
+| `run/worker` | no | worker internals are not public; kernel deep-imports intentionally |
+| `scope` | no | single file (`scopes.ts`) |
+
+Pipeline ESLint still allows only `#run/control/bus/calls.js` and `#run/control/bus/types.js` from `pipeline/**` (not the bus barrel path).
+
 Do not add `pipeline/track/` for this design. Tracks are not a reusable pipeline package here. They are runtime state owned by `run/worker/state.ts`. If capture, process, or publish can import a `TrackStack` and create its own queue, the architecture has already split in the wrong place.
 
 ## Public API (`src/index.ts`)
@@ -194,7 +215,7 @@ subscribeBoard / subscribeArtifacts (optional)
 awaitRun
 ```
 
-CLI/Gateway must **not** import worker, control-bus, board patch, or pipeline internals. `@flowstream-re2/core` owns error serialization via `serializeFlowStreamError`, `serializeUnknownError`, and `isFlowStreamError`.
+CLI/Gateway must **not** import worker, control-bus, board patch, or pipeline internals. `@livestreak/core` owns error serialization via `serializeLiveStreakError`, `serializeUnknownError`, and `isLiveStreakError`.
 
 Contract expectations:
 
@@ -394,7 +415,7 @@ Board status is not a command channel.
 Kernel-only run statuses (`created`, `preparing`, `prepared`, `starting`) stay on the board until the worker's first snapshot commits `running`. After that, worker lifecycle drives board status projection for active and terminal states.
 
 ```text
-makeObserveRun(config) -> Effect<ObserveRun, FlowStreamConfigError>
+makeObserveRun(config) -> Effect<ObserveRun, LiveStreakConfigError>
   -> validate envelope
   -> create initial Board
   -> create ObserveRun handle
@@ -656,7 +677,7 @@ Projection rules:
 
 Bridge authorization always delegates to `scope/` before any runtime call. There is no injectable Bridge authorizer; observe owns authorization internally. `BridgeCaller.trusted === true` bypasses grant checks for local trusted callers after caller id validation. Otherwise `BridgeCaller.grants` carries `CapabilityGrant` records evaluated by `requireAnyScope`. Grants may be exact scopes, prefix wildcards such as `bridge:board:*` or `capture:browser:*`, or global `*`. Revoked and expired grants fail. External gateway authenticates callers and supplies caller/grant context to Bridge; it does not inject observe authorization logic. Gateway is not implemented in observe.
 
-CLI, web, and future Gateway transports must not invent their own error JSON. Convert typed `FlowStreamError` values with `@flowstream-re2/core` `serializeFlowStreamError` into stable, JSON-safe `SerializedFlowStreamError` payloads (`shortName`, `title`, `message`, `description`, optional `context`, optional metadata fields). Do not serialize `metadata.cause` to clients.
+CLI, web, and future Gateway transports must not invent their own error JSON. Convert typed `LiveStreakError` values with `@livestreak/core` `serializeLiveStreakError` into stable, JSON-safe `SerializedLiveStreakError` payloads (`shortName`, `title`, `message`, `description`, optional `context`, optional metadata fields). Do not serialize `metadata.cause` to clients.
 
 Pause is one lifecycle operation. Board `system:pause.settings.requested` drives worker pause/resume; presentation is separate from lifecycle.
 
@@ -798,7 +819,7 @@ Artifacts are per-run and stored in that run's ControlBus in-memory map. A contr
 | Rule | Behavior |
 | --- | --- |
 | Id format | Opaque `art_<uuid>` assigned at store time; do not export id factories or test reset helpers |
-| Fetch input | JSON `artifactId` validated at runtime/store boundary; non-string or whitespace-only fails with `FlowStreamConfigError`: `artifactId must be a non-empty string` |
+| Fetch input | JSON `artifactId` validated at runtime/store boundary; non-string or whitespace-only fails with `LiveStreakConfigError`: `artifactId must be a non-empty string` |
 | Missing id | Unknown ids such as `art_missing` fail with `Artifact <id> not found for run <runId>` — UUID format is not validated on input |
 | Cross-run access | Artifacts from run A cannot be read under run B |
 | Read models | Board, Panel, and Controls must not embed artifact payloads; `refs` are optional and id-only strings when present |
@@ -1535,7 +1556,7 @@ Bridge -> ControlCallEnvelope(scope: capture:browser:inspectTargets)
 Rules:
 
 - Preview images live in `ControlCallResult.artifact`, not in the Board and not in worker tracks.
-- Function payload decoding must fail with `FlowStreamConfigError`, never throw `TypeError`.
+- Function payload decoding must fail with `LiveStreakConfigError`, never throw `TypeError`.
 - Read-only preview functions do not bump board revision; they advance browser-local `previewRevision`.
 - Mutating functions return explicit board patches.
 - `getPreview` and `inspectTargets` share artifact kind `browser.previewTargets`; `getPreview` returns `targets: []`.
@@ -1558,7 +1579,7 @@ expanded pause schema for live sources (behavior still incomplete)
 ESLint guard: pipeline/** may import only #run/control/bus/calls.js and #run/control/bus/types.js
 ```
 
-`createControlBus({ runId, ... })` returns `Effect<ControlBus, FlowStreamConfigError>`. Each bus rejects mismatched `callFunction` envelopes. Duplicate live surface scopes fail at construction or `mountSurface` with typed config errors. Unknown capture drivers fail at prepare with `FlowStreamConfigError`.
+`createControlBus({ runId, ... })` returns `Effect<ControlBus, LiveStreakConfigError>`. Each bus rejects mismatched `callFunction` envelopes. Duplicate live surface scopes fail at construction or `mountSurface` with typed config errors. Unknown capture drivers fail at prepare with `LiveStreakConfigError`.
 
 Surface mount semantics:
 
@@ -1647,7 +1668,7 @@ Observe responsibilities for this boundary (target slices):
 
 - Publish endpoint manifest and evidence refs needed for market registration.
 - Expose `observeRunId`, manifest URI, watch URL/WebRTC endpoint refs, and subject metadata to gateway/bookmaker (via bridge read models or host session — transport TBD).
-- Trigger or coordinate **market registration write** at stream start through edge orchestration. This may live in CLI/gateway calling `@flowstream-re2/contracts`; it must not become hidden worker logic inside the observe kernel.
+- Trigger or coordinate **market registration write** at stream start through edge orchestration. This may live in CLI/gateway calling `@livestreak/contracts`; it must not become hidden worker logic inside the observe kernel.
 
 Observe does **not**:
 
@@ -1656,7 +1677,7 @@ Observe does **not**:
 - Stream user funds into vaults (options).
 - Judge bad markets, bad vaults, bad bookmakers, or bad stewards (steward).
 
-Similarity is **vault-scoped inside `marketId`**, not global topic collapse across unrelated streams. Host may suggest similar vaults under the active market, but the bookmaker chooses an explicit action: join existing vault, create a new vault under the same market, or do nothing. See `packages-re2/bookmaker/docs/architecture.md`.
+Similarity is **vault-scoped inside `marketId`**, not global topic collapse across unrelated streams. Host may suggest similar vaults under the active market, but the bookmaker chooses an explicit action: join existing vault, create a new vault under the same market, or do nothing. See `packages/bookmaker/docs/architecture.md`.
 
 ## Relationship To Existing Instructions
 
@@ -1667,11 +1688,11 @@ Other instructions still apply where they do not conflict:
 | Document | Role |
 | --- | --- |
 | `docs/architecture.md` (this file) | Runtime model, ownership boundaries, phased delivery |
-| `packages-re2/bookmaker/docs/architecture.md` | Vault creation under observer-registered markets |
+| `packages/bookmaker/docs/architecture.md` | Vault creation under observer-registered markets |
 | `AGENTS.md` (when present) | Package style: exports at top, helpers at bottom, Effect purity, dependency order between pipeline / run / scope / bridge |
-| `TODO.md` (when present) | Slice ordering; should be updated to follow the **First Build Slice** and **Phased Delivery** sections here instead of porting `-re` kernel verbatim |
+| `README.md` (when present) | Slice ordering; should be updated to follow the **First Build Slice** and **Phased Delivery** sections here instead of porting `-re` kernel verbatim |
 
-If `AGENTS.md` or `TODO.md` still describe only `run/kernel.ts` without `run/control/` and `run/worker/`, treat this document as authoritative for run layout until those files are updated to point here.
+If `AGENTS.md` or `README.md` still describe only `run/kernel.ts` without `run/control/` and `run/worker/`, treat this document as authoritative for run layout until those files are updated to point here.
 
 ### How the layers fit together
 
