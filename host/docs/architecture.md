@@ -1,10 +1,10 @@
-# FlowStream Host Architecture
+# LiveStreak Host Architecture
 
 This document is for the developer who arrives with no conversation history and needs to move. It explains the architecture we want, why the folders exist, what should not be built, and how a running host process serves CLI, observe output workflows, steward forum storage, and account-abstraction execution support.
 
-The short version: **`packages-re2/host` is shared language** — protocol types, request/response shapes, descriptors, and tiny constants. **`host/` is the server implementation** — HTTP routes, in-memory or durable stores, bundler/paymaster proxying, and provider integrations. Real functions live only in top-level `host/`. Every other package depends on stable host shapes from `packages-re2/host`.
+The short version: **`packages/host` is shared language** — protocol types, request/response shapes, descriptors, and tiny constants. **`host/` is the server implementation** — HTTP routes, in-memory or durable stores, bundler/paymaster proxying, and provider integrations. Real functions live only in top-level `host/`. Every other package depends on stable host shapes from `packages/host`.
 
-Top-level `host/` is a server-side provider for FlowStream at the same level as `app/` and `cli-re2/`. It is not an npm package implementation target.
+Top-level `host/` is a server-side provider for LiveStreak at the same level as `app/` and `cli-re2/`. It is not an npm package implementation target.
 
 ## Vocabulary
 
@@ -14,15 +14,15 @@ Use these terms in code and docs:
 | --- | --- |
 | `HostProvider` | A running host server instance identified by `hostId` and `baseUrl`. |
 | Host descriptor | Public identity document: version, capabilities, supported outputs, terms. Served at `GET /descriptor`. |
-| Host policy | Output/cache/quota rules evaluated before a session is created. Request/result types live in `packages-re2/host`; evaluation logic lives in `host/`. |
+| Host policy | Output/cache/quota rules evaluated before a session is created. Request/result types live in `packages/host`; evaluation logic lives in `host/`. |
 | Host session | A hosted output context created after policy passes. Carries `sessionId`, observer/content linkage, and manifest generation inputs. |
-| Endpoint manifest | Signed bundle of watch/WebRTC/state/telemetry/archive/control endpoints for one session. Types in `packages-re2/host`; generation and storage in `host/manifests/`. |
-| Cache receipt | Evidence reference submitted after hosted cache work. Types in `packages-re2/host`; acceptance and storage in `host/cache/`. |
+| Endpoint manifest | Signed bundle of watch/WebRTC/state/telemetry/archive/control endpoints for one session. Types in `packages/host`; generation and storage in `host/manifests/`. |
+| Cache receipt | Evidence reference submitted after hosted cache work. Types in `packages/host`; acceptance and storage in `host/cache/`. |
 | Account descriptor | Tenant/account/api-key metadata shape. Types only in the package; enforcement in `host/tenants/` (later). |
-| AA descriptor | Account-abstraction capability document: EntryPoint, Safe modules, bundler endpoint, paymaster endpoint, sponsorship flags. Types in `packages-re2/host`; routes in `host/aa/`. |
-| Bundler endpoint | Host-owned JSON-RPC proxy for UserOperation calls, for example `POST /aa/bundler/:chain`. In dev it forwards to local Alto. Types live in `packages-re2/host`; proxy logic lives in `host/aa/`. |
+| AA descriptor | Account-abstraction capability document: EntryPoint, Safe modules, bundler endpoint, paymaster endpoint, sponsorship flags. Types in `packages/host`; routes in `host/aa/`. |
+| Bundler endpoint | Host-owned JSON-RPC proxy for UserOperation calls, for example `POST /aa/bundler/:chain`. In dev it forwards to local Alto. Types live in `packages/host`; proxy logic lives in `host/aa/`. |
 | Paymaster endpoint | Host-owned sponsorship/signing surface for AA flows. v0 may be open/dev-only; production adds tenant/auth/quota. |
-| Forum thread | Steward discussion record stored by the host. Types in `packages-re2/host`; CRUD in `host/forum/`. |
+| Forum thread | Steward discussion record stored by the host. Types in `packages/host`; CRUD in `host/forum/`. |
 | WebRTC forwarding | Server-side route/shape for simulcast/live handoff. Route stub in `host/webrtc/` first; real SFU/TURN provider later. |
 
 Do not use these as host architecture terms:
@@ -31,14 +31,14 @@ Do not use these as host architecture terms:
 | --- | --- |
 | Host Bridge | HTTP routes — host is an HTTP/provider server, not an observe-style Bridge |
 | Host scope / capability grant | API key or session auth (later) — not observe `CapabilityScope` |
-| Host client in `packages-re2/host` | Client implementations belong at the edge (`cli-re2`, `app`) or a future thin client package, not the type package |
+| Host client in `packages/host` | Client implementations belong at the edge (`cli-re2`, `app`) or a future thin client package, not the type package |
 | CLI-owned bundler | Host AA bundler endpoint; CLI/app consume the host descriptor and send UserOps there |
 | `session` (observe run) | Observe `ObserveRun` — host `session` is a hosted-output session, a different domain |
 
 ## Package Split
 
 ```text
-packages-re2/host = shared language
+packages/host = shared language
 host/              = server implementation
 ```
 
@@ -46,7 +46,7 @@ That is the boundary. Keep it clean.
 
 | Location | Owns | Does not own |
 | --- | --- | --- |
-| `packages-re2/host` | Types, descriptors, request/result shapes, pure validators/decoders, tiny enums/constants | Server, fetch client, auth implementation, storage, WebRTC implementation, bundler process |
+| `packages/host` | Types, descriptors, request/result shapes, pure validators/decoders, tiny enums/constants | Server, fetch client, auth implementation, storage, WebRTC implementation, bundler process |
 | `host/` | HTTP server, route handlers, stores, bundler/paymaster proxying, provider wiring, dev defaults | Observe pipeline, observe Bridge/scope, CLI preference storage, wallet derivation/signing, domain logic for options/bookmaker/steward agents |
 
 Observe produces media and observations. Host distributes and persists them when output mode requires a server. CLI/gateway authenticates with the host (later), stores user preferences locally, and passes selected host details into package workflows as normal config.
@@ -65,8 +65,8 @@ Observe produces media and observations. Host distributes and persists them when
 
 ### `host/` does not own
 
-- Video pipeline (see `packages-re2/observe/`)
-- Package protocol type ownership (see `packages-re2/host/`)
+- Video pipeline (see `packages/observe/`)
+- Package protocol type ownership (see `packages/host/`)
 - CLI/user preference storage
 - Observe, options, bookmaker, or steward agent domain logic
 - Gateway/CLI authentication UX
@@ -74,12 +74,12 @@ Observe produces media and observations. Host distributes and persists them when
 - Authorization scopes (observe `scope/`)
 - Observe Bridge or capability grants
 
-## Reference Shape — `packages-re2/host`
+## Reference Shape — `packages/host`
 
 Protocol/type-only package. No meaningful behavior.
 
 ```text
-packages-re2/host/src/
+packages/host/src/
   index.ts          re-exports only
   descriptor.ts     host identity, version, supported features
   policy.ts         output/cache/quota policy request + response types
@@ -89,6 +89,7 @@ packages-re2/host/src/
   account.ts        account/tenant/api-key descriptor types
   aa.ts             account abstraction descriptor, bundler, paymaster request/result types
   forum.ts          steward forum/thread/message record types
+  similarity.ts     bookmaker vault similarity request/result types
 ```
 
 Rules for the type package:
@@ -100,7 +101,7 @@ Rules for the type package:
 - Validation helpers (`validateCreateSessionRequest`, `decodeCacheReceipt`) are pure and belong here.
 - HTTP path strings and status-code mapping do **not** belong here — those are server concerns in `host/`.
 
-### Public API (`packages-re2/host/src/index.ts`)
+### Public API (`packages/host/src/index.ts`)
 
 External callers (CLI, app, tests, `host/` server) should import host shapes from the package root.
 
@@ -114,6 +115,7 @@ External callers (CLI, app, tests, `host/` server) should import host shapes fro
 - **Account** — tenant/account/api-key descriptor types (no enforcement).
 - **AA** — capability descriptor, supported operation kinds, bundler proxy request/result envelopes, paymaster sponsorship request/result envelopes.
 - **Forum** — thread, message, and list/summary record types.
+- **Similarity** — `HostSimilarityRequest`, `HostSimilarityIndexRequest`, `HostSimilarityResult`, `HostSimilarVaultCandidate`, duplicate-risk literals.
 
 **Not in the type package:**
 
@@ -156,8 +158,9 @@ host/
       routes.ts       forum CRUD routes
     aa/
       routes.ts       GET /aa/descriptor
-      bundler.ts      POST /aa/bundler/:chain JSON-RPC proxy to Alto/provider
-      paymaster.ts    POST /aa/paymaster sponsorship/signing endpoint
+      alto.ts             Alto child-process spawner (per-chain port registry)
+      paymaster-signer.ts VerifyingPaymaster-compatible ERC-7677 signer (viem)
+      routes.ts           AA descriptor + bundler/paymaster JSON-RPC handlers
       config.ts       chain -> bundler/paymaster provider config
     tenants/
       store.ts        placeholder for multi-tenant state (later)
@@ -180,7 +183,7 @@ Implementation order:
 4. `webrtc/` — forwarding shape, then provider binding
 5. `server/` — HTTP shell that wires the feature routes together
 
-Each feature folder owns its store and routes. Cross-cutting auth, quota, and audit attach at `server/` middleware in later slices — not inside `packages-re2/host`.
+Each feature folder owns its store and routes. Cross-cutting auth, quota, and audit attach at `server/` middleware in later slices — not inside `packages/host`.
 
 ## Top-Level Model
 
@@ -204,7 +207,7 @@ HOST HTTP SERVER (host/)
   webrtc/         forwarding route shape (stub first)
   tenants/        account boundary (later)
 
-TYPE PACKAGE (packages-re2/host)
+TYPE PACKAGE (packages/host)
   shared request/response + record shapes only
 ```
 
@@ -221,30 +224,40 @@ POST /policy/evaluate
 POST /sessions
 GET  /sessions/:sessionId/manifest
 POST /sessions/:sessionId/cache-receipts
+POST /similarity/vaults
+POST /similarity/find
 POST /forum/threads
 GET  /forum/threads/:threadId
 POST /forum/threads/:threadId/messages
 GET  /aa/descriptor
 POST /aa/bundler/:chain
-POST /aa/paymaster
+POST /aa/paymaster/:chain
 ```
 
-### Route behavior (slice 1)
+### Route behavior (registered)
 
-| Route | First-slice behavior |
+| Route | Behavior |
 | --- | --- |
 | `GET /health` | `{ ok: true }` plus optional `hostId`, version, uptime |
 | `GET /descriptor` | Returns `HostProviderDescriptor` from server config |
 | `POST /policy/evaluate` | In-memory rules: supported output mode, cache intent, rough quota checks; returns `HostPolicyResult` |
-| `POST /sessions` | Creates session after policy pass; stores draft in memory; returns session summary |
-| `GET /sessions/:sessionId/manifest` | Generates `EndpointManifest` with dev placeholder endpoint URLs |
-| `POST /sessions/:sessionId/cache-receipts` | Accepts receipt submission; stores in memory; returns status |
-| `POST /forum/threads` | Creates thread record; returns thread id |
-| `GET /forum/threads/:threadId` | Returns thread + messages |
-| `POST /forum/threads/:threadId/messages` | Appends message; returns message record |
-| `GET /aa/descriptor` | Capability document: EntryPoint, Safe module addresses, bundler URL, paymaster URL, sponsorship flags |
-| `POST /aa/bundler/:chain` | JSON-RPC proxy to configured bundler provider (dev quarry: Xylkstream Alto proxy) |
-| `POST /aa/paymaster` | Paymaster sponsorship/signing endpoint; v0 may be open/dev-only but must be isolated under `host/aa/` |
+| `GET /aa/descriptor` | Capability document: EntryPoint, Safe module addresses, bundler path, paymaster path, sponsorship flags — **no Alto proxy or paymaster signing** |
+| `POST /sessions` | Creates session after policy pass; stores draft in memory; returns `HostSessionResult` |
+| `GET /sessions/:sessionId/manifest` | Returns `EndpointManifest` with dev placeholder endpoint URLs |
+| `POST /sessions/:sessionId/cache-receipts` | Accepts cache receipt submission; stores in memory; returns submission status |
+| `POST /similarity/vaults` | Dev in-memory vault index seam — indexes a vault under `marketId` (production: chain indexer on `VaultCreated`, not this open route) |
+| `POST /similarity/find` | Vault-scoped similarity lookup for bookmaker — `marketId`-filtered token overlap (types in `packages/host/src/similarity.ts`) |
+| `POST /forum/threads` | Creates thread record with optional initial message; returns `ForumThreadRecord` |
+| `GET /forum/threads/:threadId` | Returns thread metadata + messages |
+| `POST /forum/threads/:threadId/messages` | Appends message; returns updated `ForumThreadRecord` |
+| `POST /aa/bundler/:chain` | JSON-RPC proxy to local Alto when running for that chain; 503 JSON-RPC error when Alto is not up |
+| `POST /aa/paymaster/:chain` | ERC-7677 `pm_getPaymasterStubData` / `pm_getPaymasterData` via env-loaded verifying paymaster signer |
+
+### Route behavior (deferred — production only)
+
+| Route | Deferred behavior |
+| --- | --- |
+| Chain-event vault indexer | Replaces open `POST /similarity/vaults` in production deployments |
 
 WebRTC forwarding: expose route shape and response types in slice 1; bind to a real provider in a later slice.
 
@@ -254,14 +267,14 @@ WebRTC forwarding: expose route shape and response types in slice 1; bind to a r
 - **Open endpoints** — no serious auth in slice 1.
 - **Bind to localhost by default** — e.g. `127.0.0.1:8787`; document env override.
 - **Generate endpoint manifests** — dev URLs are fine; signature can be a deterministic dev stub until real signing lands.
-- **Accept cache receipt submissions** — validate shape via `packages-re2/host`; persist in memory.
+- **Accept cache receipt submissions** — validate shape via `packages/host`; persist in memory.
 - **Create forum threads and messages** — validate shape; persist in memory.
 - **Expose AA capability descriptor** — advertise EntryPoint/Safe/paymaster/bundler details.
 - **Proxy AA bundler requests** — forward UserOperation JSON-RPC to the configured chain bundler.
 - **Expose paymaster route** — dev sponsorship/signing route first; production auth/quota later.
 - **WebRTC forwarding** — return typed placeholder responses from `host/webrtc/routes.ts`; implement `forwarding.ts` against a real SFU/TURN provider later.
 
-Error responses should use the same JSON error shape as other FlowStream edges (`@flowstream-re2/core` serialization where applicable). Do not invent a parallel error format per route.
+Error responses should use the same JSON error shape as other LiveStreak edges (`@livestreak/core` serialization where applicable). Do not invent a parallel error format per route.
 
 ## Future Host Production Responsibilities
 
@@ -283,14 +296,14 @@ Future host production responsibilities:
 | Concern | Target home |
 | --- | --- |
 | API keys | `host/tenants/` + `server/` auth middleware |
-| Multi-tenant accounts | `host/tenants/store.ts` + `packages-re2/host/account.ts` |
+| Multi-tenant accounts | `host/tenants/store.ts` + `packages/host/account.ts` |
 | Quota enforcement | policy evaluation + tenant store; not in the type package |
 | Cache storage | `host/cache/store.ts` backed by object storage |
 | Audit logs | `host/server/` middleware + durable log sink |
 | Endpoint signing | `host/manifests/store.ts` with real key material |
 | WebRTC/SFU/TURN | `host/webrtc/forwarding.ts` provider adapter |
-| AA bundler proxy | `host/aa/bundler.ts` forwarding to Alto/provider |
-| AA paymaster | `host/aa/paymaster.ts` sponsorship/signing; private key in host env |
+| AA bundler proxy | `host/src/aa/alto.ts` + `handleBundlerRpc` in `host/src/aa/routes.ts` |
+| AA paymaster | `host/src/aa/paymaster-signer.ts` + `handlePaymasterRpc`; private key in host env |
 | Abuse controls | rate limits, receipt spam checks, forum moderation hooks |
 
 ## Boundary With Observe
@@ -299,12 +312,12 @@ Host and observe solve different problems:
 
 | Concern | Owner |
 | --- | --- |
-| Video capture, process, publish | `packages-re2/observe` |
-| Run lifecycle, control bus, board | `packages-re2/observe` |
-| Capability grants, bridge panel | `packages-re2/observe` (`scope/`, `bridge/`) |
+| Video capture, process, publish | `packages/observe` |
+| Run lifecycle, control bus, board | `packages/observe` |
+| Capability grants, bridge panel | `packages/observe` (`scope/`, `bridge/`) |
 | Hosted output distribution, manifests, cache receipts | `host/` |
 | Steward forum persistence API | `host/` |
-| Shared host protocol types | `packages-re2/host` |
+| Shared host protocol types | `packages/host` |
 
 Host does **not** need observe-style `Bridge` or `scope`. It is an HTTP/provider server. CLI may call both observe Bridge (local) and host HTTP (remote) in one workflow; they must not share authorization models.
 
@@ -319,7 +332,7 @@ Expected first-slice flow:
 2. Client POST /policy/evaluate with output mode, cache intent, duration hints.
 3. Server returns HostPolicyResult with pass/warning/blocked status.
 4. Client POST /sessions with sessionId, observer, contentId, policy context.
-5. Server validates request shapes from packages-re2/host.
+5. Server validates request shapes from packages/host.
 6. Server re-evaluates or trusts prior policy (document choice in implementation).
 7. Server stores session draft in memory.
 8. Client GET /sessions/:sessionId/manifest.
@@ -333,7 +346,7 @@ Policy evaluation in slice 1 can be synchronous and in-process. No external poli
 
 ## Manifest Shape
 
-Manifest types live in `packages-re2/host`. Generation lives in `host/manifests/`.
+Manifest types live in `packages/host`. Generation lives in `host/manifests/`.
 
 ```jsonc
 {
@@ -359,7 +372,7 @@ Endpoint kinds: `watch`, `webrtc`, `state`, `telemetry`, `archive`, `control`. S
 
 ## Forum Shape
 
-Forum record types live in `packages-re2/host`. Storage and routes live in `host/forum/`.
+Forum record types live in `packages/host`. Storage and routes live in `host/forum/`.
 
 Slice 1 forum is a simple thread/message store:
 
@@ -373,7 +386,7 @@ No moderation, search, or pagination in slice 1 unless trivially added to the st
 
 Good code keeps ownership obvious:
 
-- `packages-re2/host/*.ts` — pure types and validators only.
+- `packages/host/*.ts` — pure types and validators only.
 - `host/src/server/http.ts` — listen, dispatch, shared error envelope.
 - `host/src/server/routes.ts` — registers feature routers; no business logic.
 - `host/src/sessions/store.ts` — session draft lifecycle; no HTTP types leaking into the package.
@@ -383,7 +396,7 @@ Good code keeps ownership obvious:
 
 Good code follows these rules:
 
-- Types cross package boundaries only through `packages-re2/host`.
+- Types cross package boundaries only through `packages/host`.
 - Route handlers are thin: decode body → call store → encode response.
 - Stores are swappable behind small interfaces for later Postgres/S3 replacements.
 - Side effects run at the server edge only.
@@ -392,15 +405,15 @@ Good code follows these rules:
 
 ## What Should Not Be Built
 
-Do not put server code in `packages-re2/host`.
+Do not put server code in `packages/host`.
 
 Do not put observe Bridge, scope, or panel projection in `host/`.
 
-Do not put a fetch client in `packages-re2/host` — clients live at CLI/app edge or a dedicated client module outside the type package.
+Do not put a fetch client in `packages/host` — clients live at CLI/app edge or a dedicated client module outside the type package.
 
 Do not block slice 1 on WebRTC SFU or multi-tenant auth. For AA, ship the dev route shape and proxy boundary early; production sponsorship policy can harden later.
 
-Do not copy `packages-re/sdk-stats/src/host/provider.ts` wholesale into `host/` — port shapes into `packages-re2/host`, reimplement server routes cleanly.
+Do not copy `packages-re/sdk-stats/src/host/provider.ts` wholesale into `host/` — port shapes into `packages/host`, reimplement server routes cleanly.
 
 Do not use observe `session` naming for host run handles — host `sessionId` is hosted-output context only.
 
@@ -413,7 +426,7 @@ Recommended delivery order:
 ### Step A — type package only (do first if one step at a time)
 
 ```text
-packages-re2/host/
+packages/host/
   descriptor.ts, policy.ts, session.ts, manifest.ts,
   cache.ts, account.ts, aa.ts, forum.ts, index.ts
 ```
@@ -448,8 +461,9 @@ Acceptance: in-memory session → generated manifest with typed endpoints.
 host/src/cache/
 host/src/forum/
 host/src/aa/routes.ts
-host/src/aa/bundler.ts
-host/src/aa/paymaster.ts
+host/src/aa/alto.ts
+host/src/aa/paymaster-signer.ts
+host/src/aa/routes.ts
 ```
 
 Acceptance: receipt submission stored; forum CRUD works; AA descriptor returns typed doc; bundler route proxies JSON-RPC to configured provider; paymaster route has a clear dev implementation or typed "not configured" error.
@@ -470,7 +484,7 @@ The goal is **Host Type Package + Host Dev Server Skeleton** — not a productio
 ### Slice 1 — dev server (current target)
 
 ```text
-packages-re2/host type package
+packages/host type package
 in-memory stores
 open endpoints
 localhost bind
@@ -510,7 +524,7 @@ rate limits and receipt spam controls
 forum moderation hooks
 ```
 
-When a feature is documented above but not built in the current phase, keep the types in `packages-re2/host` so vocabulary stays stable. Gate behavior in the server with clear errors — do not silently ignore unsupported fields.
+When a feature is documented above but not built in the current phase, keep the types in `packages/host` so vocabulary stays stable. Gate behavior in the server with clear errors — do not silently ignore unsupported fields.
 
 ## Relationship To Existing Instructions
 
@@ -519,20 +533,20 @@ This file is the **source of truth for host architecture**: type package vs serv
 | Document | Role |
 | --- | --- |
 | `host/docs/architecture.md` (this file) | Host runtime model, ownership boundaries, phased delivery |
-| `packages-re2/observe/docs/architecture.md` | Observe runtime — complementary, not a template for host internals |
+| `packages/observe/docs/architecture.md` | Observe runtime — complementary, not a template for host internals |
 | `AGENTS.md` (repo root) | Observe package style; host server runs Effects at the edge per purity rules |
 
 ### How the layers fit together
 
 ```text
-packages-re2/host (types)
+packages/host (types)
   -> cli-re2 / app (clients, config)
   -> host/ (HTTP server, stores, providers)
   -> observe output workflows (manifest endpoints, cache receipts)
   -> AA execution support (bundler/paymaster endpoints)
 ```
 
-Observe Bridge stays local to observe. Host HTTP stays remote provider. Shared vocabulary crosses only through `packages-re2/host` and normal workflow config.
+Observe Bridge stays local to observe. Host HTTP stays remote provider. Shared vocabulary crosses only through `packages/host` and normal workflow config.
 
 ### Relationship to `-re`
 
@@ -548,8 +562,8 @@ Useful to port:
 
 Do not port:
 
-- `HostProviderClient` / `createHttpHostProviderClient` into `packages-re2/host`
+- `HostProviderClient` / `createHttpHostProviderClient` into `packages/host`
 - Monolithic provider module as the server layout
 - Observe session/kernel naming into host routes
 
-When porting a shape, place it in the `packages-re2/host` file listed in this document and implement server behavior fresh under `host/src/`.
+When porting a shape, place it in the `packages/host` file listed in this document and implement server behavior fresh under `host/src/`.

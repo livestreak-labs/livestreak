@@ -1,42 +1,36 @@
 # Host — TODO
 
-See [architecture.md](./architecture.md). Types: planned `packages-re2/host`. Server: top-level `host/`. See [repo TODO](../../TODO.md).
+See [architecture.md](./architecture.md). Types: `packages/host`. Server: top-level `host/`. See [repo TODO](../../README.md).
 
 ---
 
-## Type package (`packages-re2/host`)
+## Type package (`packages/host`)
 
-- [ ] Scaffold protocol/type-only package per architecture file list
-- [ ] Descriptor, policy, session, manifest, cache, account, AA, forum types
-- [ ] No server, fetch client, or `Effect.run*` in type package
+- [x] Scaffold protocol/type-only package per architecture file list
+- [x] Descriptor, policy, session, manifest, cache, account, AA, forum types
+- [x] Similarity request/result/index types (`src/similarity.ts`)
+- [x] No server, fetch client, or `Effect.run*` in type package
 
 ---
 
 ## Dev server (`host/`)
 
-### Slice 1 — skeleton
+### Registered routes (14)
 
-- [ ] `src/server/http.ts`, `routes.ts` — localhost bind, JSON errors
-- [ ] `GET /health`, `GET /descriptor`
+- [x] `GET /health`, `GET /descriptor`, `POST /policy/evaluate`, `GET /aa/descriptor`
+- [x] `POST /sessions`, `GET /sessions/:sessionId/manifest`, `POST /sessions/:sessionId/cache-receipts`
+- [x] `POST /similarity/vaults`, `POST /similarity/find`
+- [x] `POST /forum/threads`, `GET /forum/threads/:threadId`, `POST /forum/threads/:threadId/messages`
+- [x] `POST /aa/bundler/:chain`, `POST /aa/paymaster/:chain`
+- [x] Sessions/manifests/cache hardening
 
-### Slice 2 — sessions + manifests + policy
+**Deferred:**
 
-- [ ] `POST /policy/evaluate`
-- [ ] `POST /sessions`, `GET /sessions/:sessionId/manifest`
-- [ ] `POST /sessions/:sessionId/cache-receipts`
-- [ ] In-memory stores only; open endpoints
+- Production chain-event vault indexer (replaces dev `POST /similarity/vaults` in production)
 
-### Slice 3 — bookmaker similarity
+### Slice 4 — production indexing
 
-- [ ] `findSimilar({ marketId, vaultDraft })` route + types
-- [ ] Index markets and vaults under `marketId` for vault-scoped similarity (no global merge)
-
-### Slice 4 — forum + AA stub
-
-- [ ] Forum thread/message CRUD routes
-- [ ] `GET /aa/descriptor`
-- [ ] `POST /aa/bundler/:chain` — proxy to Alto (quarry: xylkstream bundler route)
-- [ ] `POST /aa/paymaster` — dev/open first
+- [ ] Replace open `POST /similarity/vaults` with chain-event indexer in production
 
 ### Later (documented aspiration)
 
@@ -50,16 +44,17 @@ See [architecture.md](./architecture.md). Types: planned `packages-re2/host`. Se
 
 ## Engineering
 
-- [ ] v0 open/dev-only; auth and tenancy documented but not blocking slice 1
-- [ ] Side effects at server edge only
-- [ ] Local `docs/TODO.md` updates after each slice
+- [x] v0 open/dev-only; auth and tenancy documented but not blocking slice 1
+- [x] Side effects at server edge only
+- [x] Top-level `host/` added to root npm workspaces (`@livestreak/host-server`)
 
 ---
 
 ## Hardening (every slice)
 
-Run after touching host. Full checklist: [repo TODO § Hardening loop](../../TODO.md#hardening-loop-every-slice).
-
-- [ ] check / build / test for touched `host/` or `packages-re2/host` code
-- [ ] Route handler negative-path tests for new endpoints
-- [ ] Update this `docs/TODO.md`
+```text
+npm run check:host
+npm run test:host
+cd host && npm run check && npm run build && npm test
+cd packages/host && npm run check && npm run build && npm test
+```
