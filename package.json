@@ -11,7 +11,8 @@
     "packages-re/sdk-bookmaker",
     "packages-re/sdk-steward",
     "packages-re/control-surface",
-    "cli-re"
+    "cli-re",
+    "packages/wallet"
   ],
   "scripts": {
     "clean:re": "npm run clean --workspaces --if-present",
@@ -21,7 +22,8 @@
     "lint:re:fix": "eslint cli-re packages-re contracts-re --fix",
     "lint:re:workspaces": "npm run lint --workspaces --if-present",
     "test:re": "npm run test --workspaces --if-present",
-    "pack:re": "npm run pack --workspaces --if-present"
+    "pack:re": "npm run pack --workspaces --if-present",
+    "postinstall": "patch-package --patch-dir packages/wallet/patches"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
@@ -30,6 +32,7 @@
     "globals": "^17.6.0",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.61.0",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "patch-package": "^8.0.0"
   }
 }
