@@ -1,8 +1,8 @@
-# @flowstream-re2/bookmaker Architecture
+# @livestreak/bookmaker Architecture
 
 This document is for the developer who arrives with no conversation history and needs to move. It explains the architecture we want, why the folders exist, what should not be built, and how a bookmaker agent turns live observation context into explicit vault creation decisions.
 
-The short version: **`packages-re2/bookmaker` is the market-making workflow package**. It does **not** trade, stream user funds, or own user positions. It does **not** create markets. **Observe registers the market** when a video stream starts; bookmaker watches that stream and **creates or joins vaults under an existing `marketId`**. Host suggests similar vaults inside the market; contracts record explicit writes; stewards police accountability; options handles user participation.
+The short version: **`packages/bookmaker` is the market-making workflow package**. It does **not** trade, stream user funds, or own user positions. It does **not** create markets. **Observe registers the market** when a video stream starts; bookmaker watches that stream and **creates or joins vaults under an existing `marketId`**. Host suggests similar vaults inside the market; contracts record explicit writes; stewards police accountability; options handles user participation.
 
 ## The law (five packages)
 
@@ -49,7 +49,7 @@ Do not use these as bookmaker architecture terms:
 ## What Bookmaker Is
 
 ```text
-packages-re2/bookmaker = vault origination workflow
+packages/bookmaker = vault origination workflow
 ```
 
 ### Owns
@@ -76,7 +76,7 @@ truth / finality / veto                -> steward + contracts
 TEE steward execution                  -> steward + host runtime
 wallet secrets                         -> CLI / app / gateway
 video capture / observe pipeline       -> observe
-on-chain ABI authority                 -> @flowstream-re2/contracts
+on-chain ABI authority                 -> @livestreak/contracts
 ```
 
 | Concern | Owner |
@@ -124,7 +124,7 @@ on-chain ABI authority                 -> @flowstream-re2/contracts
    v0: signals inform skip/refuse; they do not block on-chain.
 
 9. Bookmaker builds WritePlan
-   @flowstream-re2/contracts encoders:
+   @livestreak/contracts encoders:
      createVault(marketId, ...)
      or joinVaultAsCreator(vaultId, ...) if supported
 
@@ -328,7 +328,7 @@ export type BookmakerSkipReason =
 ```ts
 export interface BookmakerWritePlan {
   readonly decision: BookmakerDecision;
-  readonly calls: readonly BookmakerContractCall[];  // from @flowstream-re2/contracts write encoders
+  readonly calls: readonly BookmakerContractCall[];  // from @livestreak/contracts write encoders
 }
 
 export interface BookmakerContractCall {
@@ -343,11 +343,11 @@ export interface BookmakerContractCall {
 Public functions should feel like:
 
 ```ts
-detectOpportunity(observations, strategy, marketContext) -> Detection | null
+detectOpportunity(input) -> BookmakerDetectionEvaluation
 
-buildVaultDraft(detection, marketContext) -> VaultDraft
+buildVaultDraft(detection, marketContext, { fundingToken, nowMs }) -> VaultDraft
 
-findSimilar(draft, hostClient) -> SimilarityResult
+findSimilar(draft, hostClient) -> Promise<SimilarityResult>
 
 chooseVaultAction(draft, candidates, policy) -> BookmakerDecision
 
@@ -370,67 +370,90 @@ readUserPositions
 ## Reference shape — `src/`
 
 ```text
-packages-re2/bookmaker/src/
+packages/bookmaker/src/
   index.ts              re-exports only
 
   model/
     market-context.ts   BookmakerMarketContext
     watch-source.ts     BookmakerWatchSource
-    vault-draft.ts      VaultDraft, Detection
+    detection.ts        Detection
+    vault-draft.ts      VaultDraft
     decision.ts         BookmakerDecision, skip reasons
     similarity.ts       query/result types (host protocol mirrors)
     write-plan.ts       BookmakerWritePlan
     panel.ts            panel view types
     index.ts
 
-  strategy/
-    detector.ts         PatternDetector interface
-    evaluate.ts         detectOpportunity, confidence policy
+  validate/
+    market-context.ts   validateBookmakerMarketContext
+    watch-source.ts     validateBookmakerWatchSource
+    vault-draft.ts      validateVaultDraft
+    detection.ts        validateDetection
+    similarity.ts       validateSimilarityResult
+    decision.ts         validateBookmakerDecision
+    index.ts
+
+  detection/
+    types.ts            PatternDetector, detectOpportunity input/evaluation types
+    evaluate.ts         detectOpportunity
+    factories.ts        generic example detector factories (not exported from root)
     index.ts
 
   draft/
     build.ts            buildVaultDraft from Detection + market context
-    validate.ts         pure draft validation
     index.ts
 
   similarity/
+    client.ts           BookmakerSimilarityClient shape
+    index.ts
+
+  decision/
     choose.ts           chooseVaultAction (pure policy)
-    host-client.ts      findSimilar host call shape (types + fetch adapter at edge)
     index.ts
 
   write/
-    plan.ts             planBookmakerWrite via @flowstream-re2/contracts
-    execute.ts          executeBookmakerWrite Effect blueprint
+    plan.ts             planBookmakerWrite as pure data intents
     index.ts
 
-  runtime/
+  panel/
+    project.ts          projectBookmakerPanel
+    index.ts
+
+  strategy/             (later slice)
+    detector.ts         PatternDetector interface
+    evaluate.ts         detectOpportunity, confidence policy
+    index.ts
+
+  runtime/              (later slice)
     config.ts           BookmakerRuntimeConfig
     store.ts            in-memory agent state per marketId
     loop.ts             watch → detect → decide → plan → execute
     runtime.ts          BookmakerRuntime public owner
     index.ts
 
-  bridge/
+  bridge/               (later slice)
     panel/
       project.ts        BookmakerPanel projection
       types.ts
     types.ts
-    index.ts            callable edge (later slice)
+    index.ts            callable edge
 ```
 
 Dependency order (bottom → top):
 
-1. `model/`
-2. `strategy/`, `draft/`
-3. `similarity/`
+1. `model/`, `validate/`
+2. `detection/`, `draft/`
+3. `similarity/`, `decision/`
 4. `write/`
-5. `runtime/`
-6. `bridge/`
+5. `panel/`
+6. `strategy/`, `runtime/`, `bridge/` (later slices)
 
-May import: `@flowstream-re2/core`, `@flowstream-re2/contracts`, `@flowstream-re2/schema` (observation shapes).  
-Must **not** depend on `@flowstream-re2/options` — bookmaker creates vaults; options consumes them.
+May import: `@livestreak/host`.
+Must **not** depend on `@livestreak/options` or import contract ABI fragments — bookmaker creates vaults; options consumes them; contracts execution stays at the edge.
 
-Host similarity types may duplicate in a future `packages-re2/host` type package later. Until that package exists, `host/docs/architecture.md` is the host source of truth and bookmaker keeps only local host-facing protocol shapes needed for `findSimilar`.
+Pure functions must not read wall-clock time. Pass `nowMs` explicitly to `buildVaultDraft`, `detectOpportunity`, and panel snapshots.
+
+Host similarity types may duplicate in a future `host/` type package later. Until that package exists, `host/docs/architecture.md` is the host source of truth and bookmaker keeps only local host-facing protocol shapes needed for `findSimilar`.
 
 ## Runtime config
 
@@ -497,15 +520,19 @@ Steward-of-stewards may veto rogue stewards (steward package — not bookmaker).
 
 Bookmaker does not run TEE infrastructure.
 
-## Purity rule (Effect)
+## Purity rule
+
+Bookmaker is **vanilla TypeScript**. Pure functions do not read wall-clock time — pass `nowMs` explicitly to `buildVaultDraft`, `detectOpportunity`, and panel snapshots.
 
 | Kind | Pattern | Use for |
 | --- | --- | --- |
-| Vanilla pure | plain TS | `buildVaultDraft`, `chooseVaultAction`, `validateVaultDraft`, panel projection |
-| Effect blueprint | returns `Effect`, never runs it | `detectOpportunity`, `findSimilar`, `executeBookmakerWrite`, runtime loop |
-| Execution | `Effect.runPromise`, agent host | CLI, tests, bookmaker agent process |
+| Pure sync | plain TS functions | `detectOpportunity`, `buildVaultDraft`, `chooseVaultAction`, `validateDetection`, panel projection |
+| Injected async | `Promise` from injected clients | `findSimilar`, future write execution at the CLI edge |
+| Execution | CLI / host / app edges | runtime loop, AA transport, network I/O |
 
-Do not call `Effect.run*` inside library code except tests at edge.
+I/O edges use injected async clients returning `Promise` — **not** Effect. Do not call `fetch`, `Date.now`, or `Effect.run*` inside library `src/`.
+
+If Effect is wanted later, that is a deliberate reintroduction: add the dependency back and design at the application edge first.
 
 ## Panel contract
 
@@ -527,7 +554,7 @@ Panel does **not** answer: UI layout, user positions, vault odds (options), stew
 - Every write goes through `BookmakerWritePlan` — no surprise `createVault` in detectors.
 - Similarity is always queried with `marketId`.
 - Skip reasons are explicit and typed.
-- Write encoders come from `@flowstream-re2/contracts` only.
+- Write plans use `BookmakerContractWriteDescriptor` locally (`createVault` with `marketIdBytes` + `question`) until `@flowstream/contracts` restores wagmi-generated write encoders; bookmaker does not import ABI fragments today.
 - Bookmaker never imports options.
 
 ## What should not be built
@@ -580,7 +607,7 @@ Acceptance: duplicate candidate → `skip` or `joinVault`; novel draft → `crea
 ### Step D — write plan
 
 ```text
-write/plan.ts wired to @flowstream-re2/contracts write encoders
+write/plan.ts wired to @livestreak/contracts write encoders
 ```
 
 Acceptance: `createVault` plan matches contracts architecture surface.
@@ -646,10 +673,10 @@ Do not implement Solidity until bookmaker + steward write surfaces are clear.
 
 | Document | Role |
 | --- | --- |
-| `packages-re2/bookmaker/docs/architecture.md` (this file) | Vault origination workflow |
-| `packages-re2/observe/docs/architecture.md` | Observer registers market at stream start |
-| `packages-re2/contracts/docs/architecture.md` | `createVault(marketId, ...)`, bookmaker writes |
-| `packages-re2/options/docs/architecture.md` | User participation — not creation |
+| `packages/bookmaker/docs/architecture.md` (this file) | Vault origination workflow |
+| `packages/observe/docs/architecture.md` | Observer registers market at stream start |
+| `packages/contracts/docs/architecture.md` | `createVault(marketId, ...)`, bookmaker writes |
+| `packages/options/docs/architecture.md` | User participation — not creation |
 | `host/docs/architecture.md` | Similarity index, bundler, forum records |
 
 ### How the layers fit together
@@ -675,7 +702,7 @@ Useful to port:
 Do not port:
 
 - `CreateVaultParams` as public center
-- dependency on `@flowstream-re/sdk-options` / `FlowStreamClient`
+- dependency on `@livestreak/sdk-options` / `LiveStreakClient`
 - market creation implied by `createVault` without `marketId`
 - `makeBookmakerAgent.start` as vault factory without observe market context
 
