@@ -10,7 +10,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node .output/server/index.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --no-ignore vite.config.ts && npm run typecheck"
   },
   "dependencies": {
     "@livestreak/wallet": "file:../packages/wallet",

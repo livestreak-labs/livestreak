@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type PluginOption } from 'vite'
 import { devtools } from '@tanstack/devtools-vite'
 
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
@@ -65,8 +65,8 @@ type PolyfillConfigResult = {
 }
 type ConfigHook = (config: unknown, environment: unknown) => PolyfillConfigResult | undefined
 
-function clientScopedPolyfills(options: Parameters<typeof nodePolyfills>[0]) {
-  const plugins = nodePolyfills(options) as Array<Record<string, unknown>>
+function clientScopedPolyfills(options: Parameters<typeof nodePolyfills>[0]): PluginOption[] {
+  const plugins = nodePolyfills(options) as unknown as Array<Record<string, unknown>>
   return plugins.map(p => {
     const gated: Record<string, unknown> = {
       ...p,
@@ -93,7 +93,7 @@ function clientScopedPolyfills(options: Parameters<typeof nodePolyfills>[0]) {
       }
     }
     return gated
-  })
+  }) as unknown as PluginOption[]
 }
 
 const config = defineConfig({
