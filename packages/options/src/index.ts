@@ -39,6 +39,13 @@ export {
 } from "./model/index.js";
 export type { OptionsReadTransport } from "./read/index.js";
 export {
+  type ContractReadRequest,
+  type ContractReader,
+  type ContractsOptionsReadTransportInput,
+  type ContractsReadEntity,
+  contractsReadFailed,
+  contractsReadNotFound,
+  createContractsOptionsReadTransport,
   readMarketSnapshot,
   readUserOptionsSnapshot,
   readVaultSnapshot
