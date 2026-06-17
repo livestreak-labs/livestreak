@@ -1,8 +1,8 @@
-# @flowstream-re2/steward Architecture
+# packages/steward Architecture
 
 This document is for the developer who arrives with no conversation history and needs to move. It keeps steward simple: watch evidence, make accountability decisions, and plan explicit actions. It does not create markets, create vaults, stream funds, or run host infrastructure.
 
-The short version: **`packages-re2/steward` is the accountability workflow package**. Stewards can be humans, bots, or TEE AI agents. They watch markets, vaults, observers, bookmakers, evidence, resolutions, and other stewards. They produce findings and explicit action plans. Contracts store final on-chain actions; host stores forum/thread records; observe/bookmaker/options keep their own jobs.
+The short version: **`packages/steward` is the accountability workflow package**. Stewards can be humans, bots, or TEE AI agents. They watch markets, vaults, observers, bookmakers, evidence, resolutions, and other stewards. They produce findings and explicit action plans. Contracts store final on-chain actions; host stores forum/thread records; observe/bookmaker/options keep their own jobs.
 
 ## The Law
 
@@ -105,7 +105,7 @@ user funding streams / positions       -> options
 forum storage                          -> host
 video capture / evidence production    -> observe
 host cache / WebRTC / TEE infra        -> host/runtime
-contract ABI authority                 -> @flowstream-re2/contracts
+contract ABI authority                 -> @livestreak/contracts
 wallet secrets                         -> CLI / app / gateway
 ```
 
@@ -131,7 +131,7 @@ The package should model TEE attestation refs and steward identity. It should no
 ## Reference Shape
 
 ```text
-packages-re2/steward/src/
+packages/steward/src/
   index.ts              re-exports only
 
   model/
@@ -142,21 +142,26 @@ packages-re2/steward/src/
     panel.ts            StewardPanelView
     index.ts
 
-  rules/                future pure rule evaluation
-  runtime/              future watch loop + in-memory state
-  bridge/               future bridge only if steward runtime exists
+  facts/                StewardFact + TeeAttestationRef metadata
+  validate/             subject/finding/decision/action-plan validators
+  rules/                pure rule evaluation
+  decision/             pure decision policy
+  action/               pure action planning
+  panel/                panel projection
 ```
 
 Dependency order:
 
-1. `model/`
-2. `rules/`
-3. `runtime/`
-4. `bridge/`
+1. `model/` + `facts/`
+2. `validate/`
+3. `rules/`
+4. `decision/`
+5. `action/`
+6. `panel/`
 
-May import: `@flowstream-re2/core`, `@flowstream-re2/contracts` when write encoders exist, and `@flowstream-re2/schema` for shared public shapes.
+May import: `@livestreak/core`, `@livestreak/contracts` when write encoders exist, and `@livestreak/schema` for shared public shapes.
 
-Must **not** depend on `@flowstream-re2/options` or `@flowstream-re2/bookmaker`.
+Must **not** depend on `@livestreak/options` or `@livestreak/bookmaker`.
 
 ## Core API Target
 
@@ -165,13 +170,11 @@ Public functions should feel like:
 ```ts
 evaluateStewardRules(subject, facts, ruleset) -> StewardFinding[]
 
-chooseStewardDecision(findings, policy) -> StewardDecision
+chooseStewardDecisions(findings, policy) -> StewardDecision[]
 
-planStewardAction(decision, contractsOrHost) -> StewardActionPlan
+planStewardActions(decisions, actionContext) -> StewardActionPlan[]
 
-executeStewardAction(plan, transport) -> TxOrHostResult
-
-projectStewardPanel(runtimeState) -> StewardPanelView
+projectStewardPanel(stateOrSnapshot) -> StewardPanelView
 ```
 
 Not:
@@ -192,6 +195,8 @@ Keep the first slice model-only:
 ```text
 docs/architecture.md
 model/* types
+facts/* + validate/*
+rules/decision/action/panel pure functions
 no runtime
 no bridge
 no chain execution
@@ -200,8 +205,8 @@ no chain execution
 Next slices:
 
 ```text
-1. rules/ pure finding evaluation
-2. action-plan contract/host write planning
+1. richer rulesets and fact adapters
+2. contract/host write planning refinements
 3. runtime watch loop
 4. bridge/panel only when runtime exists
 ```
@@ -210,10 +215,10 @@ Next slices:
 
 | Package/doc | Role |
 | --- | --- |
-| `packages-re2/observe/docs/architecture.md` | Market/video evidence source |
-| `packages-re2/bookmaker/docs/architecture.md` | Vault origination under marketId |
-| `packages-re2/options/docs/architecture.md` | User funding, claims, FLOW |
-| `packages-re2/contracts/docs/architecture.md` | Hot/dispute/resolution/penalty writes |
+| `packages/observe/docs/architecture.md` | Market/video evidence source |
+| `packages/bookmaker/docs/architecture.md` | Vault origination under marketId |
+| `packages/options/docs/architecture.md` | User funding, claims, FLOW |
+| `packages/contracts/docs/architecture.md` | Hot/dispute/resolution/penalty writes |
 | `host/docs/architecture.md` | Forum records, cache receipts, AA bundler/paymaster, TEE/runtime hosting later |
 
 Simple relationship:
@@ -228,7 +233,7 @@ host -> indexes and stores evidence/forum/AA edges
 
 ## Relationship To Old `sdk-steward`
 
-`packages/sdk-steward` is a quarry, not a layout template.
+`packages-old/sdk-steward` and `packages-re/sdk-steward` are quarries, not layout templates.
 
 Useful to port:
 
