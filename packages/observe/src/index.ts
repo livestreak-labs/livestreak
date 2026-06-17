@@ -57,13 +57,13 @@ export {
   type BoardCellStatus,
   type BoardRunStatus,
   type CreateInitialBoardInput
-} from "./run/control/board/model.js";
+} from "./run/control/board/index.js";
 
 export type {
   ControlCallEnvelope,
   ControlCallResult,
   ControlArtifact
-} from "./run/control/bus/calls.js";
+} from "./run/control/bus/index.js";
 
 export type {
   ArtifactSubscription,
@@ -76,7 +76,7 @@ export type {
   ControlPanel,
   ControlSurface,
   DescribeControlContext
-} from "./run/control/bus/types.js";
+} from "./run/control/bus/index.js";
 
 export {
   buildControlCatalog,
@@ -88,14 +88,14 @@ export {
   type CatalogRegistryKind,
   type ControlCatalog,
   type JsonSchema
-} from "./run/control/catalog.js";
+} from "./run/control/index.js";
 
 export {
   systemPausePauseScope,
   systemPauseResumeScope,
   systemPauseSetPresentationScope
-} from "./run/control/system/pause.js";
-export { systemRunStopScope } from "./run/control/system/run.js";
+} from "./run/control/index.js";
+export { systemRunStopScope } from "./run/control/index.js";
 
 export {
   createObserveBridge,
@@ -148,7 +148,7 @@ export {
   makeBrowserPageCaptureAdapter,
   makeBrowserPageFactoryCaptureAdapter,
   validateBrowserCapturePageReadiness
-} from "./pipeline/capture/browser/driver.js";
+} from "./pipeline/capture/browser/index.js";
 
 export type {
   BrowserCaptureControls,
@@ -172,19 +172,15 @@ export type {
   BrowserPageCaptureAdapterOptions,
   BrowserPageCaptureFactory,
   ResolvedBrowserPageCaptureAdapterKind
-} from "./pipeline/capture/browser/driver.js";
+} from "./pipeline/capture/browser/index.js";
 
-export * from "./pipeline/capture/registry.js";
-export * from "./pipeline/capture/types.js";
-export * from "./pipeline/capture/pause.js";
+export * from "./pipeline/capture/index.js";
 export type {
   TimelineMarker,
   TimelineMarkerKind,
   TimelineMarkerPayload
 } from "./pipeline/timeline/index.js";
-export * from "./pipeline/process/registry.js";
-export * from "./pipeline/process/types.js";
-export * from "./pipeline/publish/registry.js";
-export * from "./pipeline/publish/types.js";
+export * from "./pipeline/process/index.js";
+export * from "./pipeline/publish/index.js";
 export * from "./pipeline/registry.js";
 export * from "./pipeline/shared.js";

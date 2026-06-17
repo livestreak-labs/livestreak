@@ -1,17 +1,19 @@
 import { Effect, Scope } from "effect";
-import type { FlowStreamError } from "@flowstream-re2/core";
-import type { ControlCallEnvelope, ControlCallResult, ControlArtifact } from "./control/bus/calls.js";
+import type { LiveStreakError } from "@livestreak/core";
+import type { ControlCallEnvelope, ControlCallResult, ControlArtifact } from "./control/bus/index.js";
 import type {
   ArtifactSubscription,
   BoardSubscription,
   ControlPanel
-} from "./control/bus/types.js";
-import type { Board } from "./control/board/model.js";
+} from "./control/bus/index.js";
+import type { Board } from "./control/board/index.js";
 import {
   prepareObserveRun,
   startObserveRunAsync,
+  stopObserveRun,
   type ObserveRunKernelOptions,
-  type ObserveRunResult
+  type ObserveRunResult,
+  type StopRunOptions
 } from "./kernel.js";
 import { makeObserveRun, type ObserveRun, type ObserveRunConfig } from "./run.js";
 import {
@@ -26,10 +28,9 @@ import {
   type ObserveRunHandle,
   type RunStore
 } from "./store.js";
-import { stopObserveRun, type StopRunOptions } from "./stop.js";
 
-export type { StopRunOptions } from "./stop.js";
-export { defaultStopTimeoutMs } from "./stop.js";
+export type { StopRunOptions } from "./kernel.js";
+export { defaultStopTimeoutMs } from "./kernel.js";
 
 export type RuntimeKernelOptions = ObserveRunKernelOptions & { readonly maxTurns?: number };
 
@@ -44,48 +45,48 @@ export interface ObserveRuntime {
   readonly prepareRun: (
     config: ObserveRunConfig,
     options?: ObserveRunKernelOptions
-  ) => Effect.Effect<ObserveRun, FlowStreamError>;
+  ) => Effect.Effect<ObserveRun, LiveStreakError>;
 
   readonly startRun: (
     runId: string,
     options?: RuntimeKernelOptions
-  ) => Effect.Effect<ObserveRunHandle, FlowStreamError>;
+  ) => Effect.Effect<ObserveRunHandle, LiveStreakError>;
 
   readonly listRuns: () => Effect.Effect<readonly ObserveRun[]>;
   readonly listHandles: () => Effect.Effect<readonly ObserveRunHandle[]>;
 
-  readonly readBoard: (runId: string) => Effect.Effect<Board, FlowStreamError>;
+  readonly readBoard: (runId: string) => Effect.Effect<Board, LiveStreakError>;
 
   readonly readPanel: (
     runId: string,
     options?: { readonly includeCatalog?: boolean }
-  ) => Effect.Effect<ControlPanel, FlowStreamError>;
+  ) => Effect.Effect<ControlPanel, LiveStreakError>;
 
   readonly callFunction: (
     envelope: ControlCallEnvelope
-  ) => Effect.Effect<ControlCallResult, FlowStreamError>;
+  ) => Effect.Effect<ControlCallResult, LiveStreakError>;
 
   readonly getArtifact: (
     runId: string,
     artifactId: unknown
-  ) => Effect.Effect<ControlArtifact, FlowStreamError>;
+  ) => Effect.Effect<ControlArtifact, LiveStreakError>;
 
   readonly subscribeBoard: (
     runId: string,
     listener: (board: Board) => void
-  ) => Effect.Effect<BoardSubscription, FlowStreamError>;
+  ) => Effect.Effect<BoardSubscription, LiveStreakError>;
 
   readonly subscribeArtifacts: (
     runId: string,
     listener: (artifact: ControlArtifact) => void
-  ) => Effect.Effect<ArtifactSubscription, FlowStreamError>;
+  ) => Effect.Effect<ArtifactSubscription, LiveStreakError>;
 
-  readonly awaitRun: (runId: string) => Effect.Effect<ObserveRunResult, FlowStreamError>;
+  readonly awaitRun: (runId: string) => Effect.Effect<ObserveRunResult, LiveStreakError>;
 
   readonly stopRun: (
     runId: string,
     options?: StopRunOptions
-  ) => Effect.Effect<ObserveRunResult, FlowStreamError>;
+  ) => Effect.Effect<ObserveRunResult, LiveStreakError>;
 
   readonly removeRun: (runId: string) => Effect.Effect<void>;
   readonly removeHandle: (runId: string) => Effect.Effect<void>;

@@ -1,19 +1,19 @@
-import { Effect, Fiber, type Scope } from "effect";
-import { FlowStreamConfigError, FlowStreamRuntimeError, type FlowStreamError } from "@flowstream-re2/core";
+import { Effect, Exit, Fiber, type Scope } from "effect";
+import { LiveStreakConfigError, LiveStreakRuntimeError, type LiveStreakError } from "@livestreak/core";
 import { getBuiltInCaptureDriver, getBuiltInSinkDriver } from "#builtins.js";
-import type { CaptureDriver } from "#pipeline/capture/types.js";
-import type { SinkDriver } from "#pipeline/publish/types.js";
-import type { Board } from "./control/board/model.js";
-import { setBoardRunPrepared, setBoardRunStatus } from "./control/board/model.js";
+import type { CaptureDriver } from "#pipeline/capture/index.js";
+import type { SinkDriver } from "#pipeline/publish/index.js";
+import type { Board } from "./control/board/index.js";
+import { setBoardRunPrepared, setBoardRunStatus } from "./control/board/index.js";
 import { buildControlCatalog } from "./control/catalog.js";
-import { createControlBus, stageCellSurface } from "./control/bus/bus.js";
-import { applyWorkerSnapshotToBoard } from "./control/board/worker-snapshot.js";
-import { validateBoardSettings } from "./control/board/settings.js";
-import { createSystemPauseSurface } from "./control/system/pause.js";
-import { createSystemRunSurface } from "./control/system/run.js";
-import type { DescribeControlContext } from "./control/bus/types.js";
+import { createControlBus, stageCellSurface } from "./control/bus/index.js";
+import { applyWorkerSnapshotToBoard } from "./control/board/index.js";
+import { validateBoardSettings } from "./control/board/index.js";
+import { createSystemPauseSurface } from "./control/index.js";
+import { createSystemRunSurface, systemRunStopScope } from "./control/index.js";
+import type { DescribeControlContext } from "./control/bus/index.js";
 import type { ObserveRun } from "./run.js";
-import type { ObserveRunHandle } from "./store.js";
+import { callStoredRunFunction, type ObserveRunHandle, type RunStore } from "./store.js";
 import type { WorkerRunOutcome } from "./worker/worker.js";
 import { runScopedWorkerUntilStoppedWithBoard } from "./worker/worker.js";
 import { createWorkerBoardWake } from "./worker/wake.js";
@@ -43,7 +43,7 @@ export const defaultObserveRunMaxTurns = 4096;
 export const prepareObserveRun = (
   run: ObserveRun,
   options: ObserveRunKernelOptions = {}
-): Effect.Effect<ObserveRun, FlowStreamError> =>
+): Effect.Effect<ObserveRun, LiveStreakError> =>
   Effect.gen(function* () {
     const captureDriver = yield* resolveCaptureDriver(run.config.capture.driverId, options);
     const sinkDriver = yield* resolveSinkDriver(run.config.sink.driverId, options);
@@ -97,10 +97,10 @@ export const prepareObserveRun = (
 export const startObserveRun = (
   run: ObserveRun,
   options: ObserveRunKernelOptions & { readonly maxTurns?: number } = {}
-): Effect.Effect<ObserveRunResult, FlowStreamError> => {
+): Effect.Effect<ObserveRunResult, LiveStreakError> => {
   if (run.prepared === false || run.bus === undefined) {
     return Effect.fail(
-      new FlowStreamRuntimeError({
+      new LiveStreakRuntimeError({
         message: "Observe run must be prepared before start"
       })
     );
@@ -170,13 +170,13 @@ export interface StartObserveRunAsyncInput {
 
 export const startObserveRunAsync = (
   input: StartObserveRunAsyncInput
-): Effect.Effect<ObserveRunHandle, FlowStreamError, Scope.Scope> =>
+): Effect.Effect<ObserveRunHandle, LiveStreakError, Scope.Scope> =>
   Effect.gen(function* () {
     const { run, options } = input;
 
     if (run.prepared === false || run.bus === undefined) {
       return yield* Effect.fail(
-        new FlowStreamRuntimeError({
+        new LiveStreakRuntimeError({
           message: "Observe run must be prepared before start"
         })
       );
@@ -204,17 +204,59 @@ export const startObserveRunAsync = (
     return handle;
   });
 
+export const defaultStopTimeoutMs = 5000;
+
+export interface StopRunOptions {
+  readonly reason?: string;
+  readonly timeoutMs?: number;
+}
+
+export const stopObserveRun = (
+  store: RunStore,
+  runId: string,
+  options?: StopRunOptions
+): Effect.Effect<ObserveRunResult, LiveStreakError> =>
+  Effect.gen(function* () {
+    const handle = yield* store.requireHandle(runId);
+    const timeoutMs = yield* validateStopTimeoutMs(options?.timeoutMs);
+
+    yield* callStoredRunFunction(store, {
+      callId: `stop-${runId}`,
+      runId,
+      scope: systemRunStopScope,
+      ...(options?.reason === undefined ? {} : { payload: { reason: options.reason } })
+    });
+
+    const raced = yield* Effect.race(
+      handle.awaitResult().pipe(Effect.map((result) => ({ tag: "completed" as const, result }))),
+      Effect.sleep(`${timeoutMs} millis`).pipe(Effect.map(() => ({ tag: "timeout" as const })))
+    );
+
+    if (raced.tag === "completed") {
+      return raced.result;
+    }
+
+    yield* handle.interrupt;
+
+    const afterInterrupt = yield* Effect.exit(handle.awaitResult());
+    if (Exit.isSuccess(afterInterrupt)) {
+      return afterInterrupt.value;
+    }
+
+    return yield* buildInterruptedStopResult(handle, timeoutMs);
+  });
+
 // --- helpers ---
 
 const resolveSinkDriver = (
   sinkDriverId: string,
   options: ObserveRunKernelOptions
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- built-in and injected drivers share one resolution path
-): Effect.Effect<SinkDriver<any>, FlowStreamConfigError> => {
+): Effect.Effect<SinkDriver<any>, LiveStreakConfigError> => {
   if (options.sinkDriver !== undefined) {
     if (options.sinkDriver.descriptor.id !== sinkDriverId) {
       return Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: `Injected sink driver id "${options.sinkDriver.descriptor.id}" does not match requested "${sinkDriverId}"`
         })
       );
@@ -227,7 +269,7 @@ const resolveSinkDriver = (
   }
 
   return Effect.fail(
-    new FlowStreamConfigError({
+    new LiveStreakConfigError({
       message: `Unknown sink driver "${sinkDriverId}"`
     })
   );
@@ -237,11 +279,11 @@ const resolveCaptureDriver = (
   captureDriverId: string,
   options: ObserveRunKernelOptions
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- built-in and injected drivers share one resolution path
-): Effect.Effect<CaptureDriver<any>, FlowStreamConfigError> => {
+): Effect.Effect<CaptureDriver<any>, LiveStreakConfigError> => {
   if (options.captureDriver !== undefined) {
     if (options.captureDriver.descriptor.id !== captureDriverId) {
       return Effect.fail(
-        new FlowStreamConfigError({
+        new LiveStreakConfigError({
           message: `Injected capture driver id "${options.captureDriver.descriptor.id}" does not match requested "${captureDriverId}"`
         })
       );
@@ -254,7 +296,7 @@ const resolveCaptureDriver = (
   }
 
   return Effect.fail(
-    new FlowStreamConfigError({
+    new LiveStreakConfigError({
       message: `Unknown capture driver "${captureDriverId}"`
     })
   );
@@ -266,4 +308,46 @@ const readOutputUri = (snapshot: WorkerSnapshot, sinkInstanceId: string): string
     return undefined;
   }
   return sink.finalizeResult?.output?.uri;
+};
+
+const buildInterruptedStopResult = (
+  handle: ObserveRunHandle,
+  timeoutMs: number
+): Effect.Effect<ObserveRunResult, LiveStreakError> =>
+  Effect.gen(function* () {
+    const message = `Stop timed out after ${timeoutMs}ms; worker interrupted`;
+    const currentBoard = yield* handle.bus.readBoard();
+    yield* handle.bus.commitBoard(setBoardRunStatus(currentBoard, "failed", message));
+    const board = yield* handle.bus.readBoard();
+
+    return {
+      outcome: "interrupted",
+      board
+    };
+  });
+
+const validateStopTimeoutMs = (
+  timeoutMs: unknown
+): Effect.Effect<number, LiveStreakConfigError> => {
+  if (timeoutMs === undefined) {
+    return Effect.succeed(defaultStopTimeoutMs);
+  }
+
+  if (typeof timeoutMs !== "number" || !Number.isFinite(timeoutMs)) {
+    return Effect.fail(
+      new LiveStreakConfigError({
+        message: "stopRun timeoutMs must be a finite number"
+      })
+    );
+  }
+
+  if (timeoutMs < 0) {
+    return Effect.fail(
+      new LiveStreakConfigError({
+        message: "stopRun timeoutMs must be greater than or equal to 0"
+      })
+    );
+  }
+
+  return Effect.succeed(timeoutMs);
 };
