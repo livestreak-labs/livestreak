@@ -7,7 +7,7 @@ import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { nitro } from 'nitro/vite'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
-import { resolve } from 'node:path'
+import path from 'node:path'
 
 // @livestreak/wallet (vendored wdk-4337) is a Node/bare-runtime SDK. The browser
 // build needs node polyfills; the Nitro server build runs in real Node and must
@@ -35,27 +35,71 @@ function nodePolyfillShimResolver() {
       const prefix = 'vite-plugin-node-polyfills/shims/'
       if (id.startsWith(prefix)) {
         const shim = id.slice(prefix.length)
-        return resolve(__dirname, `node_modules/vite-plugin-node-polyfills/shims/${shim}/dist/index.js`)
+        return path.resolve(import.meta.dirname, `node_modules/vite-plugin-node-polyfills/shims/${shim}/dist/index.js`)
       }
-      return null
     },
   }
 }
 
-// Restrict a plugin (or plugin array) to the browser environment only.
-function clientOnly(plugins: unknown) {
-  const arr = (Array.isArray(plugins) ? plugins : [plugins]) as Array<Record<string, unknown>>
-  return arr.map(p => ({
-    ...p,
-    applyToEnvironment: (env: { name?: string; consumer?: string }) =>
-      env.name === 'client' || env.consumer === 'client',
-  }))
+// vite-plugin-node-polyfills injects its browser-builtin alias map (util -> npm
+// util, stream -> stream-browserify, buffer/process/global -> shims, ...) through
+// a GLOBAL config() hook. `applyToEnvironment` gates a plugin's per-environment
+// hooks (resolveId/transform), but it does NOT gate a global config() hook, so
+// that alias map otherwise leaks into the Nitro *server* build — where it 500s
+// every SSR route: react-dom's renderer calls `new util.TextEncoder()` (the npm
+// util shim has no TextEncoder), and the browser CJS polyfills' circular
+// require()s (fine under Node-CJS lazy semantics) hit ESM temporal-dead-zone
+// errors once Nitro bundles them.
+//
+// Verified asymmetry: Nitro re-derives module resolution from the GLOBAL config
+// and ignores per-environment alias; the client honors per-environment alias. So
+// this wrapper does two things: (1) gates the polyfill's per-env hooks to the
+// client, and (2) re-scopes the global config() alias into `environments.client`
+// only. The browser keeps its polyfills; the server resolves bare util/stream/
+// events/buffer/crypto/assert/process to native Node builtins (Node has them all,
+// including TextEncoder, with no CJS->ESM cycles).
+// Subset of vite-plugin-node-polyfills' config() return that we re-scope.
+type PolyfillConfigResult = {
+  resolve?: { alias?: Record<string, unknown> }
+  environments?: Record<string, { resolve?: { alias?: Record<string, unknown> } }>
+}
+type ConfigHook = (config: unknown, environment: unknown) => PolyfillConfigResult | undefined
+
+function clientScopedPolyfills(options: Parameters<typeof nodePolyfills>[0]) {
+  const plugins = nodePolyfills(options) as Array<Record<string, unknown>>
+  return plugins.map(p => {
+    const gated: Record<string, unknown> = {
+      ...p,
+      applyToEnvironment: (environment: { name?: string; consumer?: string }) =>
+        environment.name === 'client' || environment.consumer === 'client',
+    }
+    // Only the polyfill's main plugin has a config() hook. It re-derives nothing
+    // from `this` under Vite/rollup (it only reads this.meta.rolldownVersion, which
+    // is undefined here), so a plain call is safe and lets us use an arrow function.
+    if (typeof p.config === 'function') {
+      const runConfig = p.config as unknown as ConfigHook
+      gated.config = (config: unknown, environment: unknown) => {
+        const result = runConfig(config, environment) ?? {}
+        const resolveConfig = result.resolve
+        const alias = resolveConfig?.alias
+        if (resolveConfig && alias) {
+          delete resolveConfig.alias
+          result.environments ??= {}
+          result.environments.client ??= {}
+          result.environments.client.resolve ??= {}
+          result.environments.client.resolve.alias = alias
+        }
+        return result
+      }
+    }
+    return gated
+  })
 }
 
 const config = defineConfig({
   resolve: {
     alias: {
-      'sodium-javascript': resolve(__dirname, 'node_modules/sodium-javascript'),
+      'sodium-javascript': path.resolve(import.meta.dirname, 'node_modules/sodium-javascript'),
     },
   },
   optimizeDeps: {
@@ -65,16 +109,16 @@ const config = defineConfig({
     nodePolyfillShimResolver(),
     devtools(),
     nitro({ rollupConfig: { external: [/^@sentry\//, ...walletExternals] } }),
-    ...clientOnly(nodePolyfills({
+    ...clientScopedPolyfills({
       include: ['buffer', 'crypto', 'stream', 'assert', 'process', 'util', 'events'],
       globals: { Buffer: true, global: true, process: true },
       // Do NOT rewrite `node:`-prefixed imports: Nitro's server adapter (srvx)
       // imports `node:stream/promises` etc. and must keep them native. The client
       // wallet deps (@safe-global) use bare `buffer`/`stream` imports, which are
-      // still polyfilled.
+      // polyfilled in the browser bundle only (see clientScopedPolyfills).
       protocolImports: false,
       overrides: { fs: 'empty' },
-    })),
+    }),
     tailwindcss(),
     tanstackStart(),
     viteReact(),

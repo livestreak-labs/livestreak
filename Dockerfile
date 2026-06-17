@@ -26,26 +26,27 @@ COPY packages/wallet ./packages/wallet
 # 2) Install app deps. We copy only package.json (NOT the macOS-generated
 #    package-lock.json) so npm resolves the linux-correct native binaries
 #    (rollup / esbuild / lightningcss / tailwind-oxide) for this container.
+#
+#    --install-links: the `@livestreak/wallet` file: dep is installed as a real
+#    COPY inside app/node_modules (with its own deps — @tetherto/wdk-*, safe
+#    kits, ethers — hoisted alongside) instead of a symlink. Without this, npm
+#    symlinks the wallet to /repo/packages/wallet and Rollup resolves the
+#    wallet's imports from there (realpath), where nothing is installed, so the
+#    client build fails with "Rollup failed to resolve import @tetherto/wdk-wallet".
+#    Locally this works only because the npm workspace hoists those deps to the
+#    repo-root node_modules; the container has no root install, so we copy instead.
 COPY app/package.json ./app/package.json
 WORKDIR /repo/app
-RUN npm install --no-audit --no-fund
+RUN npm install --install-links --no-audit --no-fund
 
 # 3) Apply the wallet's @safe-global/relay-kit patch into node_modules (non-fatal:
 #    the app build does not require it, and the wallet edge fails soft at runtime).
 RUN npx --yes patch-package --patch-dir ../packages/wallet/patches || true
 
-# 4) App source + build-time public config (Vite bakes VITE_* into the client bundle).
+# 4) App source. Public config (chain id, RPC/bundler/paymaster URLs, contract
+#    addresses) is committed in app/src/config/contracts.ts and baked in by Vite,
+#    so there are no build-time env vars / build-args to pass.
 COPY app ./
-ARG VITE_CHAIN_ID
-ARG VITE_ARC_RPC_URL
-ARG VITE_BUNDLER_URL
-ARG VITE_PAYMASTER_URL
-ARG VITE_USDC_ADDRESS
-ENV VITE_CHAIN_ID=$VITE_CHAIN_ID \
-    VITE_ARC_RPC_URL=$VITE_ARC_RPC_URL \
-    VITE_BUNDLER_URL=$VITE_BUNDLER_URL \
-    VITE_PAYMASTER_URL=$VITE_PAYMASTER_URL \
-    VITE_USDC_ADDRESS=$VITE_USDC_ADDRESS
 
 RUN npm run build
 

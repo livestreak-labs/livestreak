@@ -7,7 +7,9 @@ name: Deploy app
 #   DEPLOY_HOST        108.130.99.99
 #   DEPLOY_USER        ubuntu
 #   DEPLOY_KEY         <contents of uburu-key-pair.pem>
-#   VITE_CHAIN_ID, VITE_ARC_RPC_URL, VITE_BUNDLER_URL, VITE_PAYMASTER_URL, VITE_USDC_ADDRESS
+#
+# Frontend config (chain id, RPC/bundler/paymaster URLs, contract addresses) is
+# committed in app/src/config/contracts.ts — no build-time secrets/vars needed.
 #
 # One-time after the first run: make the ghcr package PUBLIC
 #   (github.com/users/<you>/packages/container/livestreak-app/settings → Change visibility)
@@ -58,12 +60,6 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            VITE_CHAIN_ID=${{ secrets.VITE_CHAIN_ID }}
-            VITE_ARC_RPC_URL=${{ secrets.VITE_ARC_RPC_URL }}
-            VITE_BUNDLER_URL=${{ secrets.VITE_BUNDLER_URL }}
-            VITE_PAYMASTER_URL=${{ secrets.VITE_PAYMASTER_URL }}
-            VITE_USDC_ADDRESS=${{ secrets.VITE_USDC_ADDRESS }}
 
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
