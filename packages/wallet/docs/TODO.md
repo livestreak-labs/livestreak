@@ -13,17 +13,20 @@ See [architecture.md](./architecture.md) and [flow.md](./flow.md).
 - [x] `check` / `build` / `lint` / `test` all green. Package importable; sodium deduped to `sodium-universal`.
 - [x] Test runner fixed: was `vitest` (looking for `*.test.ts`) silently running nothing; now `node --test` runs the `.mjs` vectors with zero transform.
 
-## Blocked / cross-package (inbox)
+## Cross-package — done (2026-06-18)
 
-- [ ] **App migration (consumer break, by design):** `app/src/hooks/useStealthWallet.ts:71` imports
-      the package **default** as a constructor (`const { default: WalletManagerEvmErc4337 } = await import(...)`).
-      The default is now `createWalletManager`. Switch to `createWalletManager('evm', seed, cfg)` or the
-      named `WalletManagerEvmErc4337`. Caught by `tsc`/lint. (App is interim; options SDK is the intended owner.)
-- [ ] **Schema Sui config:** `@livestreak/schema` `WalletInitConfig` mirrors the EVM wdkConfig only.
-      A `SuiWalletInitConfig` is needed so the app can map schema → Sui config at the edge — file to schema.
-- [ ] **Browser-bundle pre-check:** confirm `@livestreak/wallet` (bare-runtime + sodium-universal) bundles
-      in the `app/` build; `app/vite.config.ts` currently aliases `sodium-javascript`. If it won't bundle,
-      that's an app/vite slice, not a wallet change.
+- [x] **App migration:** `app/src/hooks/useStealthWallet.ts` switched from the default constructor to
+      the named `WalletManagerEvmErc4337` export. App `tsc` no longer reports any wallet-related error.
+- [x] **Schema Sui config:** added `SuiWalletInitConfig` (rpcUrl + retries — Sui signs natively, no
+      bundler/paymaster), `WalletChain`, and a chain-discriminated `ChainWalletInit` to
+      `@livestreak/schema` `wallet.ts`. Schema `check`/`build` green.
+- [x] **Browser-bundle pre-check:** `app/` `vite build` exits 0 — `@livestreak/wallet`, `sodium-universal`,
+      `sodium-native`, `bare-node-runtime` all resolve/externalize cleanly (client + Nitro server). No CONFLICT.
+
+## Remaining (not wallet-owned)
+
+- [ ] `app/vite.config.ts:117–131` has 6 pre-existing `TS2769` errors (vite plugin overloads), unrelated
+      to the wallet work — separate app-infra fix.
 
 ## Maintenance loop
 
