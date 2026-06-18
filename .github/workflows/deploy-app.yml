@@ -44,6 +44,9 @@ jobs:
             app:
               - 'app/**'
               - 'packages/wallet/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig.base.json'
               - 'Dockerfile'
               - '.github/workflows/deploy-app.yml'
               - '!**/*.md'

@@ -8,6 +8,11 @@ import tailwindcss from '@tailwindcss/vite'
 import { nitro } from 'nitro/vite'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import path from 'node:path'
+import { createRequire } from 'node:module'
+
+// Resolve packages from wherever npm places them — the repo-root node_modules
+// (workspace hoist) or app/node_modules (Docker --install-links).
+const nodeRequire = createRequire(import.meta.url)
 
 // @livestreak/wallet (vendored wdk-4337) is a Node/bare-runtime SDK. The browser
 // build needs node polyfills; the Nitro server build runs in real Node and must
@@ -25,9 +30,11 @@ const walletExternals = [
 // vite-plugin-node-polyfills rewrites `buffer`/`process`/`global` imports to its
 // own shim specifiers. The wallet (and its @safe-global deps) resolve from the
 // repo-root node_modules, outside app/'s scope, so a plain resolve.alias is not
-// reliably applied. This pre-resolver pins those shim specifiers to absolute
-// paths in app/node_modules regardless of which package imported them.
+// reliably applied. This pre-resolver pins those shim specifiers to the plugin's
+// real install dir, resolved via Node so it works whether the plugin is hoisted
+// to the repo-root node_modules or copied into app/node_modules.
 function nodePolyfillShimResolver() {
+  const pluginDir = path.resolve(path.dirname(nodeRequire.resolve('vite-plugin-node-polyfills')), '..')
   return {
     name: 'livestreak:node-polyfill-shim-resolver',
     enforce: 'pre' as const,
@@ -35,7 +42,7 @@ function nodePolyfillShimResolver() {
       const prefix = 'vite-plugin-node-polyfills/shims/'
       if (id.startsWith(prefix)) {
         const shim = id.slice(prefix.length)
-        return path.resolve(import.meta.dirname, `node_modules/vite-plugin-node-polyfills/shims/${shim}/dist/index.js`)
+        return path.join(pluginDir, 'shims', shim, 'dist/index.js')
       }
     },
   }
@@ -99,7 +106,7 @@ function clientScopedPolyfills(options: Parameters<typeof nodePolyfills>[0]): Pl
 const config = defineConfig({
   resolve: {
     alias: {
-      'sodium-javascript': path.resolve(import.meta.dirname, 'node_modules/sodium-javascript'),
+      'sodium-javascript': path.dirname(nodeRequire.resolve('sodium-javascript')),
     },
   },
   optimizeDeps: {
