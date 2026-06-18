@@ -13,8 +13,8 @@ config   native WDK config, discriminated by chain:
            evm -> EvmErc4337WalletConfig (chainId, provider/rpc, bundlerUrl, paymasterUrl?,
                   entryPointAddress, safe module addresses, contractNetworks, gas mode)
            sui -> SuiWalletConfig (rpcUrl | provider, retries?)
-         The app maps @livestreak/schema WalletInitConfig -> the EVM config at the edge.
-         (@livestreak/schema has no Sui variant yet — see TODO.)
+         The app maps @livestreak/schema's EvmWalletInitConfig | SuiWalletInitConfig
+         (the chain-discriminated WalletInit) -> the native WDK config at the edge.
 ```
 
 ## The path

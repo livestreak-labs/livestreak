@@ -148,7 +148,7 @@ export const PROTOCOL_LP_ABI = [
 //
 // These are the CREATE2 deterministic Safe + EntryPoint addresses (identical on
 // every EVM chain). Bundler/paymaster come from the URLs configured at the top of
-// this file. This shape mirrors @livestreak/schema's WalletInitConfig.
+// this file. This shape mirrors @livestreak/schema's EvmWalletInitConfig.
 
 const AA_ADDRESSES = {
   entryPoint: '0x0000000071727De22E5E9d8BAf0edAc6f37da032',

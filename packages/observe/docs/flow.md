@@ -35,7 +35,7 @@ market-registration edge documented end-to-end" — i.e. on this file.
 | capture injection seam | `run/kernel.ts` `ObserveRunKernelOptions.captureDriver/sinkDriver` | drivers are **injected**; kernel resolves built-ins or injected |
 | sinks today | `pipeline/publish/sinks/file` | **file export only**. `local/` + `simulcast/` READMEs say "Planned … not implemented" |
 | output vocab | `@livestreak/schema` session.ts:3 | `OutputMode = "file"|"local"|"simulcast"` |
-| AA wallet config (injected) | `@livestreak/schema` wallet.ts | `WalletInit{ seedSource, config: WalletInitConfig{ chainId, provider(rpc), bundlerUrl, paymasterUrl?, isSponsored, entryPointAddress, safe4337ModuleAddress, contractNetworks, … } }` — "every field CALLER-INJECTED; never hardcode" |
+| AA wallet config (injected) | `@livestreak/schema` wallet.ts | `WalletInit{ seedSource, config: EvmWalletInitConfig{ chainId, provider(rpc), bundlerUrl, paymasterUrl?, isSponsored, entryPointAddress, safe4337ModuleAddress, contractNetworks, … } }` — "every field CALLER-INJECTED; never hardcode" |
 | host session | `@livestreak/host` session.ts | `HostCreateSessionRequest{ contentId, observer, sessionId, outputMode, … }` → `HostSessionResult{ summary, draft{ sessionId, endpoints[], manifestDraft: EndpointManifest, policy } }` |
 | signed manifest | `@livestreak/host` manifest.ts | `EndpointManifest{ manifestId, sessionId, observer, contentId, hostId, endpoints[]{kind: watch\|webrtc\|state\|telemetry\|archive\|control, url, expiresAtMs}, hostPolicyStatus, cacheReceiptRefs[], expiresAtMs, signature }` |
 | host AA infra | `@livestreak/host` aa.ts | bundler proxy `{host}/aa/bundler/{chain}`, paymaster proxy, `AaSponsorshipMode = none\|dev_open\|tenant_quota\|paymaster_signed` |

@@ -18,7 +18,7 @@ See [architecture.md](./architecture.md) and [flow.md](./flow.md).
 - [x] **App migration:** `app/src/hooks/useStealthWallet.ts` switched from the default constructor to
       the named `WalletManagerEvmErc4337` export. App `tsc` no longer reports any wallet-related error.
 - [x] **Schema Sui config:** added `SuiWalletInitConfig` (rpcUrl + retries — Sui signs natively, no
-      bundler/paymaster), `WalletChain`, and a chain-discriminated `ChainWalletInit` to
+      bundler/paymaster), `WalletChain`, and folded EVM+Sui into one chain-discriminated `WalletInit` (renamed `WalletInitConfig`→`EvmWalletInitConfig`) in
       `@livestreak/schema` `wallet.ts`. Schema `check`/`build` green.
 - [x] **Browser-bundle pre-check:** `app/` `vite build` exits 0 — `@livestreak/wallet`, `sodium-universal`,
       `sodium-native`, `bare-node-runtime` all resolve/externalize cleanly (client + Nitro server). No CONFLICT.
