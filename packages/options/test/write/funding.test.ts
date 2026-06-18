@@ -1,5 +1,5 @@
 import { LiveStreakConfigError } from "@livestreak/core";
-import { flowTokenAbi, vaultFundingAbi } from "@flowstream/contracts";
+import { vaultFundingAbi } from "@flowstream/contracts";
 import { describe, expect, it } from "vitest";
 
 import { asVaultId } from "../../src/model/ids.js";

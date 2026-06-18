@@ -34,7 +34,6 @@ export interface StealthWalletState {
 
 function warn(message: string, err?: unknown) {
   const detail = err instanceof Error ? err.message : err != null ? String(err) : ''
-  // eslint-disable-next-line no-console
   console.warn(`[wallet] ${message}${detail ? `: ${detail}` : ''} (interim wallet edge)`)
 }
 

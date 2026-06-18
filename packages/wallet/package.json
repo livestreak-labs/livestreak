@@ -35,7 +35,7 @@
     "build": "tsc -p tsconfig.build.json && node scripts/copy-vendored.mjs",
     "check": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src test",
-    "test": "node --test test/**/*.test.mjs"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@mysten/sui": "^1.21.1",
@@ -52,7 +52,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vitest": "^4.1.8"
   },
   "exports": {
     ".": {
