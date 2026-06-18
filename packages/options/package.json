@@ -16,11 +16,11 @@
     "build": "tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.json --noEmit",
     "lint": "eslint src test",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   },
   "dependencies": {
     "@livestreak/core": "file:../core",
-    "@flowstream/contracts": "file:../contracts"
+    "@livestreak/contracts": "file:../contracts"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
