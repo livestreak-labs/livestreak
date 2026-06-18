@@ -18,11 +18,6 @@ name: Deploy app
 on:
   push:
     branches: [main]
-    paths:
-      - "app/**"
-      - "packages/wallet/**"
-      - "Dockerfile"
-      - ".github/workflows/deploy-app.yml"
   workflow_dispatch: {}
 
 env:
@@ -31,7 +26,32 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/livestreak-app
 
 jobs:
+  # Decide whether anything that affects the image actually changed. Using
+  # dorny/paths-filter (not the native `paths:` allowlist) so that `app/**`
+  # auto-covers new files, while `!**/*.md` skips doc-only commits. This way a
+  # README/docs change never triggers a build, but new code anywhere under the
+  # build inputs always does — no brittle list to keep in sync.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            app:
+              - 'app/**'
+              - 'packages/wallet/**'
+              - 'Dockerfile'
+              - '.github/workflows/deploy-app.yml'
+              - '!**/*.md'
+
   build-and-deploy:
+    needs: changes
+    # Always build on a manual run; on push, only when app-relevant files changed.
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.app == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
