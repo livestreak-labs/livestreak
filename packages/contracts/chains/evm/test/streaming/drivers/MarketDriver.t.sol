@@ -104,25 +104,40 @@ contract MarketDriverTest is Test {
         assertEq(marketDriver.laneCount(aliceNft), 0, "all lanes cleared");
     }
 
-    function test_hedge_sameNftFundsBothSides() public {
+    /// Hedge = flip the vault's single lane to the other side; prior-side shares survive the switch.
+    function test_switchSide_flipsLaneKeepingPriorSideShares() public {
         _fund(alice, aliceNft, v1, Side.Yes, RATE, 50 * RATE);
-        _fund(alice, aliceNft, v1, Side.No, RATE, 50 * RATE);
+        vm.warp(START + 20);
+        assertGt(vault.pendingShares(v1, Side.Yes, aliceNft), 0, "accrued YES shares before switch");
 
-        assertEq(marketDriver.laneCount(aliceNft), 2, "two lanes on one NFT");
-        (, uint256 yesRate,,) = vault.getBoard(v1, Side.Yes);
-        (, uint256 noRate,,) = vault.getBoard(v1, Side.No);
-        assertEq(yesRate, RATE);
-        assertEq(noRate, RATE);
+        vm.prank(alice);
+        marketDriver.switchSide(aliceNft, v1, RATE, 0);
+
+        assertEq(marketDriver.laneCount(aliceNft), 1, "still one lane after hedge");
+        (, Side laneSide,) = marketDriver.laneAt(aliceNft, 0);
+        assertEq(uint256(laneSide), uint256(Side.No), "lane flipped to NO");
+
+        (uint256 yesRate,, uint256 yesAccrued,,) = vault.getPosition(v1, Side.Yes, aliceNft);
+        (uint256 noRate,,,,) = vault.getPosition(v1, Side.No, aliceNft);
+        assertEq(yesRate, 0, "YES lane stopped");
+        assertGt(yesAccrued, 0, "YES shares survive the switch");
+        assertEq(noRate, RATE, "NO lane now active at current price");
+
+        (, uint256 noSideRate,,) = vault.getBoard(v1, Side.No);
+        assertEq(noSideRate, RATE, "NO board now receiving");
     }
 
-    function test_fund_revertsOnDuplicateLane() public {
+    /// One lane per vault: a second fund on a held vault reverts — same side OR the opposite side.
+    function test_fund_revertsOnSecondLaneSameVault() public {
         _fund(alice, aliceNft, v1, Side.Yes, RATE, 50 * RATE);
 
-        usdc.mint(alice, 10 * RATE);
+        usdc.mint(alice, 20 * RATE);
         vm.startPrank(alice);
-        usdc.approve(address(marketDriver), 10 * RATE);
-        vm.expectRevert("MarketDriver: duplicate lane");
+        usdc.approve(address(marketDriver), 20 * RATE);
+        vm.expectRevert("MarketDriver: vault already has a lane");
         marketDriver.fund(aliceNft, v1, Side.Yes, RATE, 10 * RATE);
+        vm.expectRevert("MarketDriver: vault already has a lane");
+        marketDriver.fund(aliceNft, v1, Side.No, RATE, 10 * RATE);
         vm.stopPrank();
     }
 
@@ -153,31 +168,34 @@ contract MarketDriverTest is Test {
         vm.stopPrank();
     }
 
-    function test_maxEndRipple_afterSecondFund() public {
+    /// Shared-balance maxEnd ripple now spans two distinct vaults (one lane each), not two sides.
+    function test_maxEndRipple_afterSecondVaultFund() public {
         _fund(alice, aliceNft, v1, Side.Yes, RATE, 20 * RATE);
         (,,, uint32 maxEnd1,) = vault.getPosition(v1, Side.Yes, aliceNft);
         assertEq(uint256(maxEnd1), 120, "first lane maxEnd");
 
-        _fund(alice, aliceNft, v1, Side.No, RATE, 80 * RATE);
-        (,,, uint32 maxEndYes,) = vault.getPosition(v1, Side.Yes, aliceNft);
-        (,,, uint32 maxEndNo,) = vault.getPosition(v1, Side.No, aliceNft);
+        bytes32 v2 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Q2?", Side.Yes);
+        _fund(alice, aliceNft, v2, Side.No, RATE, 80 * RATE);
 
-        assertGt(uint256(maxEndYes), uint256(maxEnd1), "yes lane maxEnd extended");
-        assertEq(uint256(maxEndYes), uint256(maxEndNo), "both lanes share balance maxEnd");
+        (,,, uint32 maxEndV1,) = vault.getPosition(v1, Side.Yes, aliceNft);
+        (,,, uint32 maxEndV2,) = vault.getPosition(v2, Side.No, aliceNft);
+        assertGt(uint256(maxEndV1), uint256(maxEnd1), "v1 lane maxEnd extended by added balance");
+        assertEq(uint256(maxEndV1), uint256(maxEndV2), "both lanes share one balance maxEnd");
     }
 
-    function test_perSideStop_otherLaneStillActive() public {
+    function test_stopOneVaultLeavesOtherActive() public {
+        bytes32 v2 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Q2?", Side.Yes);
         _fund(alice, aliceNft, v1, Side.Yes, RATE, 50 * RATE);
-        _fund(alice, aliceNft, v1, Side.No, RATE, 50 * RATE);
+        _fund(alice, aliceNft, v2, Side.No, RATE, 50 * RATE);
 
         vm.prank(alice);
         marketDriver.stop(aliceNft, v1, Side.Yes);
 
         assertEq(marketDriver.laneCount(aliceNft), 1, "one lane remains");
-        (uint256 yesRate,,,,) = vault.getPosition(v1, Side.Yes, aliceNft);
-        (uint256 noRate,,,,) = vault.getPosition(v1, Side.No, aliceNft);
-        assertEq(yesRate, 0);
-        assertGt(noRate, 0);
+        (uint256 v1Rate,,,,) = vault.getPosition(v1, Side.Yes, aliceNft);
+        (uint256 v2Rate,,,,) = vault.getPosition(v2, Side.No, aliceNft);
+        assertEq(v1Rate, 0, "stopped vault lane cleared");
+        assertGt(v2Rate, 0, "other vault lane still active");
     }
 
     function test_nftTransfer_newHolderCanStop() public {
@@ -216,6 +234,40 @@ contract MarketDriverTest is Test {
         vm.warp(START + 500);
         vault.advance(v1, Side.Yes, 64);
         assertTrue(vault.caughtUp(v1, Side.Yes), "boundary pileup does not brick advance");
+    }
+
+    /// Funding must never open a position against a board left behind by the MAX_STEPS cap.
+    /// With >MAX_STEPS dry boundaries queued, a fund reverts until the board is drained; draining is
+    /// permissionless and bounded, so nothing bricks and no stale-board (over-credit) accounting occurs.
+    function test_fundWhileBehind_revertsUntilDrained() public {
+        uint256 n = 65; // > MAX_STEPS (64)
+        for (uint256 i = 0; i < n; i++) {
+            address f = address(uint160(0xF00000 + i));
+            uint256 nft = MarketDriverHarness.mint(marketDriver, f, marketId);
+            // deposit (i+1)*RATE => maxEnd = START + (i+1) in 101..165, all before the warp target.
+            MarketDriverHarness.fund(marketDriver, usdc, f, nft, v1, Side.Yes, RATE, (i + 1) * RATE);
+        }
+
+        vm.warp(START + 200); // every run-dry now past: 65 boundaries due, none processed
+        assertFalse(vault.caughtUp(v1, Side.Yes), "board behind with 65 due boundaries");
+
+        // Opening against the stale board would over-credit; must revert instead.
+        usdc.mint(alice, 10 * RATE);
+        vm.startPrank(alice);
+        usdc.approve(address(marketDriver), 10 * RATE);
+        vm.expectRevert("Vault: board behind, advance first");
+        marketDriver.fund(aliceNft, v1, Side.Yes, RATE, 10 * RATE);
+        vm.stopPrank();
+
+        // Permissionless bounded drain (65/64 => 2 calls), never bricks.
+        vault.advance(v1, Side.Yes, 64);
+        vault.advance(v1, Side.Yes, 64);
+        assertTrue(vault.caughtUp(v1, Side.Yes), "board fully drained");
+
+        // Same fund now succeeds against a current board.
+        _fund(alice, aliceNft, v1, Side.Yes, RATE, 10 * RATE);
+        (uint256 rate,,,,) = vault.getPosition(v1, Side.Yes, aliceNft);
+        assertEq(rate, RATE, "fund opens cleanly after drain");
     }
 
     function test_vaultHooks_areDriverGated() external {

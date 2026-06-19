@@ -90,6 +90,26 @@ contract VaultResolutionTest is Test {
         assertEq(usdc.balanceOf(alice), 100 * RATE);
     }
 
+    /// Hedge mid-market: alice flips YES->NO; her new side wins and pays, her abandoned side is a loss.
+    function test_switchSide_newSideWinsAndPaysAbandonedSideLoses() public {
+        _fund(alice, aliceNft, Side.Yes, RATE, 50 * RATE);
+        vm.warp(120); // accrue 20s on YES, then hedge to NO with the remaining balance
+        vm.prank(alice);
+        marketDriver.switchSide(aliceNft, v1, RATE, 0);
+        _fund(bob, bobNft, Side.Yes, RATE, 50 * RATE); // someone now holds the YES alice left
+
+        vm.warp(160);
+        _resolve(Vault.Outcome.No); // alice's NEW side wins
+        vm.warp(160 + CYCLE * 3); // let cycles complete so harvest banks the cash
+        vault.collect(v1);
+
+        vm.prank(alice);
+        uint256 payout = marketDriver.withdraw(aliceNft, v1);
+        assertGt(payout, 0, "alice paid on the side she switched to");
+        assertGt(vault.lossClaimable(aliceNft, v1, Side.Yes), 0, "abandoned YES is a loss basis");
+        assertEq(vault.lossClaimable(aliceNft, v1, Side.No), 0, "winning NO is not a loss");
+    }
+
     function test_loserWithdrawIsNoOp() public {
         _fund(alice, aliceNft, Side.Yes, RATE, 50 * RATE);
         _fund(bob, bobNft, Side.No, RATE, 50 * RATE);

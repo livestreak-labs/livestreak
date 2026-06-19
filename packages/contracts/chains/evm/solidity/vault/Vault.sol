@@ -248,7 +248,7 @@ contract Vault {
             _accountVaults[account].push(vaultId);
         }
 
-        _advance(vaultId, side, MAX_STEPS);
+        _advanceToNow(vaultId, side);
         _settle(vaultId, side, account);
 
         Position storage p = _positions[vaultId][side][account];
@@ -267,7 +267,7 @@ contract Vault {
 
     /// @notice Close a funder's position; banks accrued shares and drops the rate.
     function onStop(uint256 account, bytes32 vaultId, Side side) external onlyFundingDriver {
-        _advance(vaultId, side, MAX_STEPS);
+        _advanceToNow(vaultId, side);
         _settle(vaultId, side, account);
 
         Position storage p = _positions[vaultId][side][account];
@@ -304,7 +304,7 @@ contract Vault {
         for (uint256 i = 0; i < vaultIds.length; i++) {
             bytes32 vaultId = vaultIds[i];
             Side side = sides[i];
-            _advance(vaultId, side, MAX_STEPS);
+            _advanceToNow(vaultId, side);
             _settle(vaultId, side, account);
             Position storage p = _positions[vaultId][side][account];
             if (p.rate > 0 && !p.depleted && newMaxEnd != p.maxEnd) {
@@ -377,11 +377,7 @@ contract Vault {
     }
 
     function caughtUp(bytes32 vaultId, Side side) external view returns (bool) {
-        uint32 last = _boards[vaultId][side].lastAdvance;
-        uint256 target = block.timestamp;
-        uint32 resolvedAt = vaults[vaultId].resolvedAt;
-        if (resolvedAt != 0 && uint256(resolvedAt) < target) target = resolvedAt;
-        return last == 0 || uint256(last) == target;
+        return _boardCaughtUp(vaultId, side);
     }
 
     function getAccountVaultIds(uint256 account) external view returns (bytes32[] memory) {
@@ -442,6 +438,27 @@ contract Vault {
     //                       INTERNAL — advance / settle
     // ═══════════════════════════════════════════════════════════════════════
 
+    /// @notice True once the board has been advanced to the current accrual cap (now, or resolvedAt).
+    function _boardCaughtUp(bytes32 vaultId, Side side) internal view returns (bool) {
+        uint32 last = _boards[vaultId][side].lastAdvance;
+        if (last == 0) return true;
+        uint256 target = block.timestamp;
+        uint32 resolvedAt = vaults[vaultId].resolvedAt;
+        if (resolvedAt != 0 && uint256(resolvedAt) < target) target = resolvedAt;
+        return uint256(last) == target;
+    }
+
+    /// @notice Catch the board up and require it reached the accrual cap. Position-mutating hooks
+    /// (`onFund`/`onStop`/`refreshMaxEnds`) use this so a position is never opened, closed, or
+    /// re-pegged against a board the MAX_STEPS cap left behind — that would apply a funder's rate
+    /// across a stretch it never streamed (over-credit) or drop it before one it did (strand funds).
+    /// A backlog beyond MAX_STEPS reverts; anyone can drain it first via `advance()` (bounded,
+    /// brick-free), and no new boundary can be queued while behind, so the backlog only shrinks.
+    function _advanceToNow(bytes32 vaultId, Side side) internal {
+        _advance(vaultId, side, MAX_STEPS);
+        require(_boardCaughtUp(vaultId, side), "Vault: board behind, advance first");
+    }
+
     function _advance(bytes32 vaultId, Side side, uint256 maxSteps) internal {
         Board storage b = _boards[vaultId][side];
         if (b.lastAdvance == 0) {
@@ -479,7 +496,11 @@ contract Vault {
         }
         _boundaryHead[vaultId][side] = head;
 
-        if (steps < maxSteps && t < nowTs) {
+        // Finish to `nowTs` only when no due boundary remains unprocessed. A budget-limited stop with
+        // due boundaries still queued leaves the board at the last processed boundary (poke again to
+        // continue) — so the board never advances past a rate-drop it has not yet applied.
+        bool moreDue = head < len && uint256(arr[head].maxEnd) <= nowTs;
+        if (!moreDue && t < nowTs) {
             _segment(b, t, nowTs);
             t = nowTs;
         }
@@ -564,6 +585,9 @@ contract Vault {
         VaultData storage data = vaults[vaultId];
         require(data.status == Status.Resolved, "Vault: not resolved");
 
+        // Full catch-up to resolvedAt (uncapped) so the pot is exact. If a side ever amasses more dry
+        // boundaries than fit one block's gas, drain it first with the permissionless `advance()`
+        // (bounded, brick-free) and this becomes a no-op — funds are never stranded, only deferred.
         _advance(vaultId, Side.Yes, type(uint256).max);
         _advance(vaultId, Side.No, type(uint256).max);
 

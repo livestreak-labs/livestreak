@@ -22,13 +22,17 @@ interface ITreasuryLoss {
     function mintLossLvst(uint256 account, address to, bytes32 vaultId, Side side) external returns (uint256);
 }
 
-/// @notice Per-market NFT driver: one tokenId == one Drips account, ≤10 concurrent vault-side lanes.
+/// @notice Per-market NFT driver: one tokenId == one Drips account, ≤MAX_LANES concurrent lanes —
+/// one lane per vault (a held vault streams YES or NO, never both; hedge by flipping via `switchSide`).
+/// The lane ceiling is naturally the market's vault count (you cannot fund a vault that does not
+/// exist), hard-capped at MAX_LANES so the shared-balance maxEnd refresh stays bounded.
 contract MarketDriver is SharedDriverUtils, ERC721URIStorage, Managed {
     uint32 public immutable DRIVER_ID;
     Protocol public immutable PROTOCOL;
     Vault public immutable VAULT;
     VaultDriver public immutable VAULT_DRIVER;
 
+    /// @notice Hard ceiling on concurrent lanes (distinct vaults) per NFT — bounds refresh gas.
     uint8 public constant MAX_LANES = 10;
     uint256 public constant MAX_WITHDRAW_VAULTS = 64;
 
@@ -120,8 +124,8 @@ contract MarketDriver is SharedDriverUtils, ERC721URIStorage, Managed {
         require(rate > 0, "MarketDriver: zero rate");
         require(deposit > 0 && deposit <= uint256(uint128(type(int128).max)), "MarketDriver: bad deposit");
         require(VAULT.marketId(vaultId) == marketIdOf[tokenId], "MarketDriver: wrong market");
-        bytes32 key = _posKey(vaultId, side);
-        require(_lanes[tokenId][key].rate == 0, "MarketDriver: duplicate lane");
+        bytes32 key = vaultId; // one lane per vault: a held vault streams YES or NO, never both
+        require(_lanes[tokenId][key].rate == 0, "MarketDriver: vault already has a lane");
         require(_laneKeys[tokenId].length < MAX_LANES, "MarketDriver: too many lanes");
 
         StreamReceiver[] memory curr = _buildReceivers(tokenId);
@@ -134,14 +138,15 @@ contract MarketDriver is SharedDriverUtils, ERC721URIStorage, Managed {
         (,,,, uint32 maxEnd) = DRIPS.streamsState(tokenId, USDC);
 
         VAULT.onFund(tokenId, vaultId, side, rate, maxEnd);
-        _refreshOtherLanes(tokenId, vaultId, side, maxEnd);
+        _refreshOtherLanes(tokenId, vaultId, maxEnd);
 
         emit LaneFunded(tokenId, vaultId, side, rate, deposit, maxEnd);
     }
 
     function stop(uint256 tokenId, bytes32 vaultId, Side side) external onlyHolder(tokenId) whenNotPaused {
-        bytes32 key = _posKey(vaultId, side);
-        require(_lanes[tokenId][key].rate > 0, "MarketDriver: no lane");
+        bytes32 key = vaultId;
+        Lane storage lane = _lanes[tokenId][key];
+        require(lane.rate > 0 && lane.side == side, "MarketDriver: no lane");
 
         StreamReceiver[] memory curr = _buildReceivers(tokenId);
         _removeLane(tokenId, key);
@@ -155,6 +160,39 @@ contract MarketDriver is SharedDriverUtils, ERC721URIStorage, Managed {
         }
 
         emit LaneStopped(tokenId, vaultId, side);
+    }
+
+    /// @notice Hedge by flipping this vault's lane to the opposite side. Banks the current side's
+    /// accrued shares (they survive and still pay out if that side wins), then opens the other side at
+    /// the *current* curve price — you "suffer late incoming". One lane per vault is preserved; pass
+    /// `addDeposit > 0` to top up the shared balance. Switching back later accrues onto the prior side.
+    function switchSide(uint256 tokenId, bytes32 vaultId, uint256 newRate, uint256 addDeposit)
+        external
+        onlyHolder(tokenId)
+        whenNotPaused
+    {
+        require(newRate > 0, "MarketDriver: zero rate");
+        require(addDeposit <= uint256(uint128(type(int128).max)), "MarketDriver: bad deposit");
+        Lane storage lane = _lanes[tokenId][vaultId];
+        require(lane.rate > 0, "MarketDriver: no lane");
+        Side oldSide = lane.side;
+        Side newSide = oldSide == Side.Yes ? Side.No : Side.Yes;
+
+        StreamReceiver[] memory curr = _buildReceivers(tokenId);
+        lane.side = newSide;
+        lane.rate = newRate;
+        StreamReceiver[] memory next = _buildReceivers(tokenId);
+
+        if (addDeposit > 0) _transferFromCaller(USDC, uint128(addDeposit));
+        DRIPS.setStreams(tokenId, USDC, curr, int128(uint128(addDeposit)), next, 0, 0);
+        (,,,, uint32 maxEnd) = DRIPS.streamsState(tokenId, USDC);
+
+        VAULT.onStop(tokenId, vaultId, oldSide);
+        VAULT.onFund(tokenId, vaultId, newSide, newRate, maxEnd);
+        _refreshOtherLanes(tokenId, vaultId, maxEnd);
+
+        emit LaneStopped(tokenId, vaultId, oldSide);
+        emit LaneFunded(tokenId, vaultId, newSide, newRate, addDeposit, maxEnd);
     }
 
     function stopAll(uint256 tokenId) external onlyHolder(tokenId) {
@@ -216,10 +254,6 @@ contract MarketDriver is SharedDriverUtils, ERC721URIStorage, Managed {
         revert("MarketDriver: no caller account");
     }
 
-    function _posKey(bytes32 vaultId, Side side) internal pure returns (bytes32) {
-        return keccak256(abi.encode(vaultId, side));
-    }
-
     function _calcTokenIdWithSalt(address minter, uint64 salt) internal view returns (uint256 tokenId) {
         tokenId = DRIVER_ID;
         tokenId = (tokenId << 160) | uint160(minter);
@@ -278,11 +312,11 @@ contract MarketDriver is SharedDriverUtils, ERC721URIStorage, Managed {
         }
     }
 
-    function _refreshOtherLanes(uint256 tokenId, bytes32 newVaultId, Side newSide, uint32 maxEnd) internal {
+    function _refreshOtherLanes(uint256 tokenId, bytes32 newVaultId, uint32 maxEnd) internal {
         bytes32[] storage keys = _laneKeys[tokenId];
         uint256 n = keys.length;
         if (n <= 1) return;
-        bytes32 newKey = _posKey(newVaultId, newSide);
+        bytes32 newKey = newVaultId;
         bytes32[] memory vaultIds = new bytes32[](n - 1);
         Side[] memory sides = new Side[](n - 1);
         uint256 j;
