@@ -6,5 +6,15 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    "kit/**/*.ts",
+    "chains/evm/index.ts",
+    "chains/evm/abis.ts",
+    "chains/evm/addresses.ts",
+    "chains/evm/contract.ts",
+    "chains/evm/types.ts",
+    "chains/sui/index.ts",
+    "chains/solana/index.ts"
+  ],
+  "exclude": ["chains/evm/lib/**", "chains/evm/out/**", "chains/evm/cache/**"]
 }
