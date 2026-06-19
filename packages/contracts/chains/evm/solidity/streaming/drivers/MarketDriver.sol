@@ -195,6 +195,48 @@ contract MarketDriver is SharedDriverUtils, ERC721URIStorage, Managed {
         emit LaneFunded(tokenId, vaultId, newSide, newRate, addDeposit, maxEnd);
     }
 
+    /// @notice Atomically free a slot and move on: stop the lane on `dropVaultId` (its accrued shares
+    /// survive on its Board for later claim) and open a fresh lane on `newVaultId`. Net lane count is
+    /// unchanged, so this is how you keep streaming a new vault once you are at MAX_LANES — clean up a
+    /// spent/unwanted lane and step to the next one, no separate stop tx and no intermediate gap.
+    /// The caller chooses which lane to drop (auto-evicting a live lane would silently kill a position,
+    /// and shared-balance lanes run dry together so there is no single "dead" one to detect).
+    function replaceLane(
+        uint256 tokenId,
+        bytes32 dropVaultId,
+        bytes32 newVaultId,
+        Side newSide,
+        uint256 newRate,
+        uint256 addDeposit
+    ) external onlyHolder(tokenId) whenNotPaused {
+        require(newRate > 0, "MarketDriver: zero rate");
+        require(addDeposit <= uint256(uint128(type(int128).max)), "MarketDriver: bad deposit");
+        require(dropVaultId != newVaultId, "MarketDriver: same vault");
+        require(VAULT.marketId(newVaultId) == marketIdOf[tokenId], "MarketDriver: wrong market");
+
+        Lane storage dropLane = _lanes[tokenId][dropVaultId];
+        require(dropLane.rate > 0, "MarketDriver: no lane to drop");
+        require(_lanes[tokenId][newVaultId].rate == 0, "MarketDriver: vault already has a lane");
+        Side dropSide = dropLane.side;
+
+        StreamReceiver[] memory curr = _buildReceivers(tokenId);
+        _removeLane(tokenId, dropVaultId);
+        _laneKeys[tokenId].push(newVaultId);
+        _lanes[tokenId][newVaultId] = Lane({vaultId: newVaultId, side: newSide, rate: newRate});
+        StreamReceiver[] memory next = _buildReceivers(tokenId);
+
+        if (addDeposit > 0) _transferFromCaller(USDC, uint128(addDeposit));
+        DRIPS.setStreams(tokenId, USDC, curr, int128(uint128(addDeposit)), next, 0, 0);
+        (,,,, uint32 maxEnd) = DRIPS.streamsState(tokenId, USDC);
+
+        VAULT.onStop(tokenId, dropVaultId, dropSide);
+        VAULT.onFund(tokenId, newVaultId, newSide, newRate, maxEnd);
+        _refreshOtherLanes(tokenId, newVaultId, maxEnd);
+
+        emit LaneStopped(tokenId, dropVaultId, dropSide);
+        emit LaneFunded(tokenId, newVaultId, newSide, newRate, addDeposit, maxEnd);
+    }
+
     function stopAll(uint256 tokenId) external onlyHolder(tokenId) {
         StreamReceiver[] memory curr = _buildReceivers(tokenId);
         bytes32[] memory keys = _laneKeys[tokenId];

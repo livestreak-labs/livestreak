@@ -153,18 +153,77 @@ contract MarketDriverTest is Test {
         vm.stopPrank();
     }
 
-    function test_fund_revertsOnEleventhLane() public {
+    /// The 11th lane reverts *before* any mutation, so the standing 10 lanes (and their Drips config)
+    /// are untouched — no partial-state "drop one of the 10 / add an 11th" corruption.
+    function test_fund_revertsOnEleventhLane_noPartialState() public {
+        bytes32 lastVid;
         for (uint256 i = 0; i < 10; i++) {
             bytes32 vid =
                 VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, string(abi.encodePacked("Q", i)), Side.Yes);
             _fund(alice, aliceNft, vid, Side.Yes, RATE, 10 * RATE);
+            lastVid = vid;
         }
+        (,,,, uint32 maxEndBefore) = drips.streamsState(aliceNft, IERC20(address(usdc)));
+        (uint256 rateBefore,,,,) = vault.getPosition(lastVid, Side.Yes, aliceNft);
+
         bytes32 v11 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Q11", Side.Yes);
         usdc.mint(alice, 10 * RATE);
         vm.startPrank(alice);
         usdc.approve(address(marketDriver), 10 * RATE);
         vm.expectRevert("MarketDriver: too many lanes");
         marketDriver.fund(aliceNft, v11, Side.Yes, RATE, 10 * RATE);
+        vm.stopPrank();
+
+        assertEq(marketDriver.laneCount(aliceNft), 10, "still exactly 10 lanes after rejected 11th");
+        (,,,, uint32 maxEndAfter) = drips.streamsState(aliceNft, IERC20(address(usdc)));
+        (uint256 rateAfter,,,,) = vault.getPosition(lastVid, Side.Yes, aliceNft);
+        assertEq(uint256(maxEndAfter), uint256(maxEndBefore), "Drips stream config unchanged");
+        assertEq(rateAfter, rateBefore, "existing lane position unchanged");
+    }
+
+    /// At the cap you don't get walled off — clean up one lane and step into a new vault in one tx.
+    /// The dropped lane's accrued shares survive (claimable later); net lane count stays 10.
+    function test_replaceLane_swapsOneOutKeepingShares() public {
+        bytes32 first;
+        for (uint256 i = 0; i < 10; i++) {
+            bytes32 vid =
+                VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, string(abi.encodePacked("R", i)), Side.Yes);
+            _fund(alice, aliceNft, vid, Side.Yes, RATE, 10 * RATE);
+            if (i == 0) first = vid;
+        }
+        assertEq(marketDriver.laneCount(aliceNft), 10, "at the lane cap");
+        vm.warp(START + 5); // accrue some shares on the lane we'll drop
+
+        bytes32 v11 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "R11", Side.Yes);
+        usdc.mint(alice, 10 * RATE);
+        vm.startPrank(alice);
+        usdc.approve(address(marketDriver), 10 * RATE);
+        marketDriver.replaceLane(aliceNft, first, v11, Side.No, RATE, 10 * RATE);
+        vm.stopPrank();
+
+        assertEq(marketDriver.laneCount(aliceNft), 10, "still 10 lanes after the swap");
+        (uint256 droppedRate,, uint256 droppedShares,,) = vault.getPosition(first, Side.Yes, aliceNft);
+        (uint256 newRate,,,,) = vault.getPosition(v11, Side.No, aliceNft);
+        assertEq(droppedRate, 0, "dropped vault lane stopped");
+        assertGt(droppedShares, 0, "dropped lane's accrued shares survive the swap");
+        assertEq(newRate, RATE, "moved into the 11th vault");
+    }
+
+    function test_replaceLane_guards() public {
+        bytes32 v2 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "RG2", Side.Yes);
+        _fund(alice, aliceNft, v1, Side.Yes, RATE, 50 * RATE);
+        _fund(alice, aliceNft, v2, Side.Yes, RATE, 50 * RATE);
+        bytes32 v3 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "RG3", Side.Yes);
+
+        usdc.mint(alice, 30 * RATE);
+        vm.startPrank(alice);
+        usdc.approve(address(marketDriver), 30 * RATE);
+        vm.expectRevert("MarketDriver: same vault");
+        marketDriver.replaceLane(aliceNft, v1, v1, Side.No, RATE, 10 * RATE);
+        vm.expectRevert("MarketDriver: no lane to drop");
+        marketDriver.replaceLane(aliceNft, v3, v1, Side.No, RATE, 10 * RATE);
+        vm.expectRevert("MarketDriver: vault already has a lane");
+        marketDriver.replaceLane(aliceNft, v1, v2, Side.No, RATE, 10 * RATE);
         vm.stopPrank();
     }
 

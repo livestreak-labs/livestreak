@@ -1644,6 +1644,20 @@ export const marketDriverAbi = [
   },
   {
     type: 'function',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'dropVaultId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'newVaultId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'newSide', internalType: 'enum Side', type: 'uint8' },
+      { name: 'newRate', internalType: 'uint256', type: 'uint256' },
+      { name: 'addDeposit', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'replaceLane',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'pauser', internalType: 'address', type: 'address' }],
     name: 'revokePauser',
     outputs: [],
