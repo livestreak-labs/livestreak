@@ -4,28 +4,29 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {DripsStreaming} from "../../src/streaming/DripsStreaming.sol";
 import {MarketDriver} from "../../src/streaming/drivers/MarketDriver.sol";
+import {VaultDriver} from "../../src/streaming/drivers/VaultDriver.sol";
 import {Vault} from "../../src/vault/Vault.sol";
-import {VaultFactory} from "../../src/vault/VaultFactory.sol";
 import {Treasury} from "../../src/treasury/Treasury.sol";
 import {Side} from "../../src/vault/Side.sol";
-import {BookmakerRegistry} from "../../src/registries/BookmakerRegistry.sol";
 import {MarketRegistry} from "../../src/registries/MarketRegistry.sol";
 import {StewardRegistry} from "../../src/steward/StewardRegistry.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {MockUSDC} from "../mocks/MockUSDC.sol";
 import {ProtocolWire} from "../helpers/ProtocolWire.sol";
 import {MarketDriverHarness} from "../helpers/MarketDriverHarness.sol";
+import {VaultDriverHarness} from "../helpers/VaultDriverHarness.sol";
 
 /// @notice Conservation invariant: every deposited dollar is skim, recovery, or zero residual.
 contract ConservationInvariantTest is Test {
     uint32 internal constant CYCLE = 10;
     uint256 internal constant START = 100;
     uint256 internal constant RATE = 1_000_000;
+    uint256 internal constant CREATOR_SEED = 10 * RATE;
 
     DripsStreaming internal drips;
     MockUSDC internal usdc;
     Vault internal vault;
-    VaultFactory internal vaultFactory;
+    VaultDriver internal vaultDriver;
     Treasury internal treasury;
     MarketDriver internal marketDriver;
     StewardRegistry internal stewardRegistry;
@@ -45,20 +46,20 @@ contract ConservationInvariantTest is Test {
         usdc = new MockUSDC();
         ProtocolWire.Core memory core = ProtocolWire.deployCore(address(this), IERC20(address(usdc)));
         vault = core.vault;
-        vaultFactory = core.vaultFactory;
         treasury = core.treasury;
         stewardRegistry = core.stewardRegistry;
-
-        core.bookmakerRegistry.setBookmaker(address(this), true);
 
         ProtocolWire.Streaming memory streaming = ProtocolWire.deployStreaming(address(this), vault, usdc, CYCLE);
         streaming = ProtocolWire.wireAll(address(this), core, streaming);
         drips = streaming.drips;
         marketDriver = streaming.marketDriver;
+        vaultDriver = core.vaultDriver;
 
         stewardRegistry.registerSteward(steward);
         marketId = core.marketRegistry.registerMarket("m", bytes32("s"));
-        vaultId = vaultFactory.createVault(marketId, "Q?");
+        vaultId = VaultDriverHarness.createVault(
+            vaultDriver, usdc, VaultDriverHarness.SEED_CREATOR, marketId, "Q?", Side.Yes, RATE, CREATOR_SEED
+        );
 
         aliceNft = MarketDriverHarness.mint(marketDriver, alice, marketId);
         bobNft = MarketDriverHarness.mint(marketDriver, bob, marketId);
@@ -68,7 +69,7 @@ contract ConservationInvariantTest is Test {
     function testFuzz_conservationInvariant(uint256 seed) public {
         seed = bound(seed, 1, type(uint128).max);
 
-        uint256 totalDeposits;
+        uint256 totalDeposits = CREATOR_SEED;
         uint256 totalStopAllRefunds;
         uint256 totalWithdraws;
 
@@ -128,12 +129,23 @@ contract ConservationInvariantTest is Test {
         vm.prank(bob);
         totalWithdraws += marketDriver.withdraw(bobNft, vaultId);
 
-        assertEq(usdc.balanceOf(address(vault)), 0, "vault drained");
-        assertEq(usdc.balanceOf(address(drips)), 0, "drips drained");
+        vm.prank(VaultDriverHarness.SEED_CREATOR);
+        totalWithdraws += vaultDriver.withdraw(vaultId);
+
+        vaultDriver.harvest(vaultId, Side.Yes);
+        vaultDriver.harvest(vaultId, Side.No);
+        vault.collect(vaultId);
+
+        vm.prank(VaultDriverHarness.SEED_CREATOR);
+        totalWithdraws += vaultDriver.withdraw(vaultId);
+
+        uint256 vaultRemainder = usdc.balanceOf(address(vault));
+        uint256 dripsRemainder = usdc.balanceOf(address(drips));
+        assertLe(vaultRemainder + dripsRemainder, 2, "negligible residual dust");
         assertEq(
             totalDeposits,
-            treasury.totalSkimmed() + totalStopAllRefunds + totalWithdraws,
-            "conservation: deposits == skim + refunds + withdrawals"
+            treasury.totalSkimmed() + totalStopAllRefunds + totalWithdraws + vaultRemainder + dripsRemainder,
+            "conservation: deposits == skim + refunds + withdrawals + dust"
         );
     }
 

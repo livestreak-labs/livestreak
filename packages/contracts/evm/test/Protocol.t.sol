@@ -40,8 +40,6 @@ contract ProtocolTest is Test {
 
     function test_getters_returnWhatWasSet() public {
         address market = makeAddr("market");
-        address bookmaker = makeAddr("bookmaker");
-        address factory = makeAddr("factory");
         address vault = makeAddr("vault");
         address drips = makeAddr("drips");
         address driver = makeAddr("driver");
@@ -52,8 +50,6 @@ contract ProtocolTest is Test {
 
         vm.startPrank(owner);
         protocol.setMarketRegistry(market);
-        protocol.setBookmakerRegistry(bookmaker);
-        protocol.setVaultFactory(factory);
         protocol.setVault(vault);
         protocol.setDripsStreaming(drips);
         protocol.setMarketDriver(driver);
@@ -64,8 +60,6 @@ contract ProtocolTest is Test {
         vm.stopPrank();
 
         assertEq(protocol.marketRegistry(), market);
-        assertEq(protocol.bookmakerRegistry(), bookmaker);
-        assertEq(protocol.vaultFactory(), factory);
         assertEq(protocol.vault(), vault);
         assertEq(protocol.dripsStreaming(), drips);
         assertEq(protocol.marketDriver(), driver);

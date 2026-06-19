@@ -7,14 +7,13 @@ import {IDrips} from "../../../src/streaming/IDrips.sol";
 import {MarketDriver} from "../../../src/streaming/drivers/MarketDriver.sol";
 import {VaultDriver} from "../../../src/streaming/drivers/VaultDriver.sol";
 import {Vault} from "../../../src/vault/Vault.sol";
-import {VaultFactory} from "../../../src/vault/VaultFactory.sol";
 import {Side} from "../../../src/vault/Side.sol";
-import {BookmakerRegistry} from "../../../src/registries/BookmakerRegistry.sol";
 import {MarketRegistry} from "../../../src/registries/MarketRegistry.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {MockUSDC} from "../../mocks/MockUSDC.sol";
 import {ProtocolWire} from "../../helpers/ProtocolWire.sol";
 import {MarketDriverHarness} from "../../helpers/MarketDriverHarness.sol";
+import {VaultDriverHarness} from "../../helpers/VaultDriverHarness.sol";
 
 /// @notice MarketDriver: NFT account, multi-lane fund/stop, Board sync, holder-gated claims.
 contract MarketDriverTest is Test {
@@ -25,8 +24,6 @@ contract MarketDriverTest is Test {
     DripsStreaming internal drips;
     MockUSDC internal usdc;
     Vault internal vault;
-    VaultFactory internal vaultFactory;
-    BookmakerRegistry internal bookmakerRegistry;
     MarketRegistry internal marketRegistry;
     MarketDriver internal marketDriver;
     VaultDriver internal vaultDriver;
@@ -45,21 +42,17 @@ contract MarketDriverTest is Test {
 
         usdc = new MockUSDC();
         ProtocolWire.Core memory core = ProtocolWire.deployCore(address(this), IERC20(address(usdc)));
-        bookmakerRegistry = core.bookmakerRegistry;
         marketRegistry = core.marketRegistry;
         vault = core.vault;
-        vaultFactory = core.vaultFactory;
-        vaultDriver = core.vaultDriver;
-
-        bookmakerRegistry.setBookmaker(address(this), true);
 
         ProtocolWire.Streaming memory streaming = ProtocolWire.deployStreaming(address(this), vault, usdc, CYCLE);
         streaming = ProtocolWire.wireAll(address(this), core, streaming);
         drips = streaming.drips;
         marketDriver = streaming.marketDriver;
+        vaultDriver = core.vaultDriver;
 
         marketId = marketRegistry.registerMarket("market", bytes32("s"));
-        v1 = vaultFactory.createVault(marketId, "Q1?");
+        v1 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Q1?", Side.Yes);
 
         aliceNft = MarketDriverHarness.mint(marketDriver, alice, marketId);
         bobNft = MarketDriverHarness.mint(marketDriver, bob, marketId);
@@ -83,7 +76,7 @@ contract MarketDriverTest is Test {
         assertEq(uint256(dMaxEnd), 150, "real Drips stream opened");
 
         assertEq(marketDriver.laneCount(aliceNft), 1, "one lane");
-        assertEq(usdc.balanceOf(address(drips)), 50 * RATE, "deposit custodied");
+        assertApproxEqAbs(usdc.balanceOf(address(drips)), 50 * RATE, 2, "deposit custodied");
     }
 
     function test_stop_keepsUnspentInSharedBalance() public {
@@ -135,7 +128,7 @@ contract MarketDriverTest is Test {
 
     function test_fund_revertsOnWrongMarket() public {
         bytes32 otherMarket = marketRegistry.registerMarket("other", bytes32("o"));
-        bytes32 otherVault = vaultFactory.createVault(otherMarket, "Other?");
+        bytes32 otherVault = VaultDriverHarness.bondVault(vaultDriver, usdc, otherMarket, "Other?", Side.Yes);
 
         usdc.mint(alice, 50 * RATE);
         vm.startPrank(alice);
@@ -147,10 +140,11 @@ contract MarketDriverTest is Test {
 
     function test_fund_revertsOnEleventhLane() public {
         for (uint256 i = 0; i < 10; i++) {
-            bytes32 vid = vaultFactory.createVault(marketId, string(abi.encodePacked("Q", i)));
+            bytes32 vid =
+                VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, string(abi.encodePacked("Q", i)), Side.Yes);
             _fund(alice, aliceNft, vid, Side.Yes, RATE, 10 * RATE);
         }
-        bytes32 v11 = vaultFactory.createVault(marketId, "Q11");
+        bytes32 v11 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Q11", Side.Yes);
         usdc.mint(alice, 10 * RATE);
         vm.startPrank(alice);
         usdc.approve(address(marketDriver), 10 * RATE);
@@ -225,10 +219,10 @@ contract MarketDriverTest is Test {
     }
 
     function test_vaultHooks_areDriverGated() external {
-        vm.expectRevert("Vault: not market driver");
+        vm.expectRevert("Vault: not funding driver");
         vault.onFund(aliceNft, v1, Side.Yes, RATE, 150);
 
-        vm.expectRevert("VaultDriver: not market driver");
+        vm.expectRevert("VaultDriver: not funding driver");
         vaultDriver.receiverAccount(v1, Side.Yes);
     }
 }

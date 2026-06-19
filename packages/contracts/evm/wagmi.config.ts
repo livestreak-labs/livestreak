@@ -9,8 +9,6 @@ export default defineConfig({
       include: [
         "Protocol.sol/Protocol.json",
         "MarketRegistry.sol/MarketRegistry.json",
-        "BookmakerRegistry.sol/BookmakerRegistry.json",
-        "VaultFactory.sol/VaultFactory.json",
         "Vault.sol/Vault.json",
         "LvstToken.sol/LvstToken.json",
         "Treasury.sol/Treasury.json",

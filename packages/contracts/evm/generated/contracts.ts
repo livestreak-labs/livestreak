@@ -1,428 +1,4 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AddressDriver
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-export const addressDriverAbi = [
-  {
-    type: 'constructor',
-    inputs: [
-      { name: 'drips_', internalType: 'address', type: 'address' },
-      { name: 'forwarder', internalType: 'address', type: 'address' },
-      { name: 'driverId_', internalType: 'uint32', type: 'uint32' },
-      { name: 'vault_', internalType: 'contract Vault', type: 'address' },
-      { name: 'vaultDriver_', internalType: 'contract VaultDriver', type: 'address' },
-      { name: 'usdc_', internalType: 'address', type: 'address' },
-    ],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'DRIPS',
-    outputs: [{ name: '', internalType: 'contract IDrips', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'DRIVER_ID',
-    outputs: [{ name: '', internalType: 'uint32', type: 'uint32' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'USDC',
-    outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'VAULT',
-    outputs: [{ name: '', internalType: 'contract Vault', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'VAULT_DRIVER',
-    outputs: [{ name: '', internalType: 'contract VaultDriver', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'acceptAdmin',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'account', internalType: 'uint256', type: 'uint256' }],
-    name: 'activeStream',
-    outputs: [
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'side', internalType: 'enum Side', type: 'uint8' },
-      { name: 'rate', internalType: 'uint256', type: 'uint256' },
-      { name: 'active', internalType: 'bool', type: 'bool' },
-      { name: 'histBefore', internalType: 'bytes32', type: 'bytes32' },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'admin',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'allPausers',
-    outputs: [{ name: 'pausersList', internalType: 'address[]', type: 'address[]' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'addr', internalType: 'address', type: 'address' }],
-    name: 'calcAccountId',
-    outputs: [{ name: 'accountId', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'side', internalType: 'enum Side', type: 'uint8' },
-    ],
-    name: 'claim',
-    outputs: [{ name: 'payout', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'side', internalType: 'enum Side', type: 'uint8' },
-      { name: 'rate', internalType: 'uint256', type: 'uint256' },
-      { name: 'deposit', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'fund',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'pauser', internalType: 'address', type: 'address' }],
-    name: 'grantPauser',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'implementation',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'isPaused',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'pauser', internalType: 'address', type: 'address' }],
-    name: 'isPauser',
-    outputs: [{ name: 'isAddrPauser', internalType: 'bool', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'forwarder', internalType: 'address', type: 'address' }],
-    name: 'isTrustedForwarder',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'pause',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'newAdmin', internalType: 'address', type: 'address' }],
-    name: 'proposeNewAdmin',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'proposedAdmin',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'proxiableUUID',
-    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'side', internalType: 'enum Side', type: 'uint8' },
-    ],
-    name: 'reclaim',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'renounceAdmin',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'pauser', internalType: 'address', type: 'address' }],
-    name: 'revokePauser',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'funder', internalType: 'address', type: 'address' }],
-    name: 'settle',
-    outputs: [{ name: 'squeezed', internalType: 'uint128', type: 'uint128' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'stop',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'unpause',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'newImplementation', internalType: 'address', type: 'address' }],
-    name: 'upgradeTo',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'newImplementation', internalType: 'address', type: 'address' },
-      { name: 'data', internalType: 'bytes', type: 'bytes' },
-    ],
-    name: 'upgradeToAndCall',
-    outputs: [],
-    stateMutability: 'payable',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'previousAdmin', internalType: 'address', type: 'address', indexed: false },
-      { name: 'newAdmin', internalType: 'address', type: 'address', indexed: false },
-    ],
-    name: 'AdminChanged',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [{ name: 'beacon', internalType: 'address', type: 'address', indexed: true }],
-    name: 'BeaconUpgraded',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'currentAdmin', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newAdmin', internalType: 'address', type: 'address', indexed: true },
-    ],
-    name: 'NewAdminProposed',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [{ name: 'pauser', internalType: 'address', type: 'address', indexed: true }],
-    name: 'Paused',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'pauser', internalType: 'address', type: 'address', indexed: true },
-      { name: 'admin', internalType: 'address', type: 'address', indexed: true },
-    ],
-    name: 'PauserGranted',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'pauser', internalType: 'address', type: 'address', indexed: true },
-      { name: 'admin', internalType: 'address', type: 'address', indexed: true },
-    ],
-    name: 'PauserRevoked',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'funder', internalType: 'address', type: 'address', indexed: true },
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
-      { name: 'side', internalType: 'enum Side', type: 'uint8', indexed: false },
-      { name: 'rate', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'deposit', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'maxEnd', internalType: 'uint32', type: 'uint32', indexed: false },
-    ],
-    name: 'PositionFunded',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'funder', internalType: 'address', type: 'address', indexed: true },
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
-      { name: 'side', internalType: 'enum Side', type: 'uint8', indexed: false },
-      { name: 'squeezed', internalType: 'uint128', type: 'uint128', indexed: false },
-    ],
-    name: 'PositionSettled',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'funder', internalType: 'address', type: 'address', indexed: true },
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
-      { name: 'side', internalType: 'enum Side', type: 'uint8', indexed: false },
-      { name: 'refunded', internalType: 'uint256', type: 'uint256', indexed: false },
-    ],
-    name: 'PositionStopped',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [{ name: 'pauser', internalType: 'address', type: 'address', indexed: true }],
-    name: 'Unpaused',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'implementation', internalType: 'address', type: 'address', indexed: true },
-    ],
-    name: 'Upgraded',
-  },
-] as const
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// BookmakerRegistry
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-export const bookmakerRegistryAbi = [
-  {
-    type: 'constructor',
-    inputs: [{ name: 'initialOwner', internalType: 'address', type: 'address' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: '', internalType: 'address', type: 'address' }],
-    name: 'authorizedBookmakers',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'bookmaker', internalType: 'address', type: 'address' }],
-    name: 'isAuthorized',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'owner',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'renounceOwnership',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'bookmaker', internalType: 'address', type: 'address' },
-      { name: 'authorized', internalType: 'bool', type: 'bool' },
-    ],
-    name: 'setBookmaker',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
-    name: 'transferOwnership',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'bookmaker', internalType: 'address', type: 'address', indexed: true },
-      { name: 'authorized', internalType: 'bool', type: 'bool', indexed: false },
-    ],
-    name: 'BookmakerAuthorizationSet',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
-    ],
-    name: 'OwnershipTransferred',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
-    name: 'OwnableInvalidOwner',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
-    name: 'OwnableUnauthorizedAccount',
-  },
-] as const
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Caller
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1754,6 +1330,616 @@ export const lvstTokenAbi = [
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MarketDriver
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const marketDriverAbi = [
+  {
+    type: 'constructor',
+    inputs: [
+      { name: 'drips_', internalType: 'address', type: 'address' },
+      { name: 'forwarder', internalType: 'address', type: 'address' },
+      { name: 'driverId_', internalType: 'uint32', type: 'uint32' },
+      { name: 'protocol_', internalType: 'contract Protocol', type: 'address' },
+      { name: 'vault_', internalType: 'contract Vault', type: 'address' },
+      { name: 'vaultDriver_', internalType: 'contract VaultDriver', type: 'address' },
+      { name: 'usdc_', internalType: 'address', type: 'address' },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'DRIPS',
+    outputs: [{ name: '', internalType: 'contract IDrips', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'DRIVER_ID',
+    outputs: [{ name: '', internalType: 'uint32', type: 'uint32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_LANES',
+    outputs: [{ name: '', internalType: 'uint8', type: 'uint8' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_WITHDRAW_VAULTS',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'PROTOCOL',
+    outputs: [{ name: '', internalType: 'contract Protocol', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'USDC',
+    outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'VAULT',
+    outputs: [{ name: '', internalType: 'contract Vault', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'VAULT_DRIVER',
+    outputs: [{ name: '', internalType: 'contract VaultDriver', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'acceptAdmin',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'admin',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'allPausers',
+    outputs: [{ name: 'pausersList', internalType: 'address[]', type: 'address[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'approve',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'minter', internalType: 'address', type: 'address' },
+      { name: 'salt', internalType: 'uint64', type: 'uint64' },
+    ],
+    name: 'calcTokenIdWithSalt',
+    outputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'side', internalType: 'enum Side', type: 'uint8' },
+    ],
+    name: 'claimLossLvst',
+    outputs: [{ name: 'minted', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'side', internalType: 'enum Side', type: 'uint8' },
+      { name: 'rate', internalType: 'uint256', type: 'uint256' },
+      { name: 'deposit', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'fund',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getApproved',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'pauser', internalType: 'address', type: 'address' }],
+    name: 'grantPauser',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'implementation',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'operator', internalType: 'address', type: 'address' },
+    ],
+    name: 'isApprovedForAll',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'isPaused',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'pauser', internalType: 'address', type: 'address' }],
+    name: 'isPauser',
+    outputs: [{ name: 'isAddrPauser', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'minter', internalType: 'address', type: 'address' },
+      { name: 'salt', internalType: 'uint64', type: 'uint64' },
+    ],
+    name: 'isSaltUsed',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'forwarder', internalType: 'address', type: 'address' }],
+    name: 'isTrustedForwarder',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'index', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'laneAt',
+    outputs: [
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'side', internalType: 'enum Side', type: 'uint8' },
+      { name: 'rate', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'laneCount',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'marketIdOf',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'marketId_', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'to', internalType: 'address', type: 'address' },
+    ],
+    name: 'mint',
+    outputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'marketId_', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'salt', internalType: 'uint64', type: 'uint64' },
+      { name: 'to', internalType: 'address', type: 'address' },
+    ],
+    name: 'mintWithSalt',
+    outputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'name',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextTokenId',
+    outputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'ownerOf',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newAdmin', internalType: 'address', type: 'address' }],
+    name: 'proposeNewAdmin',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'proposedAdmin',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'proxiableUUID',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceAdmin',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'pauser', internalType: 'address', type: 'address' }],
+    name: 'revokePauser',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'safeTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'safeTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'approved', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'setApprovalForAll',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'side', internalType: 'enum Side', type: 'uint8' },
+    ],
+    name: 'stop',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'stopAll',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'interfaceId', internalType: 'bytes4', type: 'bytes4' }],
+    name: 'supportsInterface',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'symbol',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'tokenURI',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'transferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'unpause',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newImplementation', internalType: 'address', type: 'address' }],
+    name: 'upgradeTo',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'newImplementation', internalType: 'address', type: 'address' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'upgradeToAndCall',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'vaultIds', internalType: 'bytes32[]', type: 'bytes32[]' },
+    ],
+    name: 'withdraw',
+    outputs: [{ name: 'total', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+    ],
+    name: 'withdraw',
+    outputs: [{ name: 'payout', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'maxVaults', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'withdrawAll',
+    outputs: [{ name: 'total', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'previousAdmin', internalType: 'address', type: 'address', indexed: false },
+      { name: 'newAdmin', internalType: 'address', type: 'address', indexed: false },
+    ],
+    name: 'AdminChanged',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+      { name: 'refunded', internalType: 'uint256', type: 'uint256', indexed: false },
+    ],
+    name: 'AllLanesStopped',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address', indexed: true },
+      { name: 'approved', internalType: 'address', type: 'address', indexed: true },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+    ],
+    name: 'Approval',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address', indexed: true },
+      { name: 'operator', internalType: 'address', type: 'address', indexed: true },
+      { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
+    ],
+    name: 'ApprovalForAll',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: '_fromTokenId', internalType: 'uint256', type: 'uint256', indexed: false },
+      { name: '_toTokenId', internalType: 'uint256', type: 'uint256', indexed: false },
+    ],
+    name: 'BatchMetadataUpdate',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [{ name: 'beacon', internalType: 'address', type: 'address', indexed: true }],
+    name: 'BeaconUpgraded',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      { name: 'side', internalType: 'enum Side', type: 'uint8', indexed: false },
+      { name: 'rate', internalType: 'uint256', type: 'uint256', indexed: false },
+      { name: 'deposit', internalType: 'uint256', type: 'uint256', indexed: false },
+      { name: 'maxEnd', internalType: 'uint32', type: 'uint32', indexed: false },
+    ],
+    name: 'LaneFunded',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      { name: 'side', internalType: 'enum Side', type: 'uint8', indexed: false },
+    ],
+    name: 'LaneStopped',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+      { name: 'marketId', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+    ],
+    name: 'MarketNftMinted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: '_tokenId', internalType: 'uint256', type: 'uint256', indexed: false },
+    ],
+    name: 'MetadataUpdate',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'currentAdmin', internalType: 'address', type: 'address', indexed: true },
+      { name: 'newAdmin', internalType: 'address', type: 'address', indexed: true },
+    ],
+    name: 'NewAdminProposed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [{ name: 'pauser', internalType: 'address', type: 'address', indexed: true }],
+    name: 'Paused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'pauser', internalType: 'address', type: 'address', indexed: true },
+      { name: 'admin', internalType: 'address', type: 'address', indexed: true },
+    ],
+    name: 'PauserGranted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'pauser', internalType: 'address', type: 'address', indexed: true },
+      { name: 'admin', internalType: 'address', type: 'address', indexed: true },
+    ],
+    name: 'PauserRevoked',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256', indexed: true },
+    ],
+    name: 'Transfer',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [{ name: 'pauser', internalType: 'address', type: 'address', indexed: true }],
+    name: 'Unpaused',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'implementation', internalType: 'address', type: 'address', indexed: true },
+    ],
+    name: 'Upgraded',
+  },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MarketRegistry
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1890,7 +2076,7 @@ export const marketRegistryAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'vaultFactory',
+    name: 'vaultDriver',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
@@ -1948,20 +2134,6 @@ export const protocolAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'addressDriver',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'bookmakerRegistry',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
     name: 'dripsStreaming',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
@@ -1970,6 +2142,13 @@ export const protocolAbi = [
     type: 'function',
     inputs: [],
     name: 'lvstToken',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'marketDriver',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
@@ -1997,20 +2176,6 @@ export const protocolAbi = [
   {
     type: 'function',
     inputs: [{ name: 'addr', internalType: 'address', type: 'address' }],
-    name: 'setAddressDriver',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'addr', internalType: 'address', type: 'address' }],
-    name: 'setBookmakerRegistry',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'addr', internalType: 'address', type: 'address' }],
     name: 'setDripsStreaming',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -2019,6 +2184,13 @@ export const protocolAbi = [
     type: 'function',
     inputs: [{ name: 'addr', internalType: 'address', type: 'address' }],
     name: 'setLvstToken',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'addr', internalType: 'address', type: 'address' }],
+    name: 'setMarketDriver',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -2059,13 +2231,6 @@ export const protocolAbi = [
   },
   {
     type: 'function',
-    inputs: [{ name: 'addr', internalType: 'address', type: 'address' }],
-    name: 'setVaultFactory',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
     inputs: [],
     name: 'stewardRegistry',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
@@ -2100,34 +2265,6 @@ export const protocolAbi = [
     stateMutability: 'view',
   },
   {
-    type: 'function',
-    inputs: [],
-    name: 'vaultFactory',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'addressDriver', internalType: 'address', type: 'address', indexed: true },
-    ],
-    name: 'AddressDriverSet',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'bookmakerRegistry',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-    ],
-    name: 'BookmakerRegistrySet',
-  },
-  {
     type: 'event',
     anonymous: false,
     inputs: [
@@ -2142,6 +2279,14 @@ export const protocolAbi = [
       { name: 'lvstToken', internalType: 'address', type: 'address', indexed: true },
     ],
     name: 'LvstTokenSet',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'marketDriver', internalType: 'address', type: 'address', indexed: true },
+    ],
+    name: 'MarketDriverSet',
   },
   {
     type: 'event',
@@ -2181,14 +2326,6 @@ export const protocolAbi = [
       { name: 'vaultDriver', internalType: 'address', type: 'address', indexed: true },
     ],
     name: 'VaultDriverSet',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'vaultFactory', internalType: 'address', type: 'address', indexed: true },
-    ],
-    name: 'VaultFactorySet',
   },
   {
     type: 'event',
@@ -2450,16 +2587,6 @@ export const treasuryAbi = [
   },
   {
     type: 'function',
-    inputs: [
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'side', internalType: 'enum Side', type: 'uint8' },
-    ],
-    name: 'claimAndStakeLossLvst',
-    outputs: [{ name: 'minted', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
     inputs: [],
     name: 'claimDividends',
     outputs: [{ name: 'amount', internalType: 'uint256', type: 'uint256' }],
@@ -2468,17 +2595,7 @@ export const treasuryAbi = [
   {
     type: 'function',
     inputs: [
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'side', internalType: 'enum Side', type: 'uint8' },
-    ],
-    name: 'claimLossLvst',
-    outputs: [{ name: 'minted', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
       { name: '', internalType: 'bytes32', type: 'bytes32' },
       { name: '', internalType: 'enum Side', type: 'uint8' },
     ],
@@ -2489,7 +2606,7 @@ export const treasuryAbi = [
   {
     type: 'function',
     inputs: [
-      { name: 'user', internalType: 'address', type: 'address' },
+      { name: 'account', internalType: 'uint256', type: 'uint256' },
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
       { name: 'side', internalType: 'enum Side', type: 'uint8' },
     ],
@@ -2538,6 +2655,18 @@ export const treasuryAbi = [
     name: 'mintKnee',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'account', internalType: 'uint256', type: 'uint256' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'side', internalType: 'enum Side', type: 'uint8' },
+    ],
+    name: 'mintLossLvst',
+    outputs: [{ name: 'minted', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -2823,18 +2952,7 @@ export const vaultAbi = [
   {
     type: 'function',
     inputs: [
-      { name: 'funder', internalType: 'address', type: 'address' },
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'side', internalType: 'enum Side', type: 'uint8' },
-    ],
-    name: 'claimFor',
-    outputs: [{ name: 'payout', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'funder', internalType: 'address', type: 'address' },
+      { name: 'account', internalType: 'uint256', type: 'uint256' },
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
       { name: 'side', internalType: 'enum Side', type: 'uint8' },
     ],
@@ -2847,7 +2965,7 @@ export const vaultAbi = [
     inputs: [
       { name: '', internalType: 'bytes32', type: 'bytes32' },
       { name: '', internalType: 'enum Side', type: 'uint8' },
-      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'claimed',
     outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
@@ -2880,16 +2998,9 @@ export const vaultAbi = [
   },
   {
     type: 'function',
-    inputs: [],
-    name: 'factory',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'fundingDriver',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    inputs: [{ name: 'account', internalType: 'uint256', type: 'uint256' }],
+    name: 'getAccountVaultIds',
+    outputs: [{ name: '', internalType: 'bytes32[]', type: 'bytes32[]' }],
     stateMutability: 'view',
   },
   {
@@ -2912,7 +3023,7 @@ export const vaultAbi = [
     inputs: [
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
       { name: 'side', internalType: 'enum Side', type: 'uint8' },
-      { name: 'funder', internalType: 'address', type: 'address' },
+      { name: 'account', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'getPosition',
     outputs: [
@@ -2932,13 +3043,6 @@ export const vaultAbi = [
     ],
     name: 'getSharePrice',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'user', internalType: 'address', type: 'address' }],
-    name: 'getUserVaultIds',
-    outputs: [{ name: '', internalType: 'bytes32[]', type: 'bytes32[]' }],
     stateMutability: 'view',
   },
   {
@@ -2979,7 +3083,7 @@ export const vaultAbi = [
   {
     type: 'function',
     inputs: [
-      { name: 'funder', internalType: 'address', type: 'address' },
+      { name: 'account', internalType: 'uint256', type: 'uint256' },
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
       { name: 'side', internalType: 'enum Side', type: 'uint8' },
     ],
@@ -2989,8 +3093,22 @@ export const vaultAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'marketDriver',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'vaultId', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'marketId',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [
-      { name: 'funder', internalType: 'address', type: 'address' },
+      { name: 'account', internalType: 'uint256', type: 'uint256' },
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
       { name: 'side', internalType: 'enum Side', type: 'uint8' },
       { name: 'rate', internalType: 'uint256', type: 'uint256' },
@@ -3003,7 +3121,7 @@ export const vaultAbi = [
   {
     type: 'function',
     inputs: [
-      { name: 'funder', internalType: 'address', type: 'address' },
+      { name: 'account', internalType: 'uint256', type: 'uint256' },
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
       { name: 'side', internalType: 'enum Side', type: 'uint8' },
     ],
@@ -3016,7 +3134,7 @@ export const vaultAbi = [
     inputs: [
       { name: '', internalType: 'bytes32', type: 'bytes32' },
       { name: '', internalType: 'enum Side', type: 'uint8' },
-      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'overageOwed',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
@@ -3025,9 +3143,20 @@ export const vaultAbi = [
   {
     type: 'function',
     inputs: [
+      { name: '', internalType: 'bytes32', type: 'bytes32' },
+      { name: '', internalType: 'enum Side', type: 'uint8' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'overagePaid',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
       { name: 'side', internalType: 'enum Side', type: 'uint8' },
-      { name: 'funder', internalType: 'address', type: 'address' },
+      { name: 'account', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'pendingShares',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
@@ -3050,12 +3179,13 @@ export const vaultAbi = [
   {
     type: 'function',
     inputs: [
-      { name: 'funder', internalType: 'address', type: 'address' },
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'side', internalType: 'enum Side', type: 'uint8' },
+      { name: 'account', internalType: 'uint256', type: 'uint256' },
+      { name: 'vaultIds', internalType: 'bytes32[]', type: 'bytes32[]' },
+      { name: 'sides', internalType: 'enum Side[]', type: 'uint8[]' },
+      { name: 'newMaxEnd', internalType: 'uint32', type: 'uint32' },
     ],
-    name: 'reclaimOverage',
-    outputs: [{ name: 'amt', internalType: 'uint256', type: 'uint256' }],
+    name: 'refreshMaxEnds',
+    outputs: [],
     stateMutability: 'nonpayable',
   },
   {
@@ -3080,7 +3210,7 @@ export const vaultAbi = [
     inputs: [
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
       { name: 'side', internalType: 'enum Side', type: 'uint8' },
-      { name: 'funder', internalType: 'address', type: 'address' },
+      { name: 'account', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'settle',
     outputs: [],
@@ -3152,12 +3282,23 @@ export const vaultAbi = [
     stateMutability: 'view',
   },
   {
+    type: 'function',
+    inputs: [
+      { name: 'account', internalType: 'uint256', type: 'uint256' },
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'payee', internalType: 'address', type: 'address' },
+    ],
+    name: 'withdraw',
+    outputs: [{ name: 'total', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
     type: 'event',
     anonymous: false,
     inputs: [
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
       { name: 'side', internalType: 'enum Side', type: 'uint8', indexed: true },
-      { name: 'funder', internalType: 'address', type: 'address', indexed: true },
+      { name: 'account', internalType: 'uint256', type: 'uint256', indexed: true },
       { name: 'shares', internalType: 'uint256', type: 'uint256', indexed: false },
       { name: 'payout', internalType: 'uint256', type: 'uint256', indexed: false },
     ],
@@ -3178,7 +3319,7 @@ export const vaultAbi = [
     inputs: [
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
       { name: 'side', internalType: 'enum Side', type: 'uint8', indexed: true },
-      { name: 'funder', internalType: 'address', type: 'address', indexed: true },
+      { name: 'account', internalType: 'uint256', type: 'uint256', indexed: true },
       { name: 'rate', internalType: 'uint256', type: 'uint256', indexed: false },
       { name: 'maxEnd', internalType: 'uint32', type: 'uint32', indexed: false },
     ],
@@ -3188,9 +3329,9 @@ export const vaultAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'fundingDriver', internalType: 'address', type: 'address', indexed: true },
+      { name: 'marketDriver', internalType: 'address', type: 'address', indexed: true },
     ],
-    name: 'FundingDriverSet',
+    name: 'MarketDriverSet',
   },
   {
     type: 'event',
@@ -3198,7 +3339,7 @@ export const vaultAbi = [
     inputs: [
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
       { name: 'side', internalType: 'enum Side', type: 'uint8', indexed: true },
-      { name: 'funder', internalType: 'address', type: 'address', indexed: true },
+      { name: 'account', internalType: 'uint256', type: 'uint256', indexed: true },
       { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
     ],
     name: 'OverageReclaimed',
@@ -3209,7 +3350,7 @@ export const vaultAbi = [
     inputs: [
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
       { name: 'side', internalType: 'enum Side', type: 'uint8', indexed: true },
-      { name: 'funder', internalType: 'address', type: 'address', indexed: true },
+      { name: 'account', internalType: 'uint256', type: 'uint256', indexed: true },
       { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
     ],
     name: 'OverageRecorded',
@@ -3235,7 +3376,7 @@ export const vaultAbi = [
     inputs: [
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
       { name: 'side', internalType: 'enum Side', type: 'uint8', indexed: true },
-      { name: 'funder', internalType: 'address', type: 'address', indexed: true },
+      { name: 'account', internalType: 'uint256', type: 'uint256', indexed: true },
       { name: 'sharesAccrued', internalType: 'uint256', type: 'uint256', indexed: false },
     ],
     name: 'Stopped',
@@ -3279,6 +3420,17 @@ export const vaultAbi = [
     ],
     name: 'VaultResolved',
   },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      { name: 'account', internalType: 'uint256', type: 'uint256', indexed: true },
+      { name: 'payee', internalType: 'address', type: 'address', indexed: true },
+      { name: 'amount', internalType: 'uint256', type: 'uint256', indexed: false },
+    ],
+    name: 'Withdrawn',
+  },
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3288,22 +3440,47 @@ export const vaultAbi = [
 export const vaultDriverAbi = [
   {
     type: 'constructor',
-    inputs: [{ name: 'protocol_', internalType: 'contract Protocol', type: 'address' }],
+    inputs: [
+      { name: 'protocol_', internalType: 'contract Protocol', type: 'address' },
+      { name: 'drips_', internalType: 'address', type: 'address' },
+      { name: 'forwarder', internalType: 'address', type: 'address' },
+      { name: 'usdc_', internalType: 'contract IERC20', type: 'address' },
+    ],
     stateMutability: 'nonpayable',
   },
   {
     type: 'function',
-    inputs: [{ name: 'usdc_', internalType: 'contract IERC20', type: 'address' }],
+    inputs: [],
+    name: 'DRIPS',
+    outputs: [{ name: '', internalType: 'contract IDrips', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'USDC',
+    outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'bootstrapStreaming',
     outputs: [],
     stateMutability: 'nonpayable',
   },
   {
     type: 'function',
-    inputs: [],
-    name: 'drips',
-    outputs: [{ name: '', internalType: 'contract IDrips', type: 'address' }],
-    stateMutability: 'view',
+    inputs: [
+      { name: 'marketId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'question', internalType: 'string', type: 'string' },
+      { name: 'seedSide', internalType: 'enum Side', type: 'uint8' },
+      { name: 'rate', internalType: 'uint256', type: 'uint256' },
+      { name: 'deposit', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'createVault',
+    outputs: [{ name: 'vaultId', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -3321,6 +3498,13 @@ export const vaultDriverAbi = [
     name: 'harvest',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'forwarder', internalType: 'address', type: 'address' }],
+    name: 'isTrustedForwarder',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -3368,10 +3552,71 @@ export const vaultDriverAbi = [
   },
   {
     type: 'function',
+    inputs: [
+      { name: 'creator', internalType: 'address', type: 'address' },
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+    ],
+    name: 'seedAccount',
+    outputs: [{ name: 'account', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'bytes32', type: 'bytes32' },
+      { name: '', internalType: 'address', type: 'address' },
+    ],
+    name: 'seeds',
+    outputs: [
+      { name: 'side', internalType: 'enum Side', type: 'uint8' },
+      { name: 'rate', internalType: 'uint256', type: 'uint256' },
+      { name: 'active', internalType: 'bool', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'vaultId', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'stopSeed',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [],
     name: 'usdc',
     outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'vaultId', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'withdraw',
+    outputs: [{ name: 'payout', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      { name: 'creator', internalType: 'address', type: 'address', indexed: true },
+      { name: 'side', internalType: 'enum Side', type: 'uint8', indexed: false },
+      { name: 'rate', internalType: 'uint256', type: 'uint256', indexed: false },
+      { name: 'deposit', internalType: 'uint256', type: 'uint256', indexed: false },
+      { name: 'maxEnd', internalType: 'uint32', type: 'uint32', indexed: false },
+    ],
+    name: 'SeedOpened',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      { name: 'creator', internalType: 'address', type: 'address', indexed: true },
+      { name: 'side', internalType: 'enum Side', type: 'uint8', indexed: false },
+    ],
+    name: 'SeedStopped',
   },
   {
     type: 'event',
@@ -3382,57 +3627,6 @@ export const vaultDriverAbi = [
       { name: 'driverId', internalType: 'uint32', type: 'uint32', indexed: false },
     ],
     name: 'StreamingSet',
-  },
-] as const
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// VaultFactory
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-export const vaultFactoryAbi = [
-  {
-    type: 'constructor',
-    inputs: [
-      {
-        name: 'bookmakerRegistry_',
-        internalType: 'contract BookmakerRegistry',
-        type: 'address',
-      },
-      { name: 'marketRegistry_', internalType: 'contract MarketRegistry', type: 'address' },
-      { name: 'vault_', internalType: 'contract Vault', type: 'address' },
-    ],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'bookmakerRegistry',
-    outputs: [{ name: '', internalType: 'contract BookmakerRegistry', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'marketId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'question', internalType: 'string', type: 'string' },
-    ],
-    name: 'createVault',
-    outputs: [{ name: 'vaultId', internalType: 'bytes32', type: 'bytes32' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'marketRegistry',
-    outputs: [{ name: '', internalType: 'contract MarketRegistry', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'vault',
-    outputs: [{ name: '', internalType: 'contract Vault', type: 'address' }],
-    stateMutability: 'view',
   },
   {
     type: 'event',

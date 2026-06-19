@@ -22,15 +22,6 @@ export async function deployProtocol(
       `${LABEL}.protocol`
     );
 
-    const bookmakerRegistry = await deployFromArtifact(
-      walletClient,
-      client,
-      "out/BookmakerRegistry.sol/BookmakerRegistry.json",
-      [deployer],
-      undefined,
-      `${LABEL}.bookmakerRegistry`
-    );
-
     const marketRegistry = await deployFromArtifact(
       walletClient,
       client,
@@ -47,15 +38,6 @@ export async function deployProtocol(
       [protocol],
       undefined,
       `${LABEL}.vault`
-    );
-
-    const vaultFactory = await deployFromArtifact(
-      walletClient,
-      client,
-      "out/VaultFactory.sol/VaultFactory.json",
-      [bookmakerRegistry, marketRegistry, vault],
-      undefined,
-      `${LABEL}.vaultFactory`
     );
 
     const mockUsdc = await deployFromArtifact(
@@ -94,29 +76,17 @@ export async function deployProtocol(
       `${LABEL}.stewardRegistry`
     );
 
-    const vaultDriver = await deployFromArtifact(
-      walletClient,
-      client,
-      "out/VaultDriver.sol/VaultDriver.json",
-      [protocol],
-      undefined,
-      `${LABEL}.vaultDriver`
-    );
-
     return {
       status: "completed",
       deployedAt: new Date().toISOString(),
       contracts: {
         protocol,
-        bookmakerRegistry,
         marketRegistry,
         vault,
-        vaultFactory,
         mockUsdc,
         lvstToken,
         treasury,
-        stewardRegistry,
-        vaultDriver
+        stewardRegistry
       }
     };
   } catch (error) {

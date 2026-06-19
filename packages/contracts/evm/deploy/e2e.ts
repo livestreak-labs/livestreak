@@ -73,9 +73,8 @@ const A: Record<string, Address> = {
 const abi = (path: string): Abi => JSON.parse(readFileSync(join(ROOT, path), "utf-8")).abi;
 const ABIS = {
   usdc: abi("out/MockUSDC.sol/MockUSDC.json"),
-  bookmaker: abi("out/BookmakerRegistry.sol/BookmakerRegistry.json"),
   market: abi("out/MarketRegistry.sol/MarketRegistry.json"),
-  factory: abi("out/VaultFactory.sol/VaultFactory.json"),
+  vaultDriver: abi("out/VaultDriver.sol/VaultDriver.json"),
   vault: abi("out/Vault.sol/Vault.json"),
   steward: abi("out/StewardRegistry.sol/StewardRegistry.json"),
   driver: abi("out/AddressDriver.sol/AddressDriver.json"),
@@ -123,19 +122,21 @@ async function main() {
   step("Bob   (NO)", addrOf(bob));
 
   // ── ACT 1: market + vault ────────────────────────────────────────────────────
-  act("ACT 1 — bookmaker opens a market + vault");
-  step("Deployer", "authorizes itself as bookmaker");
-  await send(deployer, A.bookmakerRegistry, ABIS.bookmaker, "setBookmaker", [addrOf(deployer), true]);
-  assert((await read(A.bookmakerRegistry, ABIS.bookmaker, "isAuthorized", [addrOf(deployer)])) === true, "deployer is bookmaker");
-
+  act("ACT 1 — permissionless market + bonded vault");
   await send(deployer, A.marketRegistry, ABIS.market, "registerMarket", ["World Cup Final", "0x" + "00".repeat(32)]);
-  const marketId = ("0x" + "00".repeat(31) + "01") as Hex; // first market = bytes32(1)
-  step("Deployer", "creates a vault under the market");
-  const cv = await send(deployer, A.vaultFactory, ABIS.factory, "createVault", [marketId, "Does YES win?"]);
-  // Vault and VaultFactory share the VaultCreated(bytes32,bytes32,address,string) signature with the
-  // marketId/vaultId order swapped — decode only the factory's own log so the field names line up.
-  const created = parseEventLogs({ abi: ABIS.factory, logs: cv.logs, eventName: "VaultCreated" }).filter(
-    (l) => l.address.toLowerCase() === A.vaultFactory.toLowerCase()
+  const marketId = ("0x" + "00".repeat(31) + "01") as Hex;
+  step("Deployer", "creates a vault with a directional seed bond");
+  await send(deployer, A.mockUsdc, ABIS.usdc, "mint", [addrOf(deployer), DEPOSIT]);
+  await send(deployer, A.mockUsdc, ABIS.usdc, "approve", [A.vaultDriver, DEPOSIT]);
+  const cv = await send(deployer, A.vaultDriver, ABIS.vaultDriver, "createVault", [
+    marketId,
+    "Does YES win?",
+    Side.Yes,
+    RATE,
+    DEPOSIT
+  ]);
+  const created = parseEventLogs({ abi: ABIS.vaultDriver, logs: cv.logs, eventName: "VaultCreated" }).filter(
+    (l) => l.address.toLowerCase() === A.vaultDriver.toLowerCase()
   );
   const vaultId = (created[0] as unknown as { args: { vaultId: Hex } }).args.vaultId;
   assert(!!vaultId, `vault created: ${vaultId.slice(0, 10)}…`);

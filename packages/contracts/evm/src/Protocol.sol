@@ -7,8 +7,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 /// @notice Set-once wiring surface for deploy. Not a call router or runtime control plane.
 contract Protocol is Ownable {
     address public marketRegistry;
-    address public bookmakerRegistry;
-    address public vaultFactory;
     address public vault;
     address public dripsStreaming;
     address public marketDriver;
@@ -18,8 +16,6 @@ contract Protocol is Ownable {
     address public treasury;
 
     event MarketRegistrySet(address indexed marketRegistry);
-    event BookmakerRegistrySet(address indexed bookmakerRegistry);
-    event VaultFactorySet(address indexed vaultFactory);
     event VaultSet(address indexed vault);
     event DripsStreamingSet(address indexed dripsStreaming);
     event MarketDriverSet(address indexed marketDriver);
@@ -34,18 +30,6 @@ contract Protocol is Ownable {
         _setOnce(marketRegistry, addr);
         marketRegistry = addr;
         emit MarketRegistrySet(addr);
-    }
-
-    function setBookmakerRegistry(address addr) external onlyOwner {
-        _setOnce(bookmakerRegistry, addr);
-        bookmakerRegistry = addr;
-        emit BookmakerRegistrySet(addr);
-    }
-
-    function setVaultFactory(address addr) external onlyOwner {
-        _setOnce(vaultFactory, addr);
-        vaultFactory = addr;
-        emit VaultFactorySet(addr);
     }
 
     function setVault(address addr) external onlyOwner {

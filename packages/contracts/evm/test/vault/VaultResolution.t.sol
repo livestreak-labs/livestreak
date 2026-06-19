@@ -4,16 +4,16 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {DripsStreaming} from "../../src/streaming/DripsStreaming.sol";
 import {MarketDriver} from "../../src/streaming/drivers/MarketDriver.sol";
+import {VaultDriver} from "../../src/streaming/drivers/VaultDriver.sol";
 import {Vault} from "../../src/vault/Vault.sol";
-import {VaultFactory} from "../../src/vault/VaultFactory.sol";
 import {Side} from "../../src/vault/Side.sol";
-import {BookmakerRegistry} from "../../src/registries/BookmakerRegistry.sol";
 import {MarketRegistry} from "../../src/registries/MarketRegistry.sol";
 import {StewardRegistry} from "../../src/steward/StewardRegistry.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {MockUSDC} from "../mocks/MockUSDC.sol";
 import {ProtocolWire} from "../helpers/ProtocolWire.sol";
 import {MarketDriverHarness} from "../helpers/MarketDriverHarness.sol";
+import {VaultDriverHarness} from "../helpers/VaultDriverHarness.sol";
 
 /// @notice Resolution, harvest-on-cycle, unified withdraw, overage, and NFT transfer proofs.
 contract VaultResolutionTest is Test {
@@ -24,8 +24,7 @@ contract VaultResolutionTest is Test {
     DripsStreaming internal drips;
     MockUSDC internal usdc;
     Vault internal vault;
-    VaultFactory internal vaultFactory;
-    BookmakerRegistry internal bookmakerRegistry;
+    VaultDriver internal vaultDriver;
     MarketRegistry internal marketRegistry;
     StewardRegistry internal stewardRegistry;
     MarketDriver internal marketDriver;
@@ -46,23 +45,20 @@ contract VaultResolutionTest is Test {
 
         usdc = new MockUSDC();
         ProtocolWire.Core memory core = ProtocolWire.deployCore(address(this), IERC20(address(usdc)));
-        bookmakerRegistry = core.bookmakerRegistry;
         marketRegistry = core.marketRegistry;
         vault = core.vault;
-        vaultFactory = core.vaultFactory;
         stewardRegistry = core.stewardRegistry;
-
-        bookmakerRegistry.setBookmaker(address(this), true);
 
         ProtocolWire.Streaming memory streaming = ProtocolWire.deployStreaming(address(this), vault, usdc, CYCLE);
         streaming = ProtocolWire.wireAll(address(this), core, streaming, false);
         drips = streaming.drips;
         marketDriver = streaming.marketDriver;
+        vaultDriver = core.vaultDriver;
 
         stewardRegistry.registerSteward(steward);
 
         marketId = marketRegistry.registerMarket("m", bytes32("s"));
-        v1 = vaultFactory.createVault(marketId, "Q?");
+        v1 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Q?", Side.Yes);
 
         aliceNft = MarketDriverHarness.mint(marketDriver, alice, marketId);
         bobNft = MarketDriverHarness.mint(marketDriver, bob, marketId);
@@ -162,8 +158,8 @@ contract VaultResolutionTest is Test {
         stewardRegistry.resolveVault(v1, Vault.Outcome.Yes);
     }
 
-    function test_factoryCannotResolveDirectly() public {
-        vm.prank(address(vaultFactory));
+    function test_vaultDriverCannotResolveDirectly() public {
+        vm.prank(address(vaultDriver));
         vm.expectRevert("Vault: not resolver");
         vault.resolve(v1, Vault.Outcome.Yes);
     }
@@ -298,7 +294,7 @@ contract VaultResolutionTest is Test {
         assertEq(av[0], v1);
 
         bytes32 marketId2 = marketRegistry.registerMarket("m2", bytes32("s2"));
-        bytes32 v2 = vaultFactory.createVault(marketId2, "Q2?");
+        bytes32 v2 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId2, "Q2?", Side.Yes);
         uint256 aliceNft2 = MarketDriverHarness.mint(marketDriver, alice, marketId2);
         MarketDriverHarness.fund(marketDriver, usdc, alice, aliceNft2, v2, Side.Yes, RATE, 50 * RATE);
 

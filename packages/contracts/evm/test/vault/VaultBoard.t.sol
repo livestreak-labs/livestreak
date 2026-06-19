@@ -7,14 +7,13 @@ import {IDrips} from "../../src/streaming/IDrips.sol";
 import {MarketDriver} from "../../src/streaming/drivers/MarketDriver.sol";
 import {VaultDriver} from "../../src/streaming/drivers/VaultDriver.sol";
 import {Vault} from "../../src/vault/Vault.sol";
-import {VaultFactory} from "../../src/vault/VaultFactory.sol";
 import {Side} from "../../src/vault/Side.sol";
-import {BookmakerRegistry} from "../../src/registries/BookmakerRegistry.sol";
 import {MarketRegistry} from "../../src/registries/MarketRegistry.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {MockUSDC} from "../mocks/MockUSDC.sol";
 import {ProtocolWire} from "../helpers/ProtocolWire.sol";
 import {MarketDriverHarness} from "../helpers/MarketDriverHarness.sol";
+import {VaultDriverHarness} from "../helpers/VaultDriverHarness.sol";
 
 /// @notice Proves the streamed-funding Board on the Vault, driven by MarketDriver Drips streams.
 contract VaultBoardTest is Test {
@@ -25,8 +24,6 @@ contract VaultBoardTest is Test {
     DripsStreaming internal drips;
     MockUSDC internal usdc;
     Vault internal vault;
-    VaultFactory internal vaultFactory;
-    BookmakerRegistry internal bookmakerRegistry;
     MarketRegistry internal marketRegistry;
     MarketDriver internal marketDriver;
     VaultDriver internal vaultDriver;
@@ -46,22 +43,18 @@ contract VaultBoardTest is Test {
 
         usdc = new MockUSDC();
         ProtocolWire.Core memory core = ProtocolWire.deployCore(address(this), IERC20(address(usdc)));
-        bookmakerRegistry = core.bookmakerRegistry;
         marketRegistry = core.marketRegistry;
         vault = core.vault;
-        vaultFactory = core.vaultFactory;
-        vaultDriver = core.vaultDriver;
-
-        bookmakerRegistry.setBookmaker(address(this), true);
 
         ProtocolWire.Streaming memory streaming = ProtocolWire.deployStreaming(address(this), vault, usdc, CYCLE);
         streaming = ProtocolWire.wireAll(address(this), core, streaming);
         drips = streaming.drips;
         marketDriver = streaming.marketDriver;
+        vaultDriver = core.vaultDriver;
 
         marketId = marketRegistry.registerMarket("market", bytes32("s"));
-        v1 = vaultFactory.createVault(marketId, "Q1?");
-        v2 = vaultFactory.createVault(marketId, "Q2?");
+        v1 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Q1?", Side.Yes);
+        v2 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Q2?", Side.No);
 
         aliceNft = MarketDriverHarness.mint(marketDriver, alice, marketId);
         bobNft = MarketDriverHarness.mint(marketDriver, bob, marketId);

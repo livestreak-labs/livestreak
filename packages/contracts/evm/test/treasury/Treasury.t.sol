@@ -4,18 +4,18 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {DripsStreaming} from "../../src/streaming/DripsStreaming.sol";
 import {MarketDriver} from "../../src/streaming/drivers/MarketDriver.sol";
+import {VaultDriver} from "../../src/streaming/drivers/VaultDriver.sol";
 import {Vault} from "../../src/vault/Vault.sol";
-import {VaultFactory} from "../../src/vault/VaultFactory.sol";
 import {LvstToken} from "../../src/treasury/LvstToken.sol";
 import {Treasury} from "../../src/treasury/Treasury.sol";
 import {Side} from "../../src/vault/Side.sol";
-import {BookmakerRegistry} from "../../src/registries/BookmakerRegistry.sol";
 import {MarketRegistry} from "../../src/registries/MarketRegistry.sol";
 import {StewardRegistry} from "../../src/steward/StewardRegistry.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {MockUSDC} from "../mocks/MockUSDC.sol";
 import {ProtocolWire} from "../helpers/ProtocolWire.sol";
 import {MarketDriverHarness} from "../helpers/MarketDriverHarness.sol";
+import {VaultDriverHarness} from "../helpers/VaultDriverHarness.sol";
 
 contract TreasuryTest is Test {
     uint32 internal constant CYCLE = 10;
@@ -25,8 +25,7 @@ contract TreasuryTest is Test {
     DripsStreaming internal drips;
     MockUSDC internal usdc;
     Vault internal vault;
-    VaultFactory internal vaultFactory;
-    BookmakerRegistry internal bookmakerRegistry;
+    VaultDriver internal vaultDriver;
     MarketRegistry internal marketRegistry;
     StewardRegistry internal stewardRegistry;
     MarketDriver internal marketDriver;
@@ -51,25 +50,22 @@ contract TreasuryTest is Test {
 
         usdc = new MockUSDC();
         ProtocolWire.Core memory core = ProtocolWire.deployCore(address(this), IERC20(address(usdc)));
-        bookmakerRegistry = core.bookmakerRegistry;
         marketRegistry = core.marketRegistry;
         vault = core.vault;
-        vaultFactory = core.vaultFactory;
         stewardRegistry = core.stewardRegistry;
         lvst = core.lvstToken;
         treasury = core.treasury;
-
-        bookmakerRegistry.setBookmaker(address(this), true);
 
         ProtocolWire.Streaming memory streaming = ProtocolWire.deployStreaming(address(this), vault, usdc, CYCLE);
         streaming = ProtocolWire.wireAll(address(this), core, streaming);
         drips = streaming.drips;
         marketDriver = streaming.marketDriver;
+        vaultDriver = core.vaultDriver;
 
         stewardRegistry.registerSteward(steward);
 
         marketId = marketRegistry.registerMarket("m", bytes32("s"));
-        v1 = vaultFactory.createVault(marketId, "Q?");
+        v1 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Q?", Side.Yes);
 
         aliceNft = MarketDriverHarness.mint(marketDriver, alice, marketId);
         bobNft = MarketDriverHarness.mint(marketDriver, bob, marketId);
@@ -87,7 +83,7 @@ contract TreasuryTest is Test {
     }
 
     function _newVault() internal returns (bytes32) {
-        return vaultFactory.createVault(marketId, "Q2?");
+        return VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Q2?", Side.Yes);
     }
 
     function test_lossMintsFlowOnCurve() public {

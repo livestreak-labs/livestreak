@@ -5,7 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Protocol} from "../Protocol.sol";
 
 /// @title MarketRegistry — observer-created market index and vault catalog
-/// @notice Owns market registration and market -> vault id index. Vault creation is factory-gated.
+/// @notice Owns market registration and market -> vault id index. Vault creation is VaultDriver-gated.
 /// @dev marketId = keccak256(abi.encode(observer, streamId)). registerMarket is state writes + emit only (no external calls).
 contract MarketRegistry is Ownable {
     Protocol public immutable protocol;
@@ -36,8 +36,8 @@ contract MarketRegistry is Ownable {
         return keccak256(abi.encode(observer, streamId));
     }
 
-    function vaultFactory() public view returns (address) {
-        return protocol.vaultFactory();
+    function vaultDriver() public view returns (address) {
+        return protocol.vaultDriver();
     }
 
     function registerMarket(string calldata title, bytes32 streamId) external returns (bytes32 marketId) {
@@ -63,7 +63,7 @@ contract MarketRegistry is Ownable {
     }
 
     function addVault(bytes32 marketId, bytes32 vaultId) external {
-        require(msg.sender == vaultFactory(), "MarketRegistry: not factory");
+        require(msg.sender == vaultDriver(), "MarketRegistry: not vault driver");
         require(markets[marketId].exists, "MarketRegistry: unknown market");
 
         _vaultIdsByMarket[marketId].push(vaultId);

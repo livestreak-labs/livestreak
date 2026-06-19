@@ -2,51 +2,49 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {BookmakerRegistry} from "../src/registries/BookmakerRegistry.sol";
 import {MarketRegistry} from "../src/registries/MarketRegistry.sol";
+import {VaultDriver} from "../src/streaming/drivers/VaultDriver.sol";
 import {Vault} from "../src/vault/Vault.sol";
-import {VaultFactory} from "../src/vault/VaultFactory.sol";
+import {Side} from "../src/vault/Side.sol";
 import {LvstToken} from "../src/treasury/LvstToken.sol";
 import {StewardRegistry} from "../src/steward/StewardRegistry.sol";
-import {Side} from "../src/vault/Side.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {MockUSDC} from "./mocks/MockUSDC.sol";
 import {ProtocolWire} from "./helpers/ProtocolWire.sol";
+import {VaultDriverHarness} from "./helpers/VaultDriverHarness.sol";
 
-/// @notice Skeleton coverage for the non-funding surfaces: market/vault registry, bookmaker gating,
-/// and steward hot/dispute writes. Funding + pricing is proven in test/vault/VaultBoard.t.sol, and
-/// the LVST house token (loss-mint, skim, staking, dividends) in test/treasury/Treasury.t.sol.
+/// @notice Skeleton coverage for market/vault registry, permissionless vault creation,
+/// and steward hot/dispute writes. Funding + pricing in VaultBoard; treasury in Treasury.t.sol.
 contract LiveStreakSkeletonTest is Test {
-    BookmakerRegistry internal bookmakerRegistry;
     MarketRegistry internal marketRegistry;
     Vault internal vault;
-    VaultFactory internal vaultFactory;
+    VaultDriver internal vaultDriver;
     LvstToken internal lvstToken;
     StewardRegistry internal stewardRegistry;
+    MockUSDC internal usdc;
+
+    uint256 internal constant RATE = 1_000_000;
+    uint256 internal constant SEED = 10 * RATE;
 
     address internal owner = makeAddr("owner");
-    address internal bookmaker = makeAddr("bookmaker");
+    address internal creator = makeAddr("creator");
     address internal stranger = makeAddr("stranger");
-    address internal user = makeAddr("user");
     address internal steward = makeAddr("steward");
 
     function setUp() public {
-        MockUSDC usdc = new MockUSDC();
+        usdc = new MockUSDC();
         ProtocolWire.Core memory core = ProtocolWire.deployCore(owner, IERC20(address(usdc)));
-        bookmakerRegistry = core.bookmakerRegistry;
         marketRegistry = core.marketRegistry;
         vault = core.vault;
-        vaultFactory = core.vaultFactory;
         lvstToken = core.lvstToken;
         stewardRegistry = core.stewardRegistry;
 
         ProtocolWire.Streaming memory streaming = ProtocolWire.deployStreaming(owner, vault, usdc, 10);
         streaming = ProtocolWire.wireAll(owner, core, streaming);
+        vaultDriver = core.vaultDriver;
 
-        vm.startPrank(owner);
-        bookmakerRegistry.setBookmaker(bookmaker, true);
+        vm.prank(owner);
         stewardRegistry.registerSteward(steward);
-        vm.stopPrank();
     }
 
     function test_registerMarket_assignsDeterministicMarketId() public {
@@ -87,10 +85,10 @@ contract LiveStreakSkeletonTest is Test {
         bytes32 marketA = marketRegistry.registerMarket("Stream A", bytes32("a"));
         bytes32 marketB = marketRegistry.registerMarket("Stream B", bytes32("b"));
 
-        vm.startPrank(bookmaker);
-        bytes32 vaultA = vaultFactory.createVault(marketA, "Question A");
-        bytes32 vaultB = vaultFactory.createVault(marketB, "Question B");
-        vm.stopPrank();
+        bytes32 vaultA =
+            VaultDriverHarness.createVault(vaultDriver, usdc, creator, marketA, "Question A", Side.Yes, RATE, SEED);
+        bytes32 vaultB =
+            VaultDriverHarness.createVault(vaultDriver, usdc, stranger, marketB, "Question B", Side.No, RATE, SEED);
 
         bytes32[] memory vaultsA = marketRegistry.getVaultIds(marketA);
         bytes32[] memory vaultsB = marketRegistry.getVaultIds(marketB);
@@ -102,52 +100,31 @@ contract LiveStreakSkeletonTest is Test {
         assertTrue(vaultA != vaultB);
     }
 
-    function test_unauthorizedBookmakerCannotCreateVault() public {
+    function test_anyoneCanCreateVaultWithBond() public {
         bytes32 marketId = marketRegistry.registerMarket("Derby stream", bytes32("stream-1"));
 
-        vm.prank(stranger);
-        vm.expectRevert("VaultFactory: not bookmaker");
-        vaultFactory.createVault(marketId, "Next goal before 70'");
-    }
-
-    function test_ownerCanSetBookmakerAuthorization() public {
-        bytes32 marketId = marketRegistry.registerMarket("Derby stream", bytes32("stream-1"));
-
-        vm.prank(owner);
-        bookmakerRegistry.setBookmaker(stranger, true);
-
-        vm.prank(stranger);
-        bytes32 vaultId = vaultFactory.createVault(marketId, "Authorized stranger vault");
+        bytes32 vaultId = VaultDriverHarness.createVault(
+            vaultDriver, usdc, stranger, marketId, "Next goal before 70'", Side.Yes, RATE, SEED
+        );
         assertTrue(vault.vaultExists(vaultId));
-
-        vm.prank(owner);
-        bookmakerRegistry.setBookmaker(stranger, false);
-
-        vm.prank(stranger);
-        vm.expectRevert("VaultFactory: not bookmaker");
-        vaultFactory.createVault(marketId, "Revoked stranger vault");
+        assertEq(vault.getVault(vaultId).creator, stranger);
     }
 
-    function test_authorizedBookmakerCanCreateVault() public {
+    function test_createVaultWithoutBond_reverts() public {
         bytes32 marketId = marketRegistry.registerMarket("Derby stream", bytes32("stream-1"));
 
-        vm.prank(bookmaker);
-        bytes32 vaultId = vaultFactory.createVault(marketId, "Next goal before 70'");
-
-        bytes32[] memory vaultIds = marketRegistry.getVaultIds(marketId);
-        assertEq(vaultIds.length, 1);
-        assertEq(vaultIds[0], vaultId);
-
-        Vault.VaultData memory data = vault.getVault(vaultId);
-        assertEq(data.marketId, marketId);
-        assertEq(data.creator, bookmaker);
-        assertEq(uint8(data.status), uint8(Vault.Status.Open));
+        vm.prank(stranger);
+        vm.expectRevert("VaultDriver: bad deposit");
+        vaultDriver.createVault(marketId, "No bond", Side.Yes, RATE, 0);
     }
 
     function test_createVaultUnderMissingMarket_reverts() public {
-        vm.prank(bookmaker);
-        vm.expectRevert("VaultFactory: unknown market");
-        vaultFactory.createVault(bytes32(uint256(99)), "Ghost vault");
+        usdc.mint(creator, SEED);
+        vm.startPrank(creator);
+        usdc.approve(address(vaultDriver), SEED);
+        vm.expectRevert("VaultDriver: unknown market");
+        vaultDriver.createVault(bytes32(uint256(99)), "Ghost vault", Side.Yes, RATE, SEED);
+        vm.stopPrank();
     }
 
     function test_steward_unauthorizedHotWrite_reverts() public {

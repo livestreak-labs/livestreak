@@ -3,26 +3,30 @@ pragma solidity ^0.8.20;
 
 import {Test, Vm} from "forge-std/Test.sol";
 import {MarketRegistry} from "../../src/registries/MarketRegistry.sol";
-import {BookmakerRegistry} from "../../src/registries/BookmakerRegistry.sol";
+import {VaultDriver} from "../../src/streaming/drivers/VaultDriver.sol";
 import {Vault} from "../../src/vault/Vault.sol";
-import {VaultFactory} from "../../src/vault/VaultFactory.sol";
+import {Side} from "../../src/vault/Side.sol";
 import {Protocol} from "../../src/Protocol.sol";
 import {MockUSDC} from "../mocks/MockUSDC.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {ProtocolWire} from "../helpers/ProtocolWire.sol";
+import {VaultDriverHarness} from "../helpers/VaultDriverHarness.sol";
 
 contract MarketIdentityTest is Test {
     MarketRegistry internal marketRegistry;
-    BookmakerRegistry internal bookmakerRegistry;
+    VaultDriver internal vaultDriver;
     Vault internal vault;
-    VaultFactory internal vaultFactory;
+    MockUSDC internal usdc;
+
+    uint256 internal constant RATE = 1_000_000;
+    uint256 internal constant SEED = 10 * RATE;
 
     Protocol internal protocol;
 
     address internal owner = makeAddr("owner");
     address internal observer = makeAddr("observer");
     address internal attacker = makeAddr("attacker");
-    address internal bookmaker = makeAddr("bookmaker");
+    address internal creator = makeAddr("creator");
     address internal stranger = makeAddr("stranger");
 
     address internal constant GOLDEN_OBSERVER = address(0xCA);
@@ -30,19 +34,15 @@ contract MarketIdentityTest is Test {
     bytes32 internal constant GOLDEN_MARKET_ID = 0xa9a8e72f956e612f800b6d705a3d5d085e655010f8c6ebec48299831c7677181;
 
     function setUp() public {
-        MockUSDC usdc = new MockUSDC();
+        usdc = new MockUSDC();
         ProtocolWire.Core memory core = ProtocolWire.deployCore(owner, IERC20(address(usdc)));
         protocol = core.protocol;
         marketRegistry = core.marketRegistry;
-        bookmakerRegistry = core.bookmakerRegistry;
         vault = core.vault;
-        vaultFactory = core.vaultFactory;
 
         ProtocolWire.Streaming memory streaming = ProtocolWire.deployStreaming(owner, vault, usdc, 10);
         streaming = ProtocolWire.wireAll(owner, core, streaming);
-
-        vm.prank(owner);
-        bookmakerRegistry.setBookmaker(bookmaker, true);
+        vaultDriver = core.vaultDriver;
     }
 
     function test_registerMarket_returnsComputeMarketId() public {
@@ -229,38 +229,37 @@ contract MarketIdentityTest is Test {
         assertEq(marketRegistry.marketIdAt(2), m3);
     }
 
-    function test_addVault_factoryGatedOnComputedMarketId() public {
+    function test_addVault_vaultDriverGatedOnComputedMarketId() public {
         bytes32 streamId = bytes32("vault-stream");
 
         vm.prank(observer);
         bytes32 marketId = marketRegistry.registerMarket("Vault market", streamId);
 
         vm.prank(stranger);
-        vm.expectRevert("MarketRegistry: not factory");
+        vm.expectRevert("MarketRegistry: not vault driver");
         marketRegistry.addVault(marketId, bytes32("vault-1"));
 
-        vm.prank(address(vaultFactory));
+        vm.prank(address(vaultDriver));
         vm.expectRevert("MarketRegistry: unknown market");
         marketRegistry.addVault(bytes32(uint256(999)), bytes32("vault-ghost"));
 
-        vm.prank(bookmaker);
-        bytes32 vaultId = vaultFactory.createVault(marketId, "Question?");
+        bytes32 vaultId = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Question?", Side.Yes);
 
         bytes32[] memory vaultIds = marketRegistry.getVaultIds(marketId);
         assertEq(vaultIds.length, 1);
         assertEq(vaultIds[0], vaultId);
     }
 
-    function test_protocolVaultFactory_onlyOwner() public {
+    function test_protocolVaultDriver_onlyOwner() public {
         Protocol fresh = new Protocol(owner);
 
         vm.prank(stranger);
         vm.expectRevert();
-        fresh.setVaultFactory(address(vaultFactory));
+        fresh.setVaultDriver(address(vaultDriver));
 
         vm.prank(owner);
-        fresh.setVaultFactory(address(vaultFactory));
-        assertEq(fresh.vaultFactory(), address(vaultFactory));
+        fresh.setVaultDriver(address(vaultDriver));
+        assertEq(fresh.vaultDriver(), address(vaultDriver));
     }
 
     function test_marketIdRoundTripsFromEventAndGetMarket() public {

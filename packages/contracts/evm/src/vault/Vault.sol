@@ -90,7 +90,6 @@ contract Vault {
         uint256 account;
     }
 
-    address public factory;
     address public marketDriver;
     address public resolver; // the steward path authorized to set outcomes
     IERC20 public usdc;
@@ -135,13 +134,13 @@ contract Vault {
         protocol = protocol_;
     }
 
-    modifier onlyFactory() {
-        require(msg.sender == factory, "Vault: not factory");
+    modifier onlyVaultDriver() {
+        require(msg.sender == address(vaultDriver), "Vault: not vault driver");
         _;
     }
 
-    modifier onlyMarketDriver() {
-        require(msg.sender == marketDriver, "Vault: not market driver");
+    modifier onlyFundingDriver() {
+        require(msg.sender == marketDriver || msg.sender == address(vaultDriver), "Vault: not funding driver");
         _;
     }
 
@@ -156,20 +155,17 @@ contract Vault {
 
     /// @notice One-shot cache of sibling module addresses from Protocol after streaming is wired.
     function syncFromProtocol() external {
-        require(factory == address(0), "Vault: already synced");
+        require(marketDriver == address(0), "Vault: already synced");
 
-        address factory_ = protocol.vaultFactory();
+        address vaultDriver_ = protocol.vaultDriver();
         address marketDriver_ = protocol.marketDriver();
         address resolver_ = protocol.stewardRegistry();
         address treasury_ = protocol.treasury();
-        address vaultDriver_ = protocol.vaultDriver();
         require(
-            factory_ != address(0) && marketDriver_ != address(0) && resolver_ != address(0)
-                && vaultDriver_ != address(0),
+            vaultDriver_ != address(0) && marketDriver_ != address(0) && resolver_ != address(0),
             "Vault: protocol incomplete"
         );
 
-        factory = factory_;
         marketDriver = marketDriver_;
         resolver = resolver_;
         vaultDriver = IVaultDriver(vaultDriver_);
@@ -190,7 +186,7 @@ contract Vault {
 
     function createVault(bytes32 marketId, string calldata question, address creator)
         external
-        onlyFactory
+        onlyVaultDriver
         returns (bytes32 vaultId)
     {
         require(bytes(question).length > 0, "Vault: empty question");
@@ -242,7 +238,7 @@ contract Vault {
     /// @notice Open a funder's position after the driver has set the real Drips stream.
     function onFund(uint256 account, bytes32 vaultId, Side side, uint256 rate, uint32 maxEnd)
         external
-        onlyMarketDriver
+        onlyFundingDriver
     {
         require(vaults[vaultId].status == Status.Open, "Vault: not open");
         require(rate > 0, "Vault: zero rate");
@@ -270,7 +266,7 @@ contract Vault {
     }
 
     /// @notice Close a funder's position; banks accrued shares and drops the rate.
-    function onStop(uint256 account, bytes32 vaultId, Side side) external onlyMarketDriver {
+    function onStop(uint256 account, bytes32 vaultId, Side side) external onlyFundingDriver {
         _advance(vaultId, side, MAX_STEPS);
         _settle(vaultId, side, account);
 
@@ -302,7 +298,7 @@ contract Vault {
     /// @notice Re-peg active lanes' `maxEnd` after a sibling lane changes the shared Drips balance.
     function refreshMaxEnds(uint256 account, bytes32[] calldata vaultIds, Side[] calldata sides, uint32 newMaxEnd)
         external
-        onlyMarketDriver
+        onlyFundingDriver
     {
         require(vaultIds.length == sides.length, "Vault: length mismatch");
         for (uint256 i = 0; i < vaultIds.length; i++) {
@@ -604,10 +600,10 @@ contract Vault {
     }
 
     /// @notice Pay a position's winnings and overage for both sides to `payee`. Revert-free when
-    /// nothing is owed; only the market driver may call (passes `payee = current NFT holder).
+    /// nothing is owed; only a funding driver may call (MarketDriver or VaultDriver seed path).
     function withdraw(uint256 account, bytes32 vaultId, address payee)
         external
-        onlyMarketDriver
+        onlyFundingDriver
         returns (uint256 total)
     {
         VaultData storage data = vaults[vaultId];

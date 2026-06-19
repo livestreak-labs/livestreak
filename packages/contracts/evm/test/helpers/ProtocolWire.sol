@@ -2,17 +2,14 @@
 pragma solidity ^0.8.20;
 
 import {Protocol} from "../../src/Protocol.sol";
-import {BookmakerRegistry} from "../../src/registries/BookmakerRegistry.sol";
 import {MarketRegistry} from "../../src/registries/MarketRegistry.sol";
 import {StewardRegistry} from "../../src/steward/StewardRegistry.sol";
 import {LvstToken} from "../../src/treasury/LvstToken.sol";
 import {Treasury} from "../../src/treasury/Treasury.sol";
 import {Vault} from "../../src/vault/Vault.sol";
-import {VaultFactory} from "../../src/vault/VaultFactory.sol";
 import {DripsStreaming} from "../../src/streaming/DripsStreaming.sol";
 import {VaultDriver} from "../../src/streaming/drivers/VaultDriver.sol";
 import {ManagedProxy} from "../../src/streaming/Managed.sol";
-import {IDrips} from "../../src/streaming/IDrips.sol";
 import {MarketDriver} from "../../src/streaming/drivers/MarketDriver.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {MockUSDC} from "../mocks/MockUSDC.sol";
@@ -24,10 +21,8 @@ library ProtocolWire {
 
     struct Core {
         Protocol protocol;
-        BookmakerRegistry bookmakerRegistry;
         MarketRegistry marketRegistry;
         Vault vault;
-        VaultFactory vaultFactory;
         StewardRegistry stewardRegistry;
         LvstToken lvstToken;
         Treasury treasury;
@@ -42,71 +37,21 @@ library ProtocolWire {
 
     function deployCore(address owner, IERC20 usdc) internal returns (Core memory core) {
         core.protocol = new Protocol(owner);
-        core.bookmakerRegistry = new BookmakerRegistry(owner);
         core.marketRegistry = new MarketRegistry(owner, core.protocol);
         core.vault = new Vault(core.protocol);
-        core.vaultFactory = new VaultFactory(core.bookmakerRegistry, core.marketRegistry, core.vault);
         core.stewardRegistry = new StewardRegistry(owner, core.protocol);
         core.lvstToken = new LvstToken(core.protocol);
         core.treasury = new Treasury(owner, usdc, core.protocol);
-        core.vaultDriver = new VaultDriver(core.protocol);
         core.usdc = MockUSDC(address(usdc));
     }
 
-    function setProtocolCore(address owner, Core memory core) internal {
-        vm.startPrank(owner);
-        core.protocol.setMarketRegistry(address(core.marketRegistry));
-        core.protocol.setBookmakerRegistry(address(core.bookmakerRegistry));
-        core.protocol.setVault(address(core.vault));
-        core.protocol.setVaultFactory(address(core.vaultFactory));
-        core.protocol.setStewardRegistry(address(core.stewardRegistry));
-        core.protocol.setLvstToken(address(core.lvstToken));
-        core.protocol.setTreasury(address(core.treasury));
-        core.protocol.setVaultDriver(address(core.vaultDriver));
-        vm.stopPrank();
-    }
-
-    function deployStreaming(address admin, Vault vault, MockUSDC usdc, uint32 cycleSecs)
+    function deployStreaming(address admin, Vault, MockUSDC usdc, uint32 cycleSecs)
         internal
         returns (Streaming memory streaming)
     {
-        vault;
         usdc;
         DripsStreaming logic = new DripsStreaming(cycleSecs);
         streaming.drips = DripsStreaming(address(new ManagedProxy(logic, admin, "")));
-    }
-
-    function finishStreaming(
-        address admin,
-        Protocol protocol,
-        Vault vault,
-        VaultDriver vaultDriver,
-        MockUSDC usdc,
-        Streaming memory streaming
-    ) internal returns (Streaming memory) {
-        vm.startPrank(admin);
-        uint32 marketDriverId = streaming.drips.registerDriver(admin);
-        vm.stopPrank();
-
-        MarketDriver driverLogic = new MarketDriver(
-            address(streaming.drips), address(0), marketDriverId, protocol, vault, vaultDriver, address(usdc)
-        );
-        streaming.marketDriver = MarketDriver(address(new ManagedProxy(driverLogic, admin, "")));
-
-        vm.prank(admin);
-        streaming.drips.updateDriverAddress(marketDriverId, address(streaming.marketDriver));
-        return streaming;
-    }
-
-    function setProtocolStreaming(address owner, Protocol protocol, Streaming memory streaming) internal {
-        vm.startPrank(owner);
-        protocol.setDripsStreaming(address(streaming.drips));
-        protocol.setMarketDriver(address(streaming.marketDriver));
-        vm.stopPrank();
-    }
-
-    function syncVault(Vault vault) internal {
-        vault.syncFromProtocol();
     }
 
     function wireAll(address owner, Core memory core, Streaming memory streaming) internal returns (Streaming memory) {
@@ -119,9 +64,7 @@ library ProtocolWire {
     {
         vm.startPrank(owner);
         core.protocol.setMarketRegistry(address(core.marketRegistry));
-        core.protocol.setBookmakerRegistry(address(core.bookmakerRegistry));
         core.protocol.setVault(address(core.vault));
-        core.protocol.setVaultFactory(address(core.vaultFactory));
         core.protocol.setStewardRegistry(address(core.stewardRegistry));
         if (withLvst) {
             core.protocol.setLvstToken(address(core.lvstToken));
@@ -130,16 +73,34 @@ library ProtocolWire {
         core.protocol.setDripsStreaming(address(streaming.drips));
         vm.stopPrank();
 
-        core.vaultDriver.bootstrapStreaming(IERC20(address(core.usdc)));
+        core.vaultDriver =
+            new VaultDriver(core.protocol, address(streaming.drips), address(0), IERC20(address(core.usdc)));
+        core.vaultDriver.bootstrapStreaming();
         vm.prank(owner);
         core.protocol.setVaultDriver(address(core.vaultDriver));
-        streaming = finishStreaming(owner, core.protocol, core.vault, core.vaultDriver, core.usdc, streaming);
 
         vm.startPrank(owner);
-        core.protocol.setMarketDriver(address(streaming.marketDriver));
+        uint32 marketDriverId = streaming.drips.registerDriver(owner);
         vm.stopPrank();
 
-        syncVault(core.vault);
+        MarketDriver driverLogic = new MarketDriver(
+            address(streaming.drips),
+            address(0),
+            marketDriverId,
+            core.protocol,
+            core.vault,
+            core.vaultDriver,
+            address(core.usdc)
+        );
+        streaming.marketDriver = MarketDriver(address(new ManagedProxy(driverLogic, owner, "")));
+
+        vm.prank(owner);
+        streaming.drips.updateDriverAddress(marketDriverId, address(streaming.marketDriver));
+
+        vm.prank(owner);
+        core.protocol.setMarketDriver(address(streaming.marketDriver));
+
+        core.vault.syncFromProtocol();
         return streaming;
     }
 }

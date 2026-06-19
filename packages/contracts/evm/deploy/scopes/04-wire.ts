@@ -27,7 +27,7 @@ export async function deployWire(
   }
 
   const { dripsProxy, caller } = streaming.contracts as Record<string, Address>;
-  const { protocol, vault, vaultFactory, marketRegistry, bookmakerRegistry, mockUsdc, stewardRegistry, lvstToken, treasury, vaultDriver } =
+  const { protocol, vault, marketRegistry, mockUsdc, stewardRegistry, lvstToken, treasury } =
     protocolScope.contracts as Record<string, Address>;
   const { deployer } = config;
 
@@ -44,21 +44,24 @@ export async function deployWire(
       await client.waitForTransactionReceipt({ hash });
     };
 
-    // 1. Protocol address book (core modules).
     await write(protocol, protocolAbi, "setMarketRegistry", [marketRegistry]);
-    await write(protocol, protocolAbi, "setBookmakerRegistry", [bookmakerRegistry]);
     await write(protocol, protocolAbi, "setVault", [vault]);
-    await write(protocol, protocolAbi, "setVaultFactory", [vaultFactory]);
     await write(protocol, protocolAbi, "setStewardRegistry", [stewardRegistry]);
     await write(protocol, protocolAbi, "setLvstToken", [lvstToken]);
     await write(protocol, protocolAbi, "setTreasury", [treasury]);
     await write(protocol, protocolAbi, "setDripsStreaming", [dripsProxy]);
 
-    // VaultDriver registers as the Drips receiver driver before the MarketDriver slot is reserved.
-    await write(vaultDriver, vaultDriverAbi, "bootstrapStreaming", [mockUsdc]);
+    const vaultDriver = await deployFromArtifact(
+      walletClient,
+      client,
+      "out/VaultDriver.sol/VaultDriver.json",
+      [protocol, dripsProxy, caller, mockUsdc],
+      undefined,
+      `${LABEL}.vaultDriver`
+    );
+    await write(vaultDriver, vaultDriverAbi, "bootstrapStreaming", []);
     await write(protocol, protocolAbi, "setVaultDriver", [vaultDriver]);
 
-    // Reserve the user driver slot (FD_user), deploy MarketDriver, register on Protocol.
     const driverId = Number(
       await client.readContract({ address: dripsProxy, abi: dripsAbi, functionName: "nextDriverId" })
     );
@@ -85,11 +88,9 @@ export async function deployWire(
     await write(protocol, protocolAbi, "setMarketDriver", [marketDriverProxy]);
     console.log(`    marketDriverProxy → ${marketDriverProxy}`);
 
-    // Vault one-shot sync of factory, funding driver, resolver, Treasury, and VaultDriver from Protocol.
     await write(vault, vaultAbi, "syncFromProtocol", []);
     console.log(`    vault synced from Protocol`);
 
-    // 4. First steward for local deploy.
     await write(stewardRegistry, stewardAbi, "registerSteward", [deployer]);
     console.log(`    resolver → stewardRegistry ${stewardRegistry}`);
 
@@ -98,7 +99,7 @@ export async function deployWire(
     return {
       status: "completed",
       deployedAt: new Date().toISOString(),
-      contracts: { marketDriverLogic, marketDriverProxy }
+      contracts: { vaultDriver, marketDriverLogic, marketDriverProxy }
     };
   } catch (error) {
     return {
