@@ -4,19 +4,19 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./generated/contracts.ts"
+    ".": "./evm/generated/contracts.ts"
   },
   "files": [
-    "generated/",
-    "foundry.toml",
-    "src/"
+    "evm/generated/",
+    "evm/foundry.toml",
+    "evm/src/"
   ],
   "scripts": {
-    "clean": "rm -rf out cache generated/contracts.ts",
-    "build": "forge build && FOUNDRY_PROFILE=aa forge build && wagmi generate",
-    "check": "tsc -p tsconfig.json --noEmit",
-    "lint": "forge fmt --check src test",
-    "test": "forge test"
+    "clean": "rm -rf evm/out evm/cache evm/generated/contracts.ts",
+    "build": "cd evm && forge build && FOUNDRY_PROFILE=aa forge build && wagmi generate",
+    "check": "tsc -p evm/tsconfig.json --noEmit",
+    "lint": "cd evm && forge fmt --check src test",
+    "test": "cd evm && forge test"
   },
   "dependencies": {
     "viem": "^2.23.0"

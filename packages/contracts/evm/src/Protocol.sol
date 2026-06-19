@@ -1,0 +1,81 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+
+/// @title Protocol — per-chain canonical address book for LiveStreak modules.
+/// @notice Set-once wiring surface for deploy. Not a call router or runtime control plane.
+contract Protocol is Ownable {
+    address public marketRegistry;
+    address public bookmakerRegistry;
+    address public vaultFactory;
+    address public vault;
+    address public dripsStreaming;
+    address public addressDriver;
+    address public stewardRegistry;
+    address public lvstToken;
+
+    event MarketRegistrySet(address indexed marketRegistry);
+    event BookmakerRegistrySet(address indexed bookmakerRegistry);
+    event VaultFactorySet(address indexed vaultFactory);
+    event VaultSet(address indexed vault);
+    event DripsStreamingSet(address indexed dripsStreaming);
+    event AddressDriverSet(address indexed addressDriver);
+    event StewardRegistrySet(address indexed stewardRegistry);
+    event LvstTokenSet(address indexed lvstToken);
+
+    constructor(address initialOwner) Ownable(initialOwner) {}
+
+    function setMarketRegistry(address addr) external onlyOwner {
+        _setOnce(marketRegistry, addr);
+        marketRegistry = addr;
+        emit MarketRegistrySet(addr);
+    }
+
+    function setBookmakerRegistry(address addr) external onlyOwner {
+        _setOnce(bookmakerRegistry, addr);
+        bookmakerRegistry = addr;
+        emit BookmakerRegistrySet(addr);
+    }
+
+    function setVaultFactory(address addr) external onlyOwner {
+        _setOnce(vaultFactory, addr);
+        vaultFactory = addr;
+        emit VaultFactorySet(addr);
+    }
+
+    function setVault(address addr) external onlyOwner {
+        _setOnce(vault, addr);
+        vault = addr;
+        emit VaultSet(addr);
+    }
+
+    function setDripsStreaming(address addr) external onlyOwner {
+        _setOnce(dripsStreaming, addr);
+        dripsStreaming = addr;
+        emit DripsStreamingSet(addr);
+    }
+
+    function setAddressDriver(address addr) external onlyOwner {
+        _setOnce(addressDriver, addr);
+        addressDriver = addr;
+        emit AddressDriverSet(addr);
+    }
+
+    function setStewardRegistry(address addr) external onlyOwner {
+        _setOnce(stewardRegistry, addr);
+        stewardRegistry = addr;
+        emit StewardRegistrySet(addr);
+    }
+
+    function setLvstToken(address addr) external onlyOwner {
+        _setOnce(lvstToken, addr);
+        lvstToken = addr;
+        emit LvstTokenSet(addr);
+    }
+
+    function _setOnce(address current, address next) private pure {
+        require(current == address(0), "Protocol: already set");
+        require(next != address(0), "Protocol: zero address");
+    }
+}
