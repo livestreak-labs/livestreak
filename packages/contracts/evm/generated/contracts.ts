@@ -2367,6 +2367,13 @@ export const stewardRegistryAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'defaultSteward',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
     name: 'disputeState',
     outputs: [
@@ -2378,10 +2385,24 @@ export const stewardRegistryAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'marketId', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'effectiveSteward',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'vaultId', internalType: 'bytes32', type: 'bytes32' }],
     name: 'endHot',
     outputs: [],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'marketSteward',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -2434,6 +2455,23 @@ export const stewardRegistryAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'steward', internalType: 'address', type: 'address' }],
+    name: 'setDefaultSteward',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'marketId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'steward', internalType: 'address', type: 'address' },
+    ],
+    name: 'setMarketSteward',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [{ name: '', internalType: 'address', type: 'address' }],
     name: 'stewards',
     outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
@@ -2480,6 +2518,12 @@ export const stewardRegistryAbi = [
   {
     type: 'event',
     anonymous: false,
+    inputs: [{ name: 'steward', internalType: 'address', type: 'address', indexed: true }],
+    name: 'DefaultStewardSet',
+  },
+  {
+    type: 'event',
+    anonymous: false,
     inputs: [{ name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true }],
     name: 'DisputeClosed',
   },
@@ -2514,6 +2558,15 @@ export const stewardRegistryAbi = [
       { name: 'reasonHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
     ],
     name: 'HotTriggered',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'marketId', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      { name: 'steward', internalType: 'address', type: 'address', indexed: true },
+    ],
+    name: 'MarketStewardSet',
   },
   {
     type: 'event',

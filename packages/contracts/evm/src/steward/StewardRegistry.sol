@@ -5,11 +5,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Protocol} from "../Protocol.sol";
 import {Vault} from "../vault/Vault.sol";
 
-/// @title StewardRegistry — steward registration, hot/dispute hooks, and the resolution authority.
-/// @notice Steward package owns the decision workflow; the Vault holds visible state and the payout.
-/// This registry is the Vault's `resolver`: a registered steward calls `resolveVault` to set the
-/// outcome. v0 is single-steward authority — quorum, challenge windows, stake-weighting and slashing
-/// are documented refinements (see docs/streamed-funding-explained.md and README.md).
+/// @title StewardRegistry — steward registration, per-market assignment, hot/dispute hooks, and resolution.
+/// @notice The Vault's `resolver`. v0 wires one steward as `defaultSteward`; markets may override via owner assignment.
 contract StewardRegistry is Ownable {
     Protocol public immutable protocol;
 
@@ -33,10 +30,15 @@ contract StewardRegistry is Ownable {
     }
 
     mapping(address => bool) public stewards;
+    mapping(bytes32 => address) public marketSteward;
     mapping(bytes32 => HotState) public vaultHotState;
     mapping(bytes32 => DisputeState) public disputeState;
 
+    address public defaultSteward;
+
     event StewardRegistered(address indexed steward);
+    event DefaultStewardSet(address indexed steward);
+    event MarketStewardSet(bytes32 indexed marketId, address indexed steward);
     event VaultResolved(bytes32 indexed vaultId, Vault.Outcome outcome, address indexed steward);
     event HotTriggered(bytes32 indexed vaultId, Severity severity, uint256 until, bytes32 reasonHash);
     event HotEnded(bytes32 indexed vaultId);
@@ -58,39 +60,64 @@ contract StewardRegistry is Ownable {
         emit StewardRegistered(steward);
     }
 
-    /// @notice Resolve a vault's outcome. v0: any registered steward may call. The Vault enforces that
-    /// only its `resolver` (this registry) can flip the outcome, so this is the sole resolution path.
+    function setDefaultSteward(address steward) external onlyOwner {
+        require(steward != address(0), "StewardRegistry: zero steward");
+        require(stewards[steward], "StewardRegistry: unregistered steward");
+        defaultSteward = steward;
+        emit DefaultStewardSet(steward);
+    }
+
+    function setMarketSteward(bytes32 marketId, address steward) external onlyOwner {
+        require(steward != address(0), "StewardRegistry: zero steward");
+        require(stewards[steward], "StewardRegistry: unregistered steward");
+        marketSteward[marketId] = steward;
+        emit MarketStewardSet(marketId, steward);
+    }
+
+    function effectiveSteward(bytes32 marketId) public view returns (address) {
+        address assigned = marketSteward[marketId];
+        if (assigned != address(0)) return assigned;
+        return defaultSteward;
+    }
+
     function resolveVault(bytes32 vaultId, Vault.Outcome outcome) external {
-        require(stewards[msg.sender], "StewardRegistry: not steward");
+        _requireMarketSteward(vaultId);
         Vault(protocol.vault()).resolve(vaultId, outcome);
         emit VaultResolved(vaultId, outcome, msg.sender);
     }
 
     function triggerHot(bytes32 vaultId, Severity severity, uint256 until, bytes32 reasonHash) external {
-        require(stewards[msg.sender], "StewardRegistry: not steward");
+        _requireMarketSteward(vaultId);
 
         vaultHotState[vaultId] = HotState({active: true, until: until, severity: severity, reasonHash: reasonHash});
         emit HotTriggered(vaultId, severity, until, reasonHash);
     }
 
     function endHot(bytes32 vaultId) external {
-        require(stewards[msg.sender], "StewardRegistry: not steward");
+        _requireMarketSteward(vaultId);
 
         delete vaultHotState[vaultId];
         emit HotEnded(vaultId);
     }
 
     function openDispute(bytes32 vaultId, uint256 challengeUntil, bytes32 proofRef) external {
-        require(stewards[msg.sender], "StewardRegistry: not steward");
+        _requireMarketSteward(vaultId);
 
         disputeState[vaultId] = DisputeState({active: true, challengeUntil: challengeUntil, proofRef: proofRef});
         emit DisputeOpened(vaultId, challengeUntil, proofRef);
     }
 
     function closeDispute(bytes32 vaultId) external {
-        require(stewards[msg.sender], "StewardRegistry: not steward");
+        _requireMarketSteward(vaultId);
 
         delete disputeState[vaultId];
         emit DisputeClosed(vaultId);
+    }
+
+    function _requireMarketSteward(bytes32 vaultId) internal view {
+        bytes32 marketId = Vault(protocol.vault()).marketId(vaultId);
+        address effective = effectiveSteward(marketId);
+        require(effective != address(0), "StewardRegistry: no steward");
+        require(msg.sender == effective, "StewardRegistry: not market steward");
     }
 }

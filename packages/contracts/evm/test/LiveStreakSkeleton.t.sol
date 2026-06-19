@@ -43,8 +43,15 @@ contract LiveStreakSkeletonTest is Test {
         streaming = ProtocolWire.wireAll(owner, core, streaming);
         vaultDriver = core.vaultDriver;
 
-        vm.prank(owner);
+        vm.startPrank(owner);
         stewardRegistry.registerSteward(steward);
+        stewardRegistry.setDefaultSteward(steward);
+        vm.stopPrank();
+    }
+
+    function _stewardVault() internal returns (bytes32 vaultId) {
+        bytes32 marketId = marketRegistry.registerMarket("Steward stream", bytes32("steward"));
+        vaultId = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Steward vault?", Side.Yes);
     }
 
     function test_registerMarket_assignsDeterministicMarketId() public {
@@ -128,15 +135,14 @@ contract LiveStreakSkeletonTest is Test {
     }
 
     function test_steward_unauthorizedHotWrite_reverts() public {
+        bytes32 vaultId = _stewardVault();
         vm.prank(stranger);
-        vm.expectRevert("StewardRegistry: not steward");
-        stewardRegistry.triggerHot(
-            bytes32("vault"), StewardRegistry.Severity.Hot, block.timestamp + 1 hours, bytes32("reason")
-        );
+        vm.expectRevert("StewardRegistry: not market steward");
+        stewardRegistry.triggerHot(vaultId, StewardRegistry.Severity.Hot, block.timestamp + 1 hours, bytes32("reason"));
     }
 
     function test_steward_authorizedHotWrite_succeeds() public {
-        bytes32 vaultId = bytes32("vault");
+        bytes32 vaultId = _stewardVault();
         bytes32 reason = bytes32("reason");
 
         vm.prank(steward);
@@ -155,13 +161,14 @@ contract LiveStreakSkeletonTest is Test {
     }
 
     function test_steward_unauthorizedDisputeWrite_reverts() public {
+        bytes32 vaultId = _stewardVault();
         vm.prank(stranger);
-        vm.expectRevert("StewardRegistry: not steward");
-        stewardRegistry.openDispute(bytes32("vault"), block.timestamp + 1 hours, bytes32("proof"));
+        vm.expectRevert("StewardRegistry: not market steward");
+        stewardRegistry.openDispute(vaultId, block.timestamp + 1 hours, bytes32("proof"));
     }
 
     function test_steward_authorizedDisputeWrite_succeeds() public {
-        bytes32 vaultId = bytes32("vault");
+        bytes32 vaultId = _stewardVault();
         bytes32 proof = bytes32("proof");
         uint256 challengeUntil = block.timestamp + 1 hours;
 

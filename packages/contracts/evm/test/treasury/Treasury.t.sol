@@ -63,6 +63,7 @@ contract TreasuryTest is Test {
         vaultDriver = core.vaultDriver;
 
         stewardRegistry.registerSteward(steward);
+        stewardRegistry.setDefaultSteward(steward);
 
         marketId = marketRegistry.registerMarket("m", bytes32("s"));
         v1 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Q?", Side.Yes);

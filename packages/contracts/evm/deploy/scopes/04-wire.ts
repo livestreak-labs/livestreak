@@ -91,8 +91,9 @@ export async function deployWire(
     await write(vault, vaultAbi, "syncFromProtocol", []);
     console.log(`    vault synced from Protocol`);
 
-    await write(stewardRegistry, stewardAbi, "registerSteward", [deployer]);
-    console.log(`    resolver → stewardRegistry ${stewardRegistry}`);
+        await write(stewardRegistry, stewardAbi, "registerSteward", [deployer]);
+        await write(stewardRegistry, stewardAbi, "setDefaultSteward", [deployer]);
+        console.log(`    resolver → stewardRegistry ${stewardRegistry}`);
 
     console.log("  Protocol + streaming wired.");
 

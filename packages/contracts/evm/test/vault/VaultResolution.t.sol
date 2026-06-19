@@ -56,6 +56,7 @@ contract VaultResolutionTest is Test {
         vaultDriver = core.vaultDriver;
 
         stewardRegistry.registerSteward(steward);
+        stewardRegistry.setDefaultSteward(steward);
 
         marketId = marketRegistry.registerMarket("m", bytes32("s"));
         v1 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Q?", Side.Yes);
@@ -154,7 +155,7 @@ contract VaultResolutionTest is Test {
 
     function test_onlyStewardCanResolve() public {
         vm.prank(makeAddr("rando"));
-        vm.expectRevert("StewardRegistry: not steward");
+        vm.expectRevert("StewardRegistry: not market steward");
         stewardRegistry.resolveVault(v1, Vault.Outcome.Yes);
     }
 

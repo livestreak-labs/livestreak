@@ -56,6 +56,7 @@ contract ConservationInvariantTest is Test {
         vaultDriver = core.vaultDriver;
 
         stewardRegistry.registerSteward(steward);
+        stewardRegistry.setDefaultSteward(steward);
         marketId = core.marketRegistry.registerMarket("m", bytes32("s"));
         vaultId = VaultDriverHarness.createVault(
             vaultDriver, usdc, VaultDriverHarness.SEED_CREATOR, marketId, "Q?", Side.Yes, RATE, CREATOR_SEED

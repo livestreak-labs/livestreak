@@ -51,6 +51,7 @@ contract VaultDriverTest is Test {
         vaultDriver = core.vaultDriver;
 
         stewardRegistry.registerSteward(steward);
+        stewardRegistry.setDefaultSteward(steward);
         marketId = marketRegistry.registerMarket("m", bytes32("s"));
     }
 
