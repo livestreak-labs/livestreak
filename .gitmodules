@@ -1,21 +1,21 @@
-[submodule "packages/contracts/evm/lib/forge-std"]
-	path = packages/contracts/evm/lib/forge-std
+[submodule "packages/contracts/chains/evm/lib/forge-std"]
+	path = packages/contracts/chains/evm/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
-[submodule "packages/contracts/evm/lib/openzeppelin-contracts"]
-	path = packages/contracts/evm/lib/openzeppelin-contracts
+[submodule "packages/contracts/chains/evm/lib/openzeppelin-contracts"]
+	path = packages/contracts/chains/evm/lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
-[submodule "packages/contracts/evm/lib/openzeppelin-v4"]
-	path = packages/contracts/evm/lib/openzeppelin-v4
+[submodule "packages/contracts/chains/evm/lib/openzeppelin-v4"]
+	path = packages/contracts/chains/evm/lib/openzeppelin-v4
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
-[submodule "packages/contracts/evm/lib/solady"]
-	path = packages/contracts/evm/lib/solady
+[submodule "packages/contracts/chains/evm/lib/solady"]
+	path = packages/contracts/chains/evm/lib/solady
 	url = https://github.com/Vectorized/solady
-[submodule "packages/contracts/evm/lib/account-abstraction"]
-	path = packages/contracts/evm/lib/account-abstraction
+[submodule "packages/contracts/chains/evm/lib/account-abstraction"]
+	path = packages/contracts/chains/evm/lib/account-abstraction
 	url = https://github.com/eth-infinitism/account-abstraction
-[submodule "packages/contracts/evm/lib/safe-contracts"]
-	path = packages/contracts/evm/lib/safe-contracts
+[submodule "packages/contracts/chains/evm/lib/safe-contracts"]
+	path = packages/contracts/chains/evm/lib/safe-contracts
 	url = https://github.com/safe-global/safe-contracts
-[submodule "packages/contracts/evm/lib/safe-modules"]
-	path = packages/contracts/evm/lib/safe-modules
+[submodule "packages/contracts/chains/evm/lib/safe-modules"]
+	path = packages/contracts/chains/evm/lib/safe-modules
 	url = https://github.com/safe-global/safe-modules
