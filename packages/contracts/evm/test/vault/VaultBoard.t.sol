@@ -6,6 +6,7 @@ import {DripsStreaming} from "../../src/streaming/DripsStreaming.sol";
 import {ManagedProxy} from "../../src/streaming/Managed.sol";
 import {IDrips} from "../../src/streaming/IDrips.sol";
 import {AddressDriver} from "../../src/streaming/drivers/AddressDriver.sol";
+import {VaultDriver} from "../../src/streaming/drivers/VaultDriver.sol";
 import {Vault} from "../../src/vault/Vault.sol";
 import {VaultFactory} from "../../src/vault/VaultFactory.sol";
 import {Side} from "../../src/vault/Side.sol";
@@ -31,6 +32,7 @@ contract VaultBoardTest is Test {
     BookmakerRegistry internal bookmakerRegistry;
     MarketRegistry internal marketRegistry;
     AddressDriver internal addressDriver;
+    VaultDriver internal vaultDriver;
 
     bytes32 internal v1;
     bytes32 internal v2;
@@ -47,6 +49,7 @@ contract VaultBoardTest is Test {
         marketRegistry = core.marketRegistry;
         vault = core.vault;
         vaultFactory = core.vaultFactory;
+        vaultDriver = core.vaultDriver;
 
         bookmakerRegistry.setBookmaker(address(this), true);
 
@@ -97,7 +100,7 @@ contract VaultBoardTest is Test {
         (,,,, bool depleted) = vault.getPosition(v1, Side.Yes, alice);
         assertTrue(depleted, "funder depleted");
 
-        uint256 r = vault.receiverAccountView(v1, Side.Yes);
+        uint256 r = vaultDriver.receiverAccountView(v1, Side.Yes);
         uint128 delivered = drips.receiveStreams(r, IERC20(address(usdc)), type(uint32).max);
         assertEq(uint256(delivered), pool, "delivered == pool (I1)");
     }

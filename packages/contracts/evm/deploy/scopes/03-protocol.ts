@@ -94,6 +94,15 @@ export async function deployProtocol(
       `${LABEL}.stewardRegistry`
     );
 
+    const vaultDriver = await deployFromArtifact(
+      walletClient,
+      client,
+      "out/VaultDriver.sol/VaultDriver.json",
+      [protocol],
+      undefined,
+      `${LABEL}.vaultDriver`
+    );
+
     return {
       status: "completed",
       deployedAt: new Date().toISOString(),
@@ -106,7 +115,8 @@ export async function deployProtocol(
         mockUsdc,
         lvstToken,
         treasury,
-        stewardRegistry
+        stewardRegistry,
+        vaultDriver
       }
     };
   } catch (error) {

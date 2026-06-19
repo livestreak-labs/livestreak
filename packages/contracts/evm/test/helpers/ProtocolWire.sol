@@ -10,6 +10,7 @@ import {Treasury} from "../../src/treasury/Treasury.sol";
 import {Vault} from "../../src/vault/Vault.sol";
 import {VaultFactory} from "../../src/vault/VaultFactory.sol";
 import {DripsStreaming} from "../../src/streaming/DripsStreaming.sol";
+import {VaultDriver} from "../../src/streaming/drivers/VaultDriver.sol";
 import {ManagedProxy} from "../../src/streaming/Managed.sol";
 import {IDrips} from "../../src/streaming/IDrips.sol";
 import {AddressDriver} from "../../src/streaming/drivers/AddressDriver.sol";
@@ -30,6 +31,7 @@ library ProtocolWire {
         StewardRegistry stewardRegistry;
         LvstToken lvstToken;
         Treasury treasury;
+        VaultDriver vaultDriver;
         MockUSDC usdc;
     }
 
@@ -47,6 +49,7 @@ library ProtocolWire {
         core.stewardRegistry = new StewardRegistry(owner, core.protocol);
         core.lvstToken = new LvstToken(core.protocol);
         core.treasury = new Treasury(owner, usdc, core.protocol);
+        core.vaultDriver = new VaultDriver(core.protocol);
         core.usdc = MockUSDC(address(usdc));
     }
 
@@ -59,6 +62,7 @@ library ProtocolWire {
         core.protocol.setStewardRegistry(address(core.stewardRegistry));
         core.protocol.setLvstToken(address(core.lvstToken));
         core.protocol.setTreasury(address(core.treasury));
+        core.protocol.setVaultDriver(address(core.vaultDriver));
         vm.stopPrank();
     }
 
@@ -72,16 +76,19 @@ library ProtocolWire {
         streaming.drips = DripsStreaming(address(new ManagedProxy(logic, admin, "")));
     }
 
-    function finishStreaming(address admin, Vault vault, MockUSDC usdc, Streaming memory streaming)
-        internal
-        returns (Streaming memory)
-    {
+    function finishStreaming(
+        address admin,
+        Vault vault,
+        VaultDriver vaultDriver,
+        MockUSDC usdc,
+        Streaming memory streaming
+    ) internal returns (Streaming memory) {
         vm.startPrank(admin);
         uint32 addrDriverId = streaming.drips.registerDriver(admin);
         vm.stopPrank();
 
         AddressDriver driverLogic =
-            new AddressDriver(IDrips(address(streaming.drips)), address(0), addrDriverId, vault, IERC20(address(usdc)));
+            new AddressDriver(address(streaming.drips), address(0), addrDriverId, vault, vaultDriver, address(usdc));
         streaming.addressDriver = AddressDriver(address(new ManagedProxy(driverLogic, admin, "")));
 
         vm.prank(admin);
@@ -121,8 +128,10 @@ library ProtocolWire {
         core.protocol.setDripsStreaming(address(streaming.drips));
         vm.stopPrank();
 
-        core.vault.bootstrapStreaming(IERC20(address(core.usdc)));
-        streaming = finishStreaming(owner, core.vault, core.usdc, streaming);
+        core.vaultDriver.bootstrapStreaming(IERC20(address(core.usdc)));
+        vm.prank(owner);
+        core.protocol.setVaultDriver(address(core.vaultDriver));
+        streaming = finishStreaming(owner, core.vault, core.vaultDriver, core.usdc, streaming);
 
         vm.startPrank(owner);
         core.protocol.setAddressDriver(address(streaming.addressDriver));

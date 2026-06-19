@@ -6,11 +6,12 @@ export const addressDriverAbi = [
   {
     type: 'constructor',
     inputs: [
-      { name: 'drips_', internalType: 'contract IDrips', type: 'address' },
+      { name: 'drips_', internalType: 'address', type: 'address' },
       { name: 'forwarder', internalType: 'address', type: 'address' },
       { name: 'driverId_', internalType: 'uint32', type: 'uint32' },
       { name: 'vault_', internalType: 'contract Vault', type: 'address' },
-      { name: 'usdc_', internalType: 'contract IERC20', type: 'address' },
+      { name: 'vaultDriver_', internalType: 'contract VaultDriver', type: 'address' },
+      { name: 'usdc_', internalType: 'address', type: 'address' },
     ],
     stateMutability: 'nonpayable',
   },
@@ -40,6 +41,13 @@ export const addressDriverAbi = [
     inputs: [],
     name: 'VAULT',
     outputs: [{ name: '', internalType: 'contract Vault', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'VAULT_DRIVER',
+    outputs: [{ name: '', internalType: 'contract VaultDriver', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -2045,6 +2053,13 @@ export const protocolAbi = [
   {
     type: 'function',
     inputs: [{ name: 'addr', internalType: 'address', type: 'address' }],
+    name: 'setVaultDriver',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'addr', internalType: 'address', type: 'address' }],
     name: 'setVaultFactory',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -2074,6 +2089,13 @@ export const protocolAbi = [
     type: 'function',
     inputs: [],
     name: 'vault',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'vaultDriver',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
@@ -2151,6 +2173,14 @@ export const protocolAbi = [
     anonymous: false,
     inputs: [{ name: 'treasury', internalType: 'address', type: 'address', indexed: true }],
     name: 'TreasurySet',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'vaultDriver', internalType: 'address', type: 'address', indexed: true },
+    ],
+    name: 'VaultDriverSet',
   },
   {
     type: 'event',
@@ -2782,13 +2812,6 @@ export const vaultAbi = [
   },
   {
     type: 'function',
-    inputs: [{ name: 'usdc_', internalType: 'contract IERC20', type: 'address' }],
-    name: 'bootstrapStreaming',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
     inputs: [
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
       { name: 'side', internalType: 'enum Side', type: 'uint8' },
@@ -2854,20 +2877,6 @@ export const vaultAbi = [
     name: 'createVault',
     outputs: [{ name: 'vaultId', internalType: 'bytes32', type: 'bytes32' }],
     stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'drips',
-    outputs: [{ name: '', internalType: 'contract IDrips', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'driverId',
-    outputs: [{ name: '', internalType: 'uint32', type: 'uint32' }],
-    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -2980,13 +2989,6 @@ export const vaultAbi = [
   },
   {
     type: 'function',
-    inputs: [],
-    name: 'nextPoolId',
-    outputs: [{ name: '', internalType: 'uint64', type: 'uint64' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     inputs: [
       { name: 'funder', internalType: 'address', type: 'address' },
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
@@ -3033,16 +3035,6 @@ export const vaultAbi = [
   },
   {
     type: 'function',
-    inputs: [
-      { name: '', internalType: 'bytes32', type: 'bytes32' },
-      { name: '', internalType: 'enum Side', type: 'uint8' },
-    ],
-    name: 'poolIdOf',
-    outputs: [{ name: '', internalType: 'uint64', type: 'uint64' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
     name: 'pot',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
@@ -3053,26 +3045,6 @@ export const vaultAbi = [
     inputs: [],
     name: 'protocol',
     outputs: [{ name: '', internalType: 'contract Protocol', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'side', internalType: 'enum Side', type: 'uint8' },
-    ],
-    name: 'receiverAccount',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'side', internalType: 'enum Side', type: 'uint8' },
-    ],
-    name: 'receiverAccountView',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
   {
@@ -3140,6 +3112,13 @@ export const vaultAbi = [
     inputs: [],
     name: 'usdc',
     outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'vaultDriver',
+    outputs: [{ name: '', internalType: 'contract IVaultDriver', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -3264,16 +3243,6 @@ export const vaultAbi = [
   {
     type: 'event',
     anonymous: false,
-    inputs: [
-      { name: 'drips', internalType: 'address', type: 'address', indexed: true },
-      { name: 'usdc', internalType: 'address', type: 'address', indexed: true },
-      { name: 'driverId', internalType: 'uint32', type: 'uint32', indexed: false },
-    ],
-    name: 'StreamingSet',
-  },
-  {
-    type: 'event',
-    anonymous: false,
     inputs: [{ name: 'treasury', internalType: 'address', type: 'address', indexed: true }],
     name: 'TreasurySet',
   },
@@ -3292,6 +3261,14 @@ export const vaultAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
+      { name: 'vaultDriver', internalType: 'address', type: 'address', indexed: true },
+    ],
+    name: 'VaultDriverSet',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
       {
         name: 'outcome',
@@ -3301,6 +3278,110 @@ export const vaultAbi = [
       },
     ],
     name: 'VaultResolved',
+  },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// VaultDriver
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const vaultDriverAbi = [
+  {
+    type: 'constructor',
+    inputs: [{ name: 'protocol_', internalType: 'contract Protocol', type: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'usdc_', internalType: 'contract IERC20', type: 'address' }],
+    name: 'bootstrapStreaming',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'drips',
+    outputs: [{ name: '', internalType: 'contract IDrips', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'driverId',
+    outputs: [{ name: '', internalType: 'uint32', type: 'uint32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'side', internalType: 'enum Side', type: 'uint8' },
+    ],
+    name: 'harvest',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextPoolId',
+    outputs: [{ name: '', internalType: 'uint64', type: 'uint64' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'bytes32', type: 'bytes32' },
+      { name: '', internalType: 'enum Side', type: 'uint8' },
+    ],
+    name: 'poolIdOf',
+    outputs: [{ name: '', internalType: 'uint64', type: 'uint64' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'protocol',
+    outputs: [{ name: '', internalType: 'contract Protocol', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'side', internalType: 'enum Side', type: 'uint8' },
+    ],
+    name: 'receiverAccount',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'side', internalType: 'enum Side', type: 'uint8' },
+    ],
+    name: 'receiverAccountView',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'usdc',
+    outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'drips', internalType: 'address', type: 'address', indexed: true },
+      { name: 'usdc', internalType: 'address', type: 'address', indexed: true },
+      { name: 'driverId', internalType: 'uint32', type: 'uint32', indexed: false },
+    ],
+    name: 'StreamingSet',
   },
 ] as const
 

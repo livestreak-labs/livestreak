@@ -6,11 +6,24 @@ import {StreamReceiver} from "../Streams.sol";
 import {IERC20, SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC2771Context} from "openzeppelin-contracts/metatx/ERC2771Context.sol";
 
-/// @notice ERC-20 token transfer utilities for drivers.
-abstract contract DriverTransferUtils is ERC2771Context {
-    constructor(address forwarder) ERC2771Context(forwarder) {}
+/// @notice Shared scaffolding for vault-aware funding drivers (ERC-2771 + Drips token plumbing).
+/// Account resolution and auth stay in concrete drivers.
+abstract contract SharedDriverUtils is ERC2771Context {
+    IDrips public immutable DRIPS;
+    IERC20 public immutable USDC;
+    uint160 internal immutable AMT_MUL;
 
-    function _drips() internal virtual returns (IDrips);
+    constructor(IDrips drips_, address forwarder, IERC20 usdc_) ERC2771Context(forwarder) {
+        DRIPS = drips_;
+        USDC = usdc_;
+        AMT_MUL = drips_.AMT_PER_SEC_MULTIPLIER();
+    }
+
+    function _drips() internal view virtual returns (IDrips) {
+        return DRIPS;
+    }
+
+    function _callerAccountId() internal view virtual returns (uint256);
 
     function _collectAndTransfer(uint256 accountId, IERC20 erc20, address transferTo) internal returns (uint128 amt) {
         amt = _drips().collect(accountId, erc20);

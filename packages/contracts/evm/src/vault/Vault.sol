@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import {Side} from "./Side.sol";
 import {BondingBoard} from "./BondingBoard.sol";
-import {IDrips} from "../streaming/IDrips.sol";
 import {Protocol} from "../Protocol.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
@@ -15,13 +14,18 @@ interface ITreasurySkim {
     function notifySkim(uint256 amount) external;
 }
 
+/// @dev Receiver-side Drips harvest surface.
+interface IVaultDriver {
+    function harvest(bytes32 vaultId, Side side) external returns (uint256);
+    function usdc() external view returns (IERC20);
+}
+
 /// @title Vault — binary YES/NO pool state under one market, with the streamed-funding Board.
 ///
 /// @notice Owns per-side pricing (the Board), per-funder positions, and the resolution skeleton.
 /// Funding flows in as USDC streams (via the vault-aware AddressDriver), priced fairly on the
-/// bonding curve through one cumulative index `g` per (vault, side). The Vault is also a Drips
-/// driver for its own receiver accounts, so only it can collect a side's streamed USDC at
-/// resolution.
+/// bonding curve through one cumulative index `g` per (vault, side). Delivered USDC is harvested
+/// into the Vault at resolution via `VaultDriver`.
 ///
 /// @dev Board math is `BondingBoard`. Design: docs/streamed-funding-explained.md. Resolution
 /// (collect / claimFor payout) is the next slice — see the marked section at the bottom.
@@ -89,19 +93,16 @@ contract Vault {
     address public factory;
     address public fundingDriver; // the vault-aware AddressDriver
     address public resolver; // the steward path authorized to set outcomes
-    IDrips public drips;
     IERC20 public usdc;
-    uint32 public driverId; // FD_vault (Drips driver id for receiver accounts)
+    IVaultDriver public vaultDriver;
 
     uint256 private _nonce;
-    uint64 public nextPoolId = 1;
 
     mapping(bytes32 => VaultData) public vaults;
     mapping(bytes32 => mapping(Side => Board)) internal _boards;
     mapping(bytes32 => mapping(Side => mapping(address => Position))) internal _positions;
     mapping(bytes32 => mapping(Side => Boundary[])) internal _boundaries;
     mapping(bytes32 => mapping(Side => uint256)) internal _boundaryHead;
-    mapping(bytes32 => mapping(Side => uint64)) public poolIdOf;
 
     mapping(bytes32 => uint256) public pot; // USDC the winning side splits (Board truth at resolvedAt)
     mapping(bytes32 => bool) public collected;
@@ -115,9 +116,9 @@ contract Vault {
 
     event VaultCreated(bytes32 indexed vaultId, bytes32 indexed marketId, address indexed creator, string question);
     event VaultResolved(bytes32 indexed vaultId, Outcome outcome);
-    event StreamingSet(address indexed drips, address indexed usdc, uint32 driverId);
     event FundingDriverSet(address indexed fundingDriver);
     event ResolverSet(address indexed resolver);
+    event VaultDriverSet(address indexed vaultDriver);
     event TreasurySet(address indexed treasury);
     event Skimmed(bytes32 indexed vaultId, uint256 amount);
     event Funded(bytes32 indexed vaultId, Side indexed side, address indexed funder, uint256 rate, uint32 maxEnd);
@@ -151,37 +152,26 @@ contract Vault {
     //                              WIRING
     // ═══════════════════════════════════════════════════════════════════════
 
-    /// @notice Register the Vault as the Drips receiver driver. Must run before the user AddressDriver slot is reserved.
-    function bootstrapStreaming(IERC20 usdc_) external {
-        require(address(drips) == address(0), "Vault: streaming already bootstrapped");
-        require(address(usdc_) != address(0), "Vault: zero usdc");
-
-        address drips_ = protocol.dripsStreaming();
-        require(drips_ != address(0), "Vault: drips unset");
-
-        drips = IDrips(drips_);
-        usdc = usdc_;
-        driverId = drips.registerDriver(address(this));
-        emit StreamingSet(drips_, address(usdc_), driverId);
-    }
-
-    /// @notice One-shot cache of sibling module addresses from Protocol after streaming is bootstrapped.
+    /// @notice One-shot cache of sibling module addresses from Protocol after streaming is wired.
     function syncFromProtocol() external {
         require(factory == address(0), "Vault: already synced");
-        require(address(drips) != address(0), "Vault: streaming not bootstrapped");
 
         address factory_ = protocol.vaultFactory();
         address fundingDriver_ = protocol.addressDriver();
         address resolver_ = protocol.stewardRegistry();
         address treasury_ = protocol.treasury();
+        address vaultDriver_ = protocol.vaultDriver();
         require(
-            factory_ != address(0) && fundingDriver_ != address(0) && resolver_ != address(0),
+            factory_ != address(0) && fundingDriver_ != address(0) && resolver_ != address(0)
+                && vaultDriver_ != address(0),
             "Vault: protocol incomplete"
         );
 
         factory = factory_;
         fundingDriver = fundingDriver_;
         resolver = resolver_;
+        vaultDriver = IVaultDriver(vaultDriver_);
+        usdc = vaultDriver.usdc();
         if (treasury_ != address(0)) {
             treasury = ITreasurySkim(treasury_);
             emit TreasurySet(treasury_);
@@ -189,6 +179,7 @@ contract Vault {
 
         emit FundingDriverSet(fundingDriver_);
         emit ResolverSet(resolver_);
+        emit VaultDriverSet(vaultDriver_);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -245,17 +236,6 @@ contract Vault {
     // ═══════════════════════════════════════════════════════════════════════
     //                       FUNDING HOOKS (driver-only)
     // ═══════════════════════════════════════════════════════════════════════
-
-    /// @notice The Drips receiver account for a (vault, side); assigns a poolId on first use.
-    function receiverAccount(bytes32 vaultId, Side side) external onlyFundingDriver returns (uint256) {
-        require(vaults[vaultId].exists, "Vault: unknown vault");
-        uint64 pid = poolIdOf[vaultId][side];
-        if (pid == 0) {
-            pid = nextPoolId++;
-            poolIdOf[vaultId][side] = pid;
-        }
-        return _receiverAccount(pid);
-    }
 
     /// @notice Open a funder's position after the driver has set the real Drips stream.
     function onFund(address funder, bytes32 vaultId, Side side, uint256 rate, uint32 maxEnd)
@@ -385,10 +365,6 @@ contract Vault {
         uint32 resolvedAt = vaults[vaultId].resolvedAt;
         if (resolvedAt != 0 && uint256(resolvedAt) < target) target = resolvedAt;
         return last == 0 || uint256(last) == target;
-    }
-
-    function receiverAccountView(bytes32 vaultId, Side side) external view returns (uint256) {
-        return _receiverAccount(poolIdOf[vaultId][side]);
     }
 
     /// @notice Every vault `user` has funded (either side), in first-funded order. Lets a client
@@ -553,10 +529,6 @@ contract Vault {
         arr[i] = Boundary({maxEnd: maxEnd, funder: funder});
     }
 
-    function _receiverAccount(uint64 poolId) internal view returns (uint256) {
-        return (uint256(driverId) << 224) | uint256(poolId);
-    }
-
     // ═══════════════════════════════════════════════════════════════════════
     //                          RESOLUTION
     // ═══════════════════════════════════════════════════════════════════════
@@ -565,7 +537,7 @@ contract Vault {
     /// `resolvedAt` — `yesPool + noPool`, i.e. exactly the USDC both sides streamed up to resolution
     /// (invariant I1: pool == delivered) — not whatever happens to be physically collected at this
     /// instant. That makes the pot independent of collect timing and order, so an early or partial
-    /// call can never strand the winners' money. The `_collectSide` calls are an idempotent liquidity
+    /// call can never strand the winners' money. The harvest calls are an idempotent liquidity
     /// pull, so `collect` is safe to call repeatedly; pair it with `AddressDriver.settle`, which banks
     /// each active funder's in-flight Drips cycle, before winners claim.
     function collect(bytes32 vaultId) external {
@@ -591,8 +563,8 @@ contract Vault {
         }
 
         // Idempotent liquidity gather: bank whatever Drips has delivered so far into the Vault.
-        _collectSide(vaultId, Side.Yes);
-        _collectSide(vaultId, Side.No);
+        vaultDriver.harvest(vaultId, Side.Yes);
+        vaultDriver.harvest(vaultId, Side.No);
 
         // Flush the skim to the LVST house pot once the cash is in. skim ≤ the pot residual, so this
         // never starves winners; idempotent (zeroed once sent), and a cashless early collect just waits.
@@ -605,16 +577,6 @@ contract Vault {
         }
 
         emit Collected(vaultId, pot[vaultId]);
-    }
-
-    function _collectSide(bytes32 vaultId, Side side) internal returns (uint256) {
-        uint64 pid = poolIdOf[vaultId][side];
-        if (pid == 0) return 0;
-        uint256 receiver = _receiverAccount(pid);
-        drips.receiveStreams(receiver, usdc, type(uint32).max);
-        uint128 amt = drips.collect(receiver, usdc);
-        if (amt > 0) drips.withdraw(usdc, address(this), amt);
-        return uint256(amt);
     }
 
     /// @notice Pay `funder` their winnings: `pot · their shares / winning-side shares`. The losing

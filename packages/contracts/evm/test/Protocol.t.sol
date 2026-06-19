@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {Protocol} from "../../src/Protocol.sol";
+import {Protocol} from "../src/Protocol.sol";
 
 contract ProtocolTest is Test {
     address internal owner = makeAddr("owner");
@@ -45,6 +45,7 @@ contract ProtocolTest is Test {
         address vault = makeAddr("vault");
         address drips = makeAddr("drips");
         address driver = makeAddr("driver");
+        address vaultDriver = makeAddr("vaultDriver");
         address steward = makeAddr("steward");
         address lvst = makeAddr("lvst");
         address treasury = makeAddr("treasury");
@@ -56,6 +57,7 @@ contract ProtocolTest is Test {
         protocol.setVault(vault);
         protocol.setDripsStreaming(drips);
         protocol.setAddressDriver(driver);
+        protocol.setVaultDriver(vaultDriver);
         protocol.setStewardRegistry(steward);
         protocol.setLvstToken(lvst);
         protocol.setTreasury(treasury);
@@ -67,6 +69,7 @@ contract ProtocolTest is Test {
         assertEq(protocol.vault(), vault);
         assertEq(protocol.dripsStreaming(), drips);
         assertEq(protocol.addressDriver(), driver);
+        assertEq(protocol.vaultDriver(), vaultDriver);
         assertEq(protocol.stewardRegistry(), steward);
         assertEq(protocol.lvstToken(), lvst);
         assertEq(protocol.treasury(), treasury);

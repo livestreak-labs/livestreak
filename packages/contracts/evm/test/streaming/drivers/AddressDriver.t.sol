@@ -6,6 +6,7 @@ import {DripsStreaming} from "../../../src/streaming/DripsStreaming.sol";
 import {ManagedProxy} from "../../../src/streaming/Managed.sol";
 import {IDrips} from "../../../src/streaming/IDrips.sol";
 import {AddressDriver} from "../../../src/streaming/drivers/AddressDriver.sol";
+import {VaultDriver} from "../../../src/streaming/drivers/VaultDriver.sol";
 import {Vault} from "../../../src/vault/Vault.sol";
 import {VaultFactory} from "../../../src/vault/VaultFactory.sol";
 import {Side} from "../../../src/vault/Side.sol";
@@ -30,6 +31,7 @@ contract AddressDriverTest is Test {
     BookmakerRegistry internal bookmakerRegistry;
     MarketRegistry internal marketRegistry;
     AddressDriver internal addressDriver;
+    VaultDriver internal vaultDriver;
 
     bytes32 internal v1;
 
@@ -45,6 +47,7 @@ contract AddressDriverTest is Test {
         marketRegistry = core.marketRegistry;
         vault = core.vault;
         vaultFactory = core.vaultFactory;
+        vaultDriver = core.vaultDriver;
 
         bookmakerRegistry.setBookmaker(address(this), true);
 
@@ -128,8 +131,8 @@ contract AddressDriverTest is Test {
         vm.expectRevert("Vault: not funding driver");
         vault.onFund(alice, v1, Side.Yes, RATE, 150);
 
-        vm.expectRevert("Vault: not funding driver");
-        vault.receiverAccount(v1, Side.Yes);
+        vm.expectRevert("VaultDriver: not funding driver");
+        vaultDriver.receiverAccount(v1, Side.Yes);
     }
 
     /// Two separate accounts (the AA model) accrue independently in proportion to rate.

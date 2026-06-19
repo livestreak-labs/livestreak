@@ -12,6 +12,7 @@ contract Protocol is Ownable {
     address public vault;
     address public dripsStreaming;
     address public addressDriver;
+    address public vaultDriver;
     address public stewardRegistry;
     address public lvstToken;
     address public treasury;
@@ -22,6 +23,7 @@ contract Protocol is Ownable {
     event VaultSet(address indexed vault);
     event DripsStreamingSet(address indexed dripsStreaming);
     event AddressDriverSet(address indexed addressDriver);
+    event VaultDriverSet(address indexed vaultDriver);
     event StewardRegistrySet(address indexed stewardRegistry);
     event LvstTokenSet(address indexed lvstToken);
     event TreasurySet(address indexed treasury);
@@ -62,6 +64,12 @@ contract Protocol is Ownable {
         _setOnce(addressDriver, addr);
         addressDriver = addr;
         emit AddressDriverSet(addr);
+    }
+
+    function setVaultDriver(address addr) external onlyOwner {
+        _setOnce(vaultDriver, addr);
+        vaultDriver = addr;
+        emit VaultDriverSet(addr);
     }
 
     function setStewardRegistry(address addr) external onlyOwner {

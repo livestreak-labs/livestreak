@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.20;
 
-import {IDrips} from "../IDrips.sol";
 import {StreamReceiver, StreamConfigImpl, StreamsHistory} from "../Streams.sol";
 import {Managed} from "../Managed.sol";
-import {DriverTransferUtils} from "./DriverTransferUtils.sol";
-import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {SharedDriverUtils} from "./SharedDriverUtils.sol";
+import {VaultDriver} from "./VaultDriver.sol";
+import {IDrips} from "../IDrips.sol";
 import {Vault} from "../../vault/Vault.sol";
 import {Side} from "../../vault/Side.sol";
+import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 
 /// @notice Vault-aware Drips driver. Each address controls the account `(DRIVER_ID << 224) | addr`
 /// and streams USDC **only** into vault-sides — never to an arbitrary receiver. `fund`/`stop` set the
@@ -17,12 +18,10 @@ import {Side} from "../../vault/Side.sol";
 /// `settle` squeezes the in-flight cycle into the vault-side at resolution; `claim` withdraws a
 /// winner's payout. Multi-vault-per-account (one config, many receivers — proven safe in Streams.sol)
 /// is the remaining refinement.
-contract AddressDriver is DriverTransferUtils, Managed {
-    IDrips public immutable DRIPS;
+contract AddressDriver is SharedDriverUtils, Managed {
     uint32 public immutable DRIVER_ID;
     Vault public immutable VAULT;
-    IERC20 public immutable USDC;
-    uint160 internal immutable AMT_MUL;
+    VaultDriver public immutable VAULT_DRIVER;
 
     struct ActiveStream {
         bytes32 vaultId;
@@ -40,18 +39,17 @@ contract AddressDriver is DriverTransferUtils, Managed {
     event PositionStopped(address indexed funder, bytes32 indexed vaultId, Side side, uint256 refunded);
     event PositionSettled(address indexed funder, bytes32 indexed vaultId, Side side, uint128 squeezed);
 
-    constructor(IDrips drips_, address forwarder, uint32 driverId_, Vault vault_, IERC20 usdc_)
-        DriverTransferUtils(forwarder)
-    {
-        DRIPS = drips_;
+    constructor(
+        address drips_,
+        address forwarder,
+        uint32 driverId_,
+        Vault vault_,
+        VaultDriver vaultDriver_,
+        address usdc_
+    ) SharedDriverUtils(IDrips(drips_), forwarder, IERC20(usdc_)) {
         DRIVER_ID = driverId_;
         VAULT = vault_;
-        USDC = usdc_;
-        AMT_MUL = drips_.AMT_PER_SEC_MULTIPLIER();
-    }
-
-    function _drips() internal view override returns (IDrips) {
-        return DRIPS;
+        VAULT_DRIVER = vaultDriver_;
     }
 
     /// @notice The account controlled by `addr`.
@@ -60,7 +58,7 @@ contract AddressDriver is DriverTransferUtils, Managed {
         accountId = (accountId << 224) | uint160(addr);
     }
 
-    function _callerAccountId() internal view returns (uint256) {
+    function _callerAccountId() internal view override returns (uint256) {
         return calcAccountId(_msgSender());
     }
 
@@ -71,7 +69,7 @@ contract AddressDriver is DriverTransferUtils, Managed {
         uint256 account = _callerAccountId();
         require(!activeStream[account].active, "AddressDriver: account already funding");
 
-        uint256 receiver = VAULT.receiverAccount(vaultId, side);
+        uint256 receiver = VAULT_DRIVER.receiverAccount(vaultId, side);
         StreamReceiver[] memory newReceivers = new StreamReceiver[](1);
         newReceivers[0] =
             StreamReceiver({accountId: receiver, config: StreamConfigImpl.create(0, uint160(rate * AMT_MUL), 0, 0)});
@@ -98,7 +96,7 @@ contract AddressDriver is DriverTransferUtils, Managed {
         // any post-resolution overage) is collectable; then close the stream and refund the unspent.
         _squeezeInflight(account, a);
 
-        uint256 receiver = VAULT.receiverAccountView(a.vaultId, a.side);
+        uint256 receiver = VAULT_DRIVER.receiverAccountView(a.vaultId, a.side);
         StreamReceiver[] memory currReceivers = new StreamReceiver[](1);
         currReceivers[0] =
             StreamReceiver({accountId: receiver, config: StreamConfigImpl.create(0, uint160(a.rate * AMT_MUL), 0, 0)});
@@ -120,10 +118,10 @@ contract AddressDriver is DriverTransferUtils, Managed {
     /// @dev Squeeze `account`'s in-flight Drips cycle into its vault-side receiver, banking USDC
     /// streamed so far in the current (unfinished) cycle. Shared by `settle` (resolution) and `stop`.
     /// A squeeze only moves funds from in-flight to the receiver's collectable balance — never out (only
-    /// the Vault, as the receiver's driver, withdraws) — so this is safe to do permissionlessly. The
+    /// the VaultDriver, as the receiver's driver, withdraws) — so this is safe to do permissionlessly. The
     /// driver holds the sender's stream history, which is what a squeeze needs.
     function _squeezeInflight(uint256 account, ActiveStream memory a) internal returns (uint128 squeezed) {
-        uint256 receiver = VAULT.receiverAccountView(a.vaultId, a.side);
+        uint256 receiver = VAULT_DRIVER.receiverAccountView(a.vaultId, a.side);
         StreamReceiver[] memory recv = new StreamReceiver[](1);
         recv[0] =
             StreamReceiver({accountId: receiver, config: StreamConfigImpl.create(0, uint160(a.rate * AMT_MUL), 0, 0)});

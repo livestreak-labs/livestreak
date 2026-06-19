@@ -27,13 +27,14 @@ export async function deployWire(
   }
 
   const { dripsProxy, caller } = streaming.contracts as Record<string, Address>;
-  const { protocol, vault, vaultFactory, marketRegistry, bookmakerRegistry, mockUsdc, stewardRegistry, lvstToken, treasury } =
+  const { protocol, vault, vaultFactory, marketRegistry, bookmakerRegistry, mockUsdc, stewardRegistry, lvstToken, treasury, vaultDriver } =
     protocolScope.contracts as Record<string, Address>;
   const { deployer } = config;
 
   try {
     const protocolAbi = loadAbi("out/Protocol.sol/Protocol.json");
     const vaultAbi = loadAbi("out/Vault.sol/Vault.json");
+    const vaultDriverAbi = loadAbi("out/VaultDriver.sol/VaultDriver.json");
     const dripsAbi = loadAbi("out/IDrips.sol/IDrips.json");
     const stewardAbi = loadAbi("out/StewardRegistry.sol/StewardRegistry.json");
 
@@ -53,8 +54,9 @@ export async function deployWire(
     await write(protocol, protocolAbi, "setTreasury", [treasury]);
     await write(protocol, protocolAbi, "setDripsStreaming", [dripsProxy]);
 
-    // Vault registers as the Drips receiver driver before the user driver slot is reserved.
-    await write(vault, vaultAbi, "bootstrapStreaming", [mockUsdc]);
+    // VaultDriver registers as the Drips receiver driver before the user AddressDriver slot is reserved.
+    await write(vaultDriver, vaultDriverAbi, "bootstrapStreaming", [mockUsdc]);
+    await write(protocol, protocolAbi, "setVaultDriver", [vaultDriver]);
 
     // Reserve the user driver slot (FD_user), deploy AddressDriver, register on Protocol.
     const driverId = Number(
@@ -67,7 +69,7 @@ export async function deployWire(
       walletClient,
       client,
       "out/AddressDriver.sol/AddressDriver.json",
-      [dripsProxy, caller, driverId, vault, mockUsdc],
+      [dripsProxy, caller, driverId, vault, vaultDriver, mockUsdc],
       undefined,
       `${LABEL}.addressDriverLogic`
     );
@@ -83,7 +85,7 @@ export async function deployWire(
     await write(protocol, protocolAbi, "setAddressDriver", [addressDriverProxy]);
     console.log(`    addressDriverProxy → ${addressDriverProxy}`);
 
-    // Vault one-shot sync of factory, funding driver, resolver, and Treasury from Protocol.
+    // Vault one-shot sync of factory, funding driver, resolver, Treasury, and VaultDriver from Protocol.
     await write(vault, vaultAbi, "syncFromProtocol", []);
     console.log(`    vault synced from Protocol`);
 
