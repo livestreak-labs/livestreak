@@ -1,0 +1,147 @@
+// SPDX-License-Identifier: GPL-3.0-only
+pragma solidity ^0.8.20;
+
+import {Test} from "forge-std/Test.sol";
+import {DripsStreaming} from "../../src/streaming/DripsStreaming.sol";
+import {MarketDriver} from "../../src/streaming/drivers/MarketDriver.sol";
+import {Vault} from "../../src/vault/Vault.sol";
+import {VaultFactory} from "../../src/vault/VaultFactory.sol";
+import {Treasury} from "../../src/treasury/Treasury.sol";
+import {Side} from "../../src/vault/Side.sol";
+import {BookmakerRegistry} from "../../src/registries/BookmakerRegistry.sol";
+import {MarketRegistry} from "../../src/registries/MarketRegistry.sol";
+import {StewardRegistry} from "../../src/steward/StewardRegistry.sol";
+import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {MockUSDC} from "../mocks/MockUSDC.sol";
+import {ProtocolWire} from "../helpers/ProtocolWire.sol";
+import {MarketDriverHarness} from "../helpers/MarketDriverHarness.sol";
+
+/// @notice Conservation invariant: every deposited dollar is skim, recovery, or zero residual.
+contract ConservationInvariantTest is Test {
+    uint32 internal constant CYCLE = 10;
+    uint256 internal constant START = 100;
+    uint256 internal constant RATE = 1_000_000;
+
+    DripsStreaming internal drips;
+    MockUSDC internal usdc;
+    Vault internal vault;
+    VaultFactory internal vaultFactory;
+    Treasury internal treasury;
+    MarketDriver internal marketDriver;
+    StewardRegistry internal stewardRegistry;
+
+    bytes32 internal marketId;
+    bytes32 internal vaultId;
+    address internal alice = makeAddr("alice");
+    address internal bob = makeAddr("bob");
+    address internal steward = makeAddr("steward");
+
+    uint256 internal aliceNft;
+    uint256 internal bobNft;
+
+    function setUp() public {
+        vm.warp(START);
+
+        usdc = new MockUSDC();
+        ProtocolWire.Core memory core = ProtocolWire.deployCore(address(this), IERC20(address(usdc)));
+        vault = core.vault;
+        vaultFactory = core.vaultFactory;
+        treasury = core.treasury;
+        stewardRegistry = core.stewardRegistry;
+
+        core.bookmakerRegistry.setBookmaker(address(this), true);
+
+        ProtocolWire.Streaming memory streaming = ProtocolWire.deployStreaming(address(this), vault, usdc, CYCLE);
+        streaming = ProtocolWire.wireAll(address(this), core, streaming);
+        drips = streaming.drips;
+        marketDriver = streaming.marketDriver;
+
+        stewardRegistry.registerSteward(steward);
+        marketId = core.marketRegistry.registerMarket("m", bytes32("s"));
+        vaultId = vaultFactory.createVault(marketId, "Q?");
+
+        aliceNft = MarketDriverHarness.mint(marketDriver, alice, marketId);
+        bobNft = MarketDriverHarness.mint(marketDriver, bob, marketId);
+    }
+
+    /// Σ deposits == skim + stopAll refunds + withdraw payees; vault and drips drain to zero.
+    function testFuzz_conservationInvariant(uint256 seed) public {
+        seed = bound(seed, 1, type(uint128).max);
+
+        uint256 totalDeposits;
+        uint256 totalStopAllRefunds;
+        uint256 totalWithdraws;
+
+        bool aliceFunded;
+        bool bobFunded;
+
+        uint256 steps = 3 + (seed % 5);
+        for (uint256 i = 0; i < steps; i++) {
+            uint256 op = uint256(keccak256(abi.encode(seed, i))) % 4;
+            uint256 deposit = RATE * (2 + (uint256(keccak256(abi.encode(seed, i, "d"))) % 18));
+
+            if (op == 0 && !aliceFunded) {
+                totalDeposits += deposit;
+                MarketDriverHarness.fund(marketDriver, usdc, alice, aliceNft, vaultId, Side.Yes, RATE, deposit);
+                aliceFunded = true;
+            } else if (op == 1 && !bobFunded) {
+                totalDeposits += deposit;
+                MarketDriverHarness.fund(marketDriver, usdc, bob, bobNft, vaultId, Side.No, RATE, deposit);
+                bobFunded = true;
+            } else if (op == 2) {
+                vm.warp(block.timestamp + 1 + (seed % 7));
+            } else {
+                vault.advance(vaultId, Side.Yes, 64);
+                vault.advance(vaultId, Side.No, 64);
+            }
+        }
+
+        if (!aliceFunded) {
+            uint256 deposit = 10 * RATE;
+            totalDeposits += deposit;
+            MarketDriverHarness.fund(marketDriver, usdc, alice, aliceNft, vaultId, Side.Yes, RATE, deposit);
+        }
+        if (!bobFunded) {
+            uint256 deposit = 10 * RATE;
+            totalDeposits += deposit;
+            MarketDriverHarness.fund(marketDriver, usdc, bob, bobNft, vaultId, Side.No, RATE, deposit);
+        }
+
+        vm.warp(block.timestamp + CYCLE);
+        vm.prank(steward);
+        stewardRegistry.resolveVault(vaultId, Vault.Outcome.Yes);
+        vault.collect(vaultId);
+        vm.warp(block.timestamp + CYCLE * 3);
+        vault.collect(vaultId);
+
+        totalStopAllRefunds += _stopAllRefund(alice, aliceNft);
+        totalStopAllRefunds += _stopAllRefund(bob, bobNft);
+
+        vm.prank(alice);
+        totalWithdraws += marketDriver.withdraw(aliceNft, vaultId);
+        vm.prank(bob);
+        totalWithdraws += marketDriver.withdraw(bobNft, vaultId);
+
+        vault.collect(vaultId);
+        vm.prank(alice);
+        totalWithdraws += marketDriver.withdraw(aliceNft, vaultId);
+        vm.prank(bob);
+        totalWithdraws += marketDriver.withdraw(bobNft, vaultId);
+
+        assertEq(usdc.balanceOf(address(vault)), 0, "vault drained");
+        assertEq(usdc.balanceOf(address(drips)), 0, "drips drained");
+        assertEq(
+            totalDeposits,
+            treasury.totalSkimmed() + totalStopAllRefunds + totalWithdraws,
+            "conservation: deposits == skim + refunds + withdrawals"
+        );
+    }
+
+    function _stopAllRefund(address who, uint256 tokenId) internal returns (uint256 refunded) {
+        if (marketDriver.laneCount(tokenId) == 0) return 0;
+        uint256 before = usdc.balanceOf(who);
+        vm.prank(who);
+        marketDriver.stopAll(tokenId);
+        refunded = usdc.balanceOf(who) - before;
+    }
+}

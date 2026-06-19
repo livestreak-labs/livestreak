@@ -10,7 +10,7 @@ import {LvstToken} from "./LvstToken.sol";
 
 /// @dev Per-funder loss basis lives on the Vault.
 interface IVaultLoss {
-    function lossClaimable(address funder, bytes32 vaultId, Side side) external view returns (uint256);
+    function lossClaimable(uint256 account, bytes32 vaultId, Side side) external view returns (uint256);
 }
 
 /// @dev Vault skim sink surface.
@@ -58,7 +58,7 @@ contract Treasury is Ownable, ITreasurySkim {
     mapping(address => uint256) public rewardDebt;
     mapping(address => uint256) public accruedDividends;
 
-    mapping(address => mapping(bytes32 => mapping(Side => bool))) public lossClaimed;
+    mapping(uint256 => mapping(bytes32 => mapping(Side => bool))) public lossClaimed;
 
     event Skimmed(uint256 amount, uint256 totalSkimmed);
     event LossLvstClaimed(
@@ -131,31 +131,26 @@ contract Treasury is Ownable, ITreasurySkim {
 
     // ── loss → LVST ───────────────────────────────────────────────────────────
 
-    /// @notice Mint LVST for the caller's loss on a resolved vault's losing side.
-    function claimLossLvst(bytes32 vaultId, Side side) external returns (uint256 minted) {
-        minted = _mintLoss(msg.sender, vaultId, side);
+    /// @notice Mint LVST for an NFT account's loss; callable only from MarketDriver.
+    function mintLossLvst(uint256 account, address to, bytes32 vaultId, Side side) external returns (uint256 minted) {
+        require(msg.sender == protocol.marketDriver(), "Treasury: not market driver");
+        minted = _mintLoss(account, to, vaultId, side);
     }
 
-    /// @notice Mint loss LVST and stake it in the same call.
-    function claimAndStakeLossLvst(bytes32 vaultId, Side side) external returns (uint256 minted) {
-        minted = _mintLoss(msg.sender, vaultId, side);
-        _stake(msg.sender, minted);
-    }
-
-    function _mintLoss(address user, bytes32 vaultId, Side side) internal returns (uint256 minted) {
-        require(!lossClaimed[user][vaultId][side], "Treasury: already claimed");
-        uint256 lostUsdc = vault().lossClaimable(user, vaultId, side);
+    function _mintLoss(uint256 account, address to, bytes32 vaultId, Side side) internal returns (uint256 minted) {
+        require(!lossClaimed[account][vaultId][side], "Treasury: already claimed");
+        uint256 lostUsdc = vault().lossClaimable(account, vaultId, side);
         require(lostUsdc > 0, "Treasury: nothing lost");
-        lossClaimed[user][vaultId][side] = true;
+        lossClaimed[account][vaultId][side] = true;
         minted = (lostUsdc * mintRate()) / USDC_ONE;
-        lvstToken().mint(user, minted);
-        emit LossLvstClaimed(user, vaultId, side, lostUsdc, minted);
+        lvstToken().mint(to, minted);
+        emit LossLvstClaimed(to, vaultId, side, lostUsdc, minted);
     }
 
-    /// @notice LVST the caller would mint for a loss right now (0 once claimed).
-    function lossLvstClaimable(address user, bytes32 vaultId, Side side) external view returns (uint256) {
-        if (lossClaimed[user][vaultId][side]) return 0;
-        return (vault().lossClaimable(user, vaultId, side) * mintRate()) / USDC_ONE;
+    /// @notice LVST an account would mint for a loss right now (0 once claimed).
+    function lossLvstClaimable(uint256 account, bytes32 vaultId, Side side) external view returns (uint256) {
+        if (lossClaimed[account][vaultId][side]) return 0;
+        return (vault().lossClaimable(account, vaultId, side) * mintRate()) / USDC_ONE;
     }
 
     // ── staking + dividends ───────────────────────────────────────────────────

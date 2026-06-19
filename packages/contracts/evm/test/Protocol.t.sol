@@ -56,7 +56,7 @@ contract ProtocolTest is Test {
         protocol.setVaultFactory(factory);
         protocol.setVault(vault);
         protocol.setDripsStreaming(drips);
-        protocol.setAddressDriver(driver);
+        protocol.setMarketDriver(driver);
         protocol.setVaultDriver(vaultDriver);
         protocol.setStewardRegistry(steward);
         protocol.setLvstToken(lvst);
@@ -68,7 +68,7 @@ contract ProtocolTest is Test {
         assertEq(protocol.vaultFactory(), factory);
         assertEq(protocol.vault(), vault);
         assertEq(protocol.dripsStreaming(), drips);
-        assertEq(protocol.addressDriver(), driver);
+        assertEq(protocol.marketDriver(), driver);
         assertEq(protocol.vaultDriver(), vaultDriver);
         assertEq(protocol.stewardRegistry(), steward);
         assertEq(protocol.lvstToken(), lvst);

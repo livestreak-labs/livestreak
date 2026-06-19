@@ -26,7 +26,7 @@ contract VaultDriver {
     }
 
     modifier onlyFundingDriver() {
-        require(msg.sender == protocol.addressDriver(), "VaultDriver: not funding driver");
+        require(msg.sender == protocol.marketDriver(), "VaultDriver: not market driver");
         _;
     }
 

@@ -18,7 +18,7 @@ export default defineConfig({
         "DripsStreaming.sol/DripsStreaming.json",
         "IDrips.sol/IDrips.json",
         "Caller.sol/Caller.json",
-        "AddressDriver.sol/AddressDriver.json",
+        "MarketDriver.sol/MarketDriver.json",
         "VaultDriver.sol/VaultDriver.json",
         "LiveStreakPaymaster.sol/LiveStreakPaymaster.json"
       ]

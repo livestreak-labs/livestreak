@@ -13,7 +13,7 @@ import {DripsStreaming} from "../../src/streaming/DripsStreaming.sol";
 import {VaultDriver} from "../../src/streaming/drivers/VaultDriver.sol";
 import {ManagedProxy} from "../../src/streaming/Managed.sol";
 import {IDrips} from "../../src/streaming/IDrips.sol";
-import {AddressDriver} from "../../src/streaming/drivers/AddressDriver.sol";
+import {MarketDriver} from "../../src/streaming/drivers/MarketDriver.sol";
 import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {MockUSDC} from "../mocks/MockUSDC.sol";
 import {Vm} from "forge-std/Vm.sol";
@@ -37,7 +37,7 @@ library ProtocolWire {
 
     struct Streaming {
         DripsStreaming drips;
-        AddressDriver addressDriver;
+        MarketDriver marketDriver;
     }
 
     function deployCore(address owner, IERC20 usdc) internal returns (Core memory core) {
@@ -78,28 +78,30 @@ library ProtocolWire {
 
     function finishStreaming(
         address admin,
+        Protocol protocol,
         Vault vault,
         VaultDriver vaultDriver,
         MockUSDC usdc,
         Streaming memory streaming
     ) internal returns (Streaming memory) {
         vm.startPrank(admin);
-        uint32 addrDriverId = streaming.drips.registerDriver(admin);
+        uint32 marketDriverId = streaming.drips.registerDriver(admin);
         vm.stopPrank();
 
-        AddressDriver driverLogic =
-            new AddressDriver(address(streaming.drips), address(0), addrDriverId, vault, vaultDriver, address(usdc));
-        streaming.addressDriver = AddressDriver(address(new ManagedProxy(driverLogic, admin, "")));
+        MarketDriver driverLogic = new MarketDriver(
+            address(streaming.drips), address(0), marketDriverId, protocol, vault, vaultDriver, address(usdc)
+        );
+        streaming.marketDriver = MarketDriver(address(new ManagedProxy(driverLogic, admin, "")));
 
         vm.prank(admin);
-        streaming.drips.updateDriverAddress(addrDriverId, address(streaming.addressDriver));
+        streaming.drips.updateDriverAddress(marketDriverId, address(streaming.marketDriver));
         return streaming;
     }
 
     function setProtocolStreaming(address owner, Protocol protocol, Streaming memory streaming) internal {
         vm.startPrank(owner);
         protocol.setDripsStreaming(address(streaming.drips));
-        protocol.setAddressDriver(address(streaming.addressDriver));
+        protocol.setMarketDriver(address(streaming.marketDriver));
         vm.stopPrank();
     }
 
@@ -131,10 +133,10 @@ library ProtocolWire {
         core.vaultDriver.bootstrapStreaming(IERC20(address(core.usdc)));
         vm.prank(owner);
         core.protocol.setVaultDriver(address(core.vaultDriver));
-        streaming = finishStreaming(owner, core.vault, core.vaultDriver, core.usdc, streaming);
+        streaming = finishStreaming(owner, core.protocol, core.vault, core.vaultDriver, core.usdc, streaming);
 
         vm.startPrank(owner);
-        core.protocol.setAddressDriver(address(streaming.addressDriver));
+        core.protocol.setMarketDriver(address(streaming.marketDriver));
         vm.stopPrank();
 
         syncVault(core.vault);

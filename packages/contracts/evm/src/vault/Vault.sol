@@ -23,7 +23,7 @@ interface IVaultDriver {
 /// @title Vault — binary YES/NO pool state under one market, with the streamed-funding Board.
 ///
 /// @notice Owns per-side pricing (the Board), per-funder positions, and the resolution skeleton.
-/// Funding flows in as USDC streams (via the vault-aware AddressDriver), priced fairly on the
+/// Funding flows in as USDC streams (via the per-market MarketDriver), priced fairly on the
 /// bonding curve through one cumulative index `g` per (vault, side). Delivered USDC is harvested
 /// into the Vault at resolution via `VaultDriver`.
 ///
@@ -87,11 +87,11 @@ contract Vault {
 
     struct Boundary {
         uint32 maxEnd;
-        address funder;
+        uint256 account;
     }
 
     address public factory;
-    address public fundingDriver; // the vault-aware AddressDriver
+    address public marketDriver;
     address public resolver; // the steward path authorized to set outcomes
     IERC20 public usdc;
     IVaultDriver public vaultDriver;
@@ -100,33 +100,35 @@ contract Vault {
 
     mapping(bytes32 => VaultData) public vaults;
     mapping(bytes32 => mapping(Side => Board)) internal _boards;
-    mapping(bytes32 => mapping(Side => mapping(address => Position))) internal _positions;
+    mapping(bytes32 => mapping(Side => mapping(uint256 => Position))) internal _positions;
     mapping(bytes32 => mapping(Side => Boundary[])) internal _boundaries;
     mapping(bytes32 => mapping(Side => uint256)) internal _boundaryHead;
 
     mapping(bytes32 => uint256) public pot; // USDC the winning side splits (Board truth at resolvedAt)
     mapping(bytes32 => bool) public collected;
-    mapping(bytes32 => mapping(Side => mapping(address => bool))) public claimed;
-    mapping(bytes32 => mapping(Side => mapping(address => uint256))) public overageOwed; // streamed past resolvedAt
-    mapping(address => bytes32[]) private _userVaults; // every vault a user has funded, first-funded order
-    mapping(address => mapping(bytes32 => bool)) private _userInVault; // dedupe guard for _userVaults
+    mapping(bytes32 => mapping(Side => mapping(uint256 => bool))) public claimed;
+    mapping(bytes32 => mapping(Side => mapping(uint256 => uint256))) public overageOwed;
+    mapping(bytes32 => mapping(Side => mapping(uint256 => uint256))) public overagePaid;
+    mapping(uint256 => bytes32[]) private _accountVaults;
+    mapping(uint256 => mapping(bytes32 => bool)) private _accountInVault;
 
     ITreasurySkim public treasury; // house pot; receives the winner-skim at resolution (0 = skim off)
     mapping(bytes32 => uint256) public skimOwed; // skim computed at first collect, flushed once cash is in
 
     event VaultCreated(bytes32 indexed vaultId, bytes32 indexed marketId, address indexed creator, string question);
     event VaultResolved(bytes32 indexed vaultId, Outcome outcome);
-    event FundingDriverSet(address indexed fundingDriver);
+    event MarketDriverSet(address indexed marketDriver);
     event ResolverSet(address indexed resolver);
     event VaultDriverSet(address indexed vaultDriver);
     event TreasurySet(address indexed treasury);
     event Skimmed(bytes32 indexed vaultId, uint256 amount);
-    event Funded(bytes32 indexed vaultId, Side indexed side, address indexed funder, uint256 rate, uint32 maxEnd);
-    event Stopped(bytes32 indexed vaultId, Side indexed side, address indexed funder, uint256 sharesAccrued);
+    event Funded(bytes32 indexed vaultId, Side indexed side, uint256 indexed account, uint256 rate, uint32 maxEnd);
+    event Stopped(bytes32 indexed vaultId, Side indexed side, uint256 indexed account, uint256 sharesAccrued);
     event Collected(bytes32 indexed vaultId, uint256 pot);
-    event Claimed(bytes32 indexed vaultId, Side indexed side, address indexed funder, uint256 shares, uint256 payout);
-    event OverageRecorded(bytes32 indexed vaultId, Side indexed side, address indexed funder, uint256 amount);
-    event OverageReclaimed(bytes32 indexed vaultId, Side indexed side, address indexed funder, uint256 amount);
+    event Claimed(bytes32 indexed vaultId, Side indexed side, uint256 indexed account, uint256 shares, uint256 payout);
+    event OverageRecorded(bytes32 indexed vaultId, Side indexed side, uint256 indexed account, uint256 amount);
+    event OverageReclaimed(bytes32 indexed vaultId, Side indexed side, uint256 indexed account, uint256 amount);
+    event Withdrawn(bytes32 indexed vaultId, uint256 indexed account, address indexed payee, uint256 amount);
 
     constructor(Protocol protocol_) {
         require(address(protocol_) != address(0), "Vault: zero protocol");
@@ -138,8 +140,8 @@ contract Vault {
         _;
     }
 
-    modifier onlyFundingDriver() {
-        require(msg.sender == fundingDriver, "Vault: not funding driver");
+    modifier onlyMarketDriver() {
+        require(msg.sender == marketDriver, "Vault: not market driver");
         _;
     }
 
@@ -157,18 +159,18 @@ contract Vault {
         require(factory == address(0), "Vault: already synced");
 
         address factory_ = protocol.vaultFactory();
-        address fundingDriver_ = protocol.addressDriver();
+        address marketDriver_ = protocol.marketDriver();
         address resolver_ = protocol.stewardRegistry();
         address treasury_ = protocol.treasury();
         address vaultDriver_ = protocol.vaultDriver();
         require(
-            factory_ != address(0) && fundingDriver_ != address(0) && resolver_ != address(0)
+            factory_ != address(0) && marketDriver_ != address(0) && resolver_ != address(0)
                 && vaultDriver_ != address(0),
             "Vault: protocol incomplete"
         );
 
         factory = factory_;
-        fundingDriver = fundingDriver_;
+        marketDriver = marketDriver_;
         resolver = resolver_;
         vaultDriver = IVaultDriver(vaultDriver_);
         usdc = vaultDriver.usdc();
@@ -177,7 +179,7 @@ contract Vault {
             emit TreasurySet(treasury_);
         }
 
-        emit FundingDriverSet(fundingDriver_);
+        emit MarketDriverSet(marketDriver_);
         emit ResolverSet(resolver_);
         emit VaultDriverSet(vaultDriver_);
     }
@@ -238,22 +240,22 @@ contract Vault {
     // ═══════════════════════════════════════════════════════════════════════
 
     /// @notice Open a funder's position after the driver has set the real Drips stream.
-    function onFund(address funder, bytes32 vaultId, Side side, uint256 rate, uint32 maxEnd)
+    function onFund(uint256 account, bytes32 vaultId, Side side, uint256 rate, uint32 maxEnd)
         external
-        onlyFundingDriver
+        onlyMarketDriver
     {
         require(vaults[vaultId].status == Status.Open, "Vault: not open");
         require(rate > 0, "Vault: zero rate");
 
-        if (!_userInVault[funder][vaultId]) {
-            _userInVault[funder][vaultId] = true;
-            _userVaults[funder].push(vaultId);
+        if (!_accountInVault[account][vaultId]) {
+            _accountInVault[account][vaultId] = true;
+            _accountVaults[account].push(vaultId);
         }
 
         _advance(vaultId, side, MAX_STEPS);
-        _settle(vaultId, side, funder);
+        _settle(vaultId, side, account);
 
-        Position storage p = _positions[vaultId][side][funder];
+        Position storage p = _positions[vaultId][side][account];
         require(p.rate == 0 && !p.depleted, "Vault: already funding");
 
         Board storage b = _boards[vaultId][side];
@@ -262,17 +264,17 @@ contract Vault {
         p.maxEnd = maxEnd;
         p.fundStart = uint32(block.timestamp);
         b.sideRate += rate;
-        _scheduleBoundary(vaultId, side, maxEnd, funder);
+        _scheduleBoundary(vaultId, side, maxEnd, account);
 
-        emit Funded(vaultId, side, funder, rate, maxEnd);
+        emit Funded(vaultId, side, account, rate, maxEnd);
     }
 
     /// @notice Close a funder's position; banks accrued shares and drops the rate.
-    function onStop(address funder, bytes32 vaultId, Side side) external onlyFundingDriver {
+    function onStop(uint256 account, bytes32 vaultId, Side side) external onlyMarketDriver {
         _advance(vaultId, side, MAX_STEPS);
-        _settle(vaultId, side, funder);
+        _settle(vaultId, side, account);
 
-        Position storage p = _positions[vaultId][side][funder];
+        Position storage p = _positions[vaultId][side][account];
         if (p.rate > 0 && !p.depleted) {
             uint32 resolvedAt = vaults[vaultId].resolvedAt;
 
@@ -287,14 +289,33 @@ contract Vault {
                 uint256 overEnd = uint256(p.maxEnd) < block.timestamp ? uint256(p.maxEnd) : block.timestamp;
                 if (overEnd > resolvedAt) {
                     uint256 over = p.rate * (overEnd - uint256(resolvedAt));
-                    overageOwed[vaultId][side][funder] += over;
-                    emit OverageRecorded(vaultId, side, funder, over);
+                    overageOwed[vaultId][side][account] += over;
+                    emit OverageRecorded(vaultId, side, account, over);
                 }
             }
             _boards[vaultId][side].sideRate -= p.rate;
             p.rate = 0; // its scheduled boundary becomes stale (rate 0 → skipped on advance)
         }
-        emit Stopped(vaultId, side, funder, p.sharesAccrued);
+        emit Stopped(vaultId, side, account, p.sharesAccrued);
+    }
+
+    /// @notice Re-peg active lanes' `maxEnd` after a sibling lane changes the shared Drips balance.
+    function refreshMaxEnds(uint256 account, bytes32[] calldata vaultIds, Side[] calldata sides, uint32 newMaxEnd)
+        external
+        onlyMarketDriver
+    {
+        require(vaultIds.length == sides.length, "Vault: length mismatch");
+        for (uint256 i = 0; i < vaultIds.length; i++) {
+            bytes32 vaultId = vaultIds[i];
+            Side side = sides[i];
+            _advance(vaultId, side, MAX_STEPS);
+            _settle(vaultId, side, account);
+            Position storage p = _positions[vaultId][side][account];
+            if (p.rate > 0 && !p.depleted && newMaxEnd != p.maxEnd) {
+                p.maxEnd = newMaxEnd;
+                _scheduleBoundary(vaultId, side, newMaxEnd, account);
+            }
+        }
     }
 
     /// @notice Permissionless poke: catch the Board up, bounded by `maxSteps`.
@@ -303,9 +324,9 @@ contract Vault {
     }
 
     /// @notice Catch up then bank a funder's accrued shares at the current `g`.
-    function settle(bytes32 vaultId, Side side, address funder) external {
+    function settle(bytes32 vaultId, Side side, uint256 account) external {
         _advance(vaultId, side, MAX_STEPS);
-        _settle(vaultId, side, funder);
+        _settle(vaultId, side, account);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -313,8 +334,8 @@ contract Vault {
     // ═══════════════════════════════════════════════════════════════════════
 
     /// @notice Shares `funder` would be credited if settled now (same math as settle; view-parity).
-    function pendingShares(bytes32 vaultId, Side side, address funder) external view returns (uint256) {
-        Position storage p = _positions[vaultId][side][funder];
+    function pendingShares(bytes32 vaultId, Side side, uint256 account) external view returns (uint256) {
+        Position storage p = _positions[vaultId][side][account];
         uint256 capTs = block.timestamp;
         uint32 resolvedAt = vaults[vaultId].resolvedAt;
         if (resolvedAt != 0 && uint256(resolvedAt) < capTs) capTs = resolvedAt; // freeze at resolution
@@ -350,12 +371,12 @@ contract Vault {
         return (b.pool, b.sideRate, b.g, b.lastAdvance);
     }
 
-    function getPosition(bytes32 vaultId, Side side, address funder)
+    function getPosition(bytes32 vaultId, Side side, uint256 account)
         external
         view
         returns (uint256 rate, uint256 gPaid, uint256 sharesAccrued, uint32 maxEnd, bool depleted)
     {
-        Position storage p = _positions[vaultId][side][funder];
+        Position storage p = _positions[vaultId][side][account];
         return (p.rate, p.gPaid, p.sharesAccrued, p.maxEnd, p.depleted);
     }
 
@@ -367,10 +388,13 @@ contract Vault {
         return last == 0 || uint256(last) == target;
     }
 
-    /// @notice Every vault `user` has funded (either side), in first-funded order. Lets a client
-    /// aggregate a user's positions and loss-claims without scanning every market.
-    function getUserVaultIds(address user) external view returns (bytes32[] memory) {
-        return _userVaults[user];
+    function getAccountVaultIds(uint256 account) external view returns (bytes32[] memory) {
+        return _accountVaults[account];
+    }
+
+    function marketId(bytes32 vaultId) external view returns (bytes32) {
+        require(vaults[vaultId].exists, "Vault: unknown vault");
+        return vaults[vaultId].marketId;
     }
 
     /// @notice The side that won. Reverts before resolution.
@@ -385,15 +409,15 @@ contract Vault {
     /// and 0 for the losing side, a non-funder, or an already-claimed position. After `collect` the
     /// board sits at `resolvedAt`, so `b.g` is `G(resolvedAt)` and `b.sideShares` is final; this brings
     /// the funder's un-settled tail to the same point, in the same scaled units `claimFor` divides on.
-    function claimable(address funder, bytes32 vaultId, Side side) external view returns (uint256) {
+    function claimable(uint256 account, bytes32 vaultId, Side side) external view returns (uint256) {
         VaultData storage data = vaults[vaultId];
         if (data.status != Status.Resolved || !collected[vaultId]) return 0;
         Side winning = data.outcome == Outcome.Yes ? Side.Yes : Side.No;
-        if (side != winning || claimed[vaultId][side][funder]) return 0;
+        if (side != winning || claimed[vaultId][side][account]) return 0;
 
         Board storage b = _boards[vaultId][side];
         if (b.sideShares == 0) return 0;
-        Position storage p = _positions[vaultId][side][funder];
+        Position storage p = _positions[vaultId][side][account];
         uint256 shares = p.sharesAccrued + p.rate * (b.g - p.gPaid);
         if (shares == 0) return 0;
         return FixedPointMathLib.fullMulDiv(pot[vaultId], shares, b.sideShares);
@@ -402,12 +426,12 @@ contract Vault {
     /// @notice USDC `funder` lost on the losing side — the basis they mint LVST against. 0 before
     /// resolution, for the winning side, or for a non-funder. Survives stop/deplete (banked in
     /// `lostUsdc`); a still-active losing stream is measured live up to resolvedAt.
-    function lossClaimable(address funder, bytes32 vaultId, Side side) external view returns (uint256) {
+    function lossClaimable(uint256 account, bytes32 vaultId, Side side) external view returns (uint256) {
         VaultData storage data = vaults[vaultId];
         if (data.status != Status.Resolved) return 0;
         Side winning = data.outcome == Outcome.Yes ? Side.Yes : Side.No;
         if (side == winning) return 0;
-        return _lossUsdc(_positions[vaultId][side][funder], uint256(data.resolvedAt));
+        return _lossUsdc(_positions[vaultId][side][account], uint256(data.resolvedAt));
     }
 
     function _lossUsdc(Position storage p, uint256 resolvedAt) internal view returns (uint256 total) {
@@ -440,12 +464,12 @@ contract Vault {
         while (steps < maxSteps && head < len) {
             uint32 bMaxEnd = arr[head].maxEnd;
             if (uint256(bMaxEnd) > nowTs) break;
-            address funder = arr[head].funder;
-            Position storage p = _positions[vaultId][side][funder];
+            uint256 boundaryAccount = arr[head].account;
+            Position storage p = _positions[vaultId][side][boundaryAccount];
             // valid depletion iff the funder is still active with exactly this maxEnd
             if (p.rate > 0 && !p.depleted && p.maxEnd == bMaxEnd) {
                 _segment(b, t, bMaxEnd);
-                _settle(vaultId, side, funder);
+                _settle(vaultId, side, boundaryAccount);
                 // Bank the full USDC this stream delivered (it ran dry at bMaxEnd ≤ resolvedAt) — the
                 // loss basis the funder can later mint LVST against if this side loses.
                 if (bMaxEnd > p.fundStart) p.lostUsdc += p.rate * (uint256(bMaxEnd) - uint256(p.fundStart));
@@ -474,9 +498,9 @@ contract Vault {
         b.g += dG;
     }
 
-    function _settle(bytes32 vaultId, Side side, address funder) internal {
+    function _settle(bytes32 vaultId, Side side, uint256 account) internal {
         Board storage b = _boards[vaultId][side];
-        Position storage p = _positions[vaultId][side][funder];
+        Position storage p = _positions[vaultId][side][account];
         if (p.gPaid == b.g) return;
         uint256 d = p.rate * (b.g - p.gPaid);
         p.sharesAccrued += d;
@@ -497,7 +521,7 @@ contract Vault {
         while (idx < len) {
             uint32 bMaxEnd = arr[idx].maxEnd;
             if (uint256(bMaxEnd) > atTs) break;
-            Position storage p = _positions[vaultId][side][arr[idx].funder];
+            Position storage p = _positions[vaultId][side][arr[idx].account];
             if (p.rate > 0 && !p.depleted && p.maxEnd == bMaxEnd) {
                 if (sideRate != 0 && uint256(bMaxEnd) > t) {
                     (pool, g) = _applySeg(pool, sideRate, g, uint256(bMaxEnd) - t);
@@ -517,16 +541,16 @@ contract Vault {
         return (newPool, g + dG);
     }
 
-    function _scheduleBoundary(bytes32 vaultId, Side side, uint32 maxEnd, address funder) internal {
+    function _scheduleBoundary(bytes32 vaultId, Side side, uint32 maxEnd, uint256 account) internal {
         Boundary[] storage arr = _boundaries[vaultId][side];
-        arr.push(Boundary({maxEnd: maxEnd, funder: funder}));
+        arr.push(Boundary({maxEnd: maxEnd, account: account}));
         uint256 i = arr.length - 1;
         uint256 head = _boundaryHead[vaultId][side];
         while (i > head && arr[i - 1].maxEnd > maxEnd) {
             arr[i] = arr[i - 1];
             i--;
         }
-        arr[i] = Boundary({maxEnd: maxEnd, funder: funder});
+        arr[i] = Boundary({maxEnd: maxEnd, account: account});
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -538,8 +562,8 @@ contract Vault {
     /// (invariant I1: pool == delivered) — not whatever happens to be physically collected at this
     /// instant. That makes the pot independent of collect timing and order, so an early or partial
     /// call can never strand the winners' money. The harvest calls are an idempotent liquidity
-    /// pull, so `collect` is safe to call repeatedly; pair it with `AddressDriver.settle`, which banks
-    /// each active funder's in-flight Drips cycle, before winners claim.
+    /// pull, so `collect` is safe to call repeatedly; pair with a later harvest once cycles
+    /// complete, then `withdraw` pays winners and overage.
     function collect(bytes32 vaultId) external {
         VaultData storage data = vaults[vaultId];
         require(data.status == Status.Resolved, "Vault: not resolved");
@@ -579,39 +603,79 @@ contract Vault {
         emit Collected(vaultId, pot[vaultId]);
     }
 
-    /// @notice Pay `funder` their winnings: `pot · their shares / winning-side shares`. The losing
-    /// side and double claims revert. Permissionless — the payout always goes to `funder`.
-    function claimFor(address funder, bytes32 vaultId, Side side) external returns (uint256 payout) {
+    /// @notice Pay a position's winnings and overage for both sides to `payee`. Revert-free when
+    /// nothing is owed; only the market driver may call (passes `payee = current NFT holder).
+    function withdraw(uint256 account, bytes32 vaultId, address payee)
+        external
+        onlyMarketDriver
+        returns (uint256 total)
+    {
         VaultData storage data = vaults[vaultId];
-        require(data.status == Status.Resolved, "Vault: not resolved");
-        require(collected[vaultId], "Vault: not collected");
+        if (data.status != Status.Resolved || !collected[vaultId]) return 0;
+
         Side winning = data.outcome == Outcome.Yes ? Side.Yes : Side.No;
-        require(side == winning, "Vault: not winning side");
-        require(!claimed[vaultId][side][funder], "Vault: already claimed");
+        uint32 resolvedAt = data.resolvedAt;
 
-        _advance(vaultId, side, type(uint256).max);
-        _settle(vaultId, side, funder);
-        claimed[vaultId][side][funder] = true;
+        _advance(vaultId, Side.Yes, type(uint256).max);
+        _advance(vaultId, Side.No, type(uint256).max);
 
-        uint256 shares = _positions[vaultId][side][funder].sharesAccrued;
-        require(shares > 0, "Vault: no shares");
-        uint256 sideTotal = _boards[vaultId][side].sideShares;
-        payout = FixedPointMathLib.fullMulDiv(pot[vaultId], shares, sideTotal);
-        if (payout > 0) usdc.safeTransfer(funder, payout);
-        emit Claimed(vaultId, side, funder, shares, payout);
+        total += _withdrawSide(account, vaultId, Side.Yes, winning, payee, resolvedAt);
+        total += _withdrawSide(account, vaultId, Side.No, winning, payee, resolvedAt);
+
+        if (total > 0) emit Withdrawn(vaultId, account, payee, total);
     }
 
-    /// @notice Refund USDC `funder` streamed AFTER `resolvedAt` — money past the freeze that was never
-    /// part of any bet (recorded in `onStop`). Permissionless; always pays the recorded `funder`.
-    /// @dev Requires the pot to be finalized (`collect`). The cash must already be in the Vault; if the
-    /// funder's post-resolution cycle hasn't been collected yet the transfer reverts — a recoverable
-    /// retry, never a loss. The funder's own `AddressDriver.stop` squeezes that cycle so it is present.
-    function reclaimOverage(address funder, bytes32 vaultId, Side side) external returns (uint256 amt) {
-        require(collected[vaultId], "Vault: not collected");
-        amt = overageOwed[vaultId][side][funder];
-        require(amt > 0, "Vault: no overage");
-        overageOwed[vaultId][side][funder] = 0;
-        usdc.safeTransfer(funder, amt);
-        emit OverageReclaimed(vaultId, side, funder, amt);
+    function _withdrawSide(uint256 account, bytes32 vaultId, Side side, Side winning, address payee, uint32 resolvedAt)
+        internal
+        returns (uint256 paid)
+    {
+        paid += _payWinnings(account, vaultId, side, winning, payee);
+        paid += _payOverage(account, vaultId, side, payee, resolvedAt);
+    }
+
+    function _payWinnings(uint256 account, bytes32 vaultId, Side side, Side winning, address payee)
+        internal
+        returns (uint256 payout)
+    {
+        if (side != winning || claimed[vaultId][side][account]) return 0;
+
+        _settle(vaultId, side, account);
+        Position storage p = _positions[vaultId][side][account];
+        uint256 shares = p.sharesAccrued;
+        if (shares == 0) return 0;
+
+        uint256 sideTotal = _boards[vaultId][side].sideShares;
+        if (sideTotal == 0) return 0;
+
+        payout = FixedPointMathLib.fullMulDiv(pot[vaultId], shares, sideTotal);
+        if (payout == 0) return 0;
+
+        claimed[vaultId][side][account] = true;
+        usdc.safeTransfer(payee, payout);
+        emit Claimed(vaultId, side, account, shares, payout);
+    }
+
+    function _payOverage(uint256 account, bytes32 vaultId, Side side, address payee, uint32 resolvedAt)
+        internal
+        returns (uint256 amt)
+    {
+        Position storage p = _positions[vaultId][side][account];
+        uint256 entitlement;
+        if (p.rate > 0) {
+            uint256 end = uint256(p.maxEnd) < block.timestamp ? uint256(p.maxEnd) : block.timestamp;
+            if (end > uint256(resolvedAt)) entitlement = p.rate * (end - uint256(resolvedAt));
+        } else {
+            entitlement = overageOwed[vaultId][side][account];
+        }
+
+        uint256 already = overagePaid[vaultId][side][account];
+        if (entitlement <= already) return 0;
+
+        amt = entitlement - already;
+        overagePaid[vaultId][side][account] = entitlement;
+        if (p.rate == 0) overageOwed[vaultId][side][account] = 0;
+
+        usdc.safeTransfer(payee, amt);
+        emit OverageReclaimed(vaultId, side, account, amt);
     }
 }
