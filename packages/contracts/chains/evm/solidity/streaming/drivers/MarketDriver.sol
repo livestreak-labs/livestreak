@@ -35,7 +35,6 @@ contract MarketDriver is SharedDriverUtils, ERC721URIStorage, Managed {
 
     /// @notice Hard ceiling on concurrent lanes (distinct vaults) per NFT — bounds refresh gas.
     uint8 public constant MAX_LANES = 10;
-    uint256 public constant MAX_WITHDRAW_VAULTS = 64;
 
     uint64 internal _mintedTokens;
     mapping(address => mapping(uint64 => bool)) internal _isSaltUsed;
@@ -285,38 +284,45 @@ contract MarketDriver is SharedDriverUtils, ERC721URIStorage, Managed {
         emit AllLanesStopped(tokenId, refunded);
     }
 
-    function withdraw(uint256 tokenId, bytes32 vaultId) external onlyHolder(tokenId) returns (uint256 payout) {
-        return VAULT.withdraw(tokenId, vaultId, _msgSender());
+    /// @notice Pull winnings + overage for one vault. Pays `to`, or the NFT owner when `to == 0`.
+    function withdraw(uint256 tokenId, bytes32 vaultId, address to)
+        external
+        onlyHolder(tokenId)
+        returns (uint256 payout)
+    {
+        return VAULT.withdraw(tokenId, vaultId, _payee(tokenId, to));
     }
 
-    function withdraw(uint256 tokenId, bytes32[] calldata vaultIds)
+    /// @notice Pull winnings + overage for many vaults in one call (the mass form). Same `to` rule;
+    /// the frontend builds `vaultIds` from `VAULT.getAccountVaultIds(tokenId)`.
+    function withdraw(uint256 tokenId, bytes32[] calldata vaultIds, address to)
         external
         onlyHolder(tokenId)
         returns (uint256 total)
     {
+        address payee = _payee(tokenId, to);
         for (uint256 i = 0; i < vaultIds.length; i++) {
-            total += VAULT.withdraw(tokenId, vaultIds[i], _msgSender());
+            total += VAULT.withdraw(tokenId, vaultIds[i], payee);
         }
     }
 
-    function withdrawAll(uint256 tokenId, uint256 maxVaults) external onlyHolder(tokenId) returns (uint256 total) {
-        bytes32[] memory ids = VAULT.getAccountVaultIds(tokenId);
-        uint256 n = ids.length;
-        if (n > maxVaults) n = maxVaults;
-        if (n > MAX_WITHDRAW_VAULTS) n = MAX_WITHDRAW_VAULTS;
-        for (uint256 i = 0; i < n; i++) {
-            total += VAULT.withdraw(tokenId, ids[i], _msgSender());
-        }
-    }
-
-    function claimLossLvst(uint256 tokenId, bytes32 vaultId, Side side)
+    function claimLossLvst(uint256 tokenId, bytes32 vaultId, Side side, address to)
         external
         onlyHolder(tokenId)
         returns (uint256 minted)
     {
         address treasury = PROTOCOL.treasury();
         require(treasury != address(0), "MarketDriver: treasury unset");
-        return ITreasuryLoss(treasury).mintLossLvst(tokenId, _msgSender(), vaultId, side);
+        return ITreasuryLoss(treasury).mintLossLvst(tokenId, _payee(tokenId, to), vaultId, side);
+    }
+
+    /// @dev Payout recipient: the NFT owner by default; only the owner may redirect elsewhere — an
+    /// approved operator can trigger a payout to the owner but cannot siphon it to another address.
+    function _payee(uint256 tokenId, address to) internal view returns (address) {
+        address owner = ownerOf(tokenId);
+        if (to == address(0) || to == owner) return owner;
+        require(_msgSender() == owner, "MarketDriver: only owner can redirect");
+        return to;
     }
 
     // --- helpers ---

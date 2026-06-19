@@ -1371,13 +1371,6 @@ export const marketDriverAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'MAX_WITHDRAW_VAULTS',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
     name: 'PROTOCOL',
     outputs: [{ name: '', internalType: 'contract Protocol', type: 'address' }],
     stateMutability: 'view',
@@ -1457,6 +1450,7 @@ export const marketDriverAbi = [
       { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
       { name: 'side', internalType: 'enum Side', type: 'uint8' },
+      { name: 'to', internalType: 'address', type: 'address' },
     ],
     name: 'claimLossLvst',
     outputs: [{ name: 'minted', internalType: 'uint256', type: 'uint256' }],
@@ -1781,6 +1775,7 @@ export const marketDriverAbi = [
     inputs: [
       { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
       { name: 'vaultIds', internalType: 'bytes32[]', type: 'bytes32[]' },
+      { name: 'to', internalType: 'address', type: 'address' },
     ],
     name: 'withdraw',
     outputs: [{ name: 'total', internalType: 'uint256', type: 'uint256' }],
@@ -1791,19 +1786,10 @@ export const marketDriverAbi = [
     inputs: [
       { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'to', internalType: 'address', type: 'address' },
     ],
     name: 'withdraw',
     outputs: [{ name: 'payout', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
-      { name: 'maxVaults', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'withdrawAll',
-    outputs: [{ name: 'total', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'nonpayable',
   },
   {

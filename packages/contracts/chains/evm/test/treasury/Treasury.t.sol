@@ -100,17 +100,17 @@ contract TreasuryTest is Test {
         uint256 rate = treasury.mintRate();
         uint256 expected = (uint256(50 * RATE) * rate) / 1e6;
         vm.prank(bob);
-        uint256 minted = marketDriver.claimLossLvst(bobNft, v1, Side.No);
+        uint256 minted = marketDriver.claimLossLvst(bobNft, v1, Side.No, address(0));
         assertEq(minted, expected, "LVST = lostUSD x mintRate");
         assertEq(lvst.balanceOf(bob), expected);
 
         vm.prank(bob);
         vm.expectRevert("Treasury: already claimed");
-        marketDriver.claimLossLvst(bobNft, v1, Side.No);
+        marketDriver.claimLossLvst(bobNft, v1, Side.No, address(0));
 
         vm.prank(alice);
         vm.expectRevert("Treasury: nothing lost");
-        marketDriver.claimLossLvst(aliceNft, v1, Side.Yes);
+        marketDriver.claimLossLvst(aliceNft, v1, Side.Yes, address(0));
     }
 
     function test_skimReducesPotAndFeedsHousePot() public {
@@ -126,7 +126,7 @@ contract TreasuryTest is Test {
         assertEq(usdc.balanceOf(address(treasury)), skim, "skim USDC sits in the house pot");
 
         vm.prank(alice);
-        assertEq(marketDriver.withdraw(aliceNft, v1), 100 * RATE - skim, "winner takes reduced pot");
+        assertEq(marketDriver.withdraw(aliceNft, v1, address(0)), 100 * RATE - skim, "winner takes reduced pot");
     }
 
     function test_noLossNoSkimFullRefund() public {
@@ -138,7 +138,7 @@ contract TreasuryTest is Test {
         assertEq(treasury.totalSkimmed(), 0, "nothing skimmed with no bounty");
         assertEq(vault.pot(v1), 50 * RATE, "pot = winner's own money");
         vm.prank(alice);
-        assertEq(marketDriver.withdraw(aliceNft, v1), 50 * RATE, "winner fully refunded");
+        assertEq(marketDriver.withdraw(aliceNft, v1, address(0)), 50 * RATE, "winner fully refunded");
     }
 
     function test_stakeEarnsDividends() public {
@@ -148,7 +148,7 @@ contract TreasuryTest is Test {
         _resolve(v1, Vault.Outcome.Yes);
         vault.collect(v1);
         vm.startPrank(bob);
-        uint256 bobFlow = marketDriver.claimLossLvst(bobNft, v1, Side.No);
+        uint256 bobFlow = marketDriver.claimLossLvst(bobNft, v1, Side.No, address(0));
         treasury.stakeLvst(bobFlow);
         vm.stopPrank();
         assertEq(treasury.lvstStaked(bob), bobFlow);
@@ -181,7 +181,7 @@ contract TreasuryTest is Test {
         vault.collect(v1);
 
         vm.startPrank(bob);
-        uint256 minted = marketDriver.claimLossLvst(bobNft, v1, Side.No);
+        uint256 minted = marketDriver.claimLossLvst(bobNft, v1, Side.No, address(0));
         treasury.stakeLvst(minted);
         vm.stopPrank();
         assertEq(treasury.lvstStaked(bob), minted, "minted LVST is staked");

@@ -120,15 +120,15 @@ contract ConservationInvariantTest is Test {
         totalStopAllRefunds += _stopAllRefund(bob, bobNft);
 
         vm.prank(alice);
-        totalWithdraws += marketDriver.withdraw(aliceNft, vaultId);
+        totalWithdraws += marketDriver.withdraw(aliceNft, vaultId, address(0));
         vm.prank(bob);
-        totalWithdraws += marketDriver.withdraw(bobNft, vaultId);
+        totalWithdraws += marketDriver.withdraw(bobNft, vaultId, address(0));
 
         vault.collect(vaultId);
         vm.prank(alice);
-        totalWithdraws += marketDriver.withdraw(aliceNft, vaultId);
+        totalWithdraws += marketDriver.withdraw(aliceNft, vaultId, address(0));
         vm.prank(bob);
-        totalWithdraws += marketDriver.withdraw(bobNft, vaultId);
+        totalWithdraws += marketDriver.withdraw(bobNft, vaultId, address(0));
 
         vm.prank(VaultDriverHarness.SEED_CREATOR);
         totalWithdraws += vaultDriver.withdraw(vaultId);

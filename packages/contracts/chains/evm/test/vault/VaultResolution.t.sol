@@ -85,7 +85,7 @@ contract VaultResolutionTest is Test {
         assertEq(vault.pot(v1), 100 * RATE, "pot = both pools");
 
         vm.prank(alice);
-        uint256 payout = marketDriver.withdraw(aliceNft, v1);
+        uint256 payout = marketDriver.withdraw(aliceNft, v1, address(0));
         assertEq(payout, 100 * RATE, "sole winner takes all");
         assertEq(usdc.balanceOf(alice), 100 * RATE);
     }
@@ -106,10 +106,50 @@ contract VaultResolutionTest is Test {
         vault.collect(v1);
 
         vm.prank(alice);
-        uint256 payout = marketDriver.withdraw(aliceNft, v1);
+        uint256 payout = marketDriver.withdraw(aliceNft, v1, address(0));
         assertGt(payout, 0, "alice paid on the side she switched to");
         assertGt(vault.lossClaimable(aliceNft, v1, Side.Yes), 0, "abandoned YES is a loss basis");
         assertEq(vault.lossClaimable(aliceNft, v1, Side.No), 0, "winning NO is not a loss");
+    }
+
+    /// The owner may direct a withdrawal to any address.
+    function test_withdraw_ownerCanRedirectDestination() public {
+        _fund(alice, aliceNft, Side.Yes, RATE, 50 * RATE);
+        _fund(bob, bobNft, Side.No, RATE, 50 * RATE);
+        vm.warp(200);
+        _resolve(Vault.Outcome.Yes);
+        vault.collect(v1);
+
+        address payee = makeAddr("payee");
+        vm.prank(alice);
+        uint256 paid = marketDriver.withdraw(aliceNft, v1, payee);
+        assertGt(paid, 0, "winner paid");
+        assertEq(usdc.balanceOf(payee), paid, "winnings went to the chosen address");
+        assertEq(usdc.balanceOf(alice), 0, "not the owner's own wallet when redirected");
+    }
+
+    /// An approved operator can trigger a payout to the owner but cannot siphon it elsewhere.
+    function test_withdraw_operatorCannotRedirectOnlyToOwner() public {
+        _fund(alice, aliceNft, Side.Yes, RATE, 50 * RATE);
+        _fund(bob, bobNft, Side.No, RATE, 50 * RATE);
+        vm.warp(200);
+        _resolve(Vault.Outcome.Yes);
+        vault.collect(v1);
+
+        address operator = makeAddr("operator");
+        vm.prank(alice);
+        marketDriver.approve(operator, aliceNft);
+
+        address attacker = makeAddr("attacker");
+        vm.prank(operator);
+        vm.expectRevert("MarketDriver: only owner can redirect");
+        marketDriver.withdraw(aliceNft, v1, attacker);
+
+        vm.prank(operator);
+        uint256 paid = marketDriver.withdraw(aliceNft, v1, address(0));
+        assertGt(paid, 0, "operator triggered payout to owner");
+        assertEq(usdc.balanceOf(alice), paid, "funds went to the owner, not the operator");
+        assertEq(usdc.balanceOf(operator), 0, "operator got nothing");
     }
 
     function test_loserWithdrawIsNoOp() public {
@@ -120,7 +160,7 @@ contract VaultResolutionTest is Test {
         vault.collect(v1);
 
         vm.prank(bob);
-        assertEq(marketDriver.withdraw(bobNft, v1), 0, "loser gets nothing from winnings");
+        assertEq(marketDriver.withdraw(bobNft, v1, address(0)), 0, "loser gets nothing from winnings");
     }
 
     function test_multipleWinnersSplitByShares() public {
@@ -136,9 +176,9 @@ contract VaultResolutionTest is Test {
         assertEq(potV, 200 * RATE, "pot = 50 + 100 + 50");
 
         vm.prank(alice);
-        uint256 aPay = marketDriver.withdraw(aliceNft, v1);
+        uint256 aPay = marketDriver.withdraw(aliceNft, v1, address(0));
         vm.prank(carol);
-        uint256 cPay = marketDriver.withdraw(carolNft, v1);
+        uint256 cPay = marketDriver.withdraw(carolNft, v1, address(0));
 
         assertApproxEqAbs(cPay, 2 * aPay, 10, "2x rate => ~2x payout");
         assertApproxEqAbs(aPay + cPay, potV, 2, "winners split the whole pot");
@@ -152,9 +192,9 @@ contract VaultResolutionTest is Test {
         vault.collect(v1);
 
         vm.prank(alice);
-        marketDriver.withdraw(aliceNft, v1);
+        marketDriver.withdraw(aliceNft, v1, address(0));
         vm.prank(alice);
-        assertEq(marketDriver.withdraw(aliceNft, v1), 0, "second withdraw is free no-op");
+        assertEq(marketDriver.withdraw(aliceNft, v1, address(0)), 0, "second withdraw is free no-op");
     }
 
     function test_collectIsIdempotent() public {
@@ -172,7 +212,7 @@ contract VaultResolutionTest is Test {
         vm.warp(200);
         _resolve(Vault.Outcome.Yes);
         vm.prank(alice);
-        assertEq(marketDriver.withdraw(aliceNft, v1), 0, "nothing before collect");
+        assertEq(marketDriver.withdraw(aliceNft, v1, address(0)), 0, "nothing before collect");
     }
 
     function test_onlyStewardCanResolve() public {
@@ -205,7 +245,7 @@ contract VaultResolutionTest is Test {
         vault.collect(v1);
 
         vm.prank(alice);
-        assertEq(marketDriver.withdraw(aliceNft, v1), 10 * RATE, "winner paid after cycle harvest");
+        assertEq(marketDriver.withdraw(aliceNft, v1, address(0)), 10 * RATE, "winner paid after cycle harvest");
     }
 
     function test_withdrawNeedsHarvestedCash() public {
@@ -222,12 +262,12 @@ contract VaultResolutionTest is Test {
 
         vm.prank(alice);
         vm.expectRevert();
-        marketDriver.withdraw(aliceNft, v1);
+        marketDriver.withdraw(aliceNft, v1, address(0));
 
         vm.warp(110);
         vault.collect(v1);
         vm.prank(alice);
-        assertEq(marketDriver.withdraw(aliceNft, v1), 10 * RATE, "succeeds once cash is in");
+        assertEq(marketDriver.withdraw(aliceNft, v1, address(0)), 10 * RATE, "succeeds once cash is in");
     }
 
     function test_overageRefundedViaWithdrawWithoutStop() public {
@@ -243,12 +283,12 @@ contract VaultResolutionTest is Test {
 
         uint256 aliceBefore = usdc.balanceOf(alice);
         vm.prank(alice);
-        uint256 paid = marketDriver.withdraw(aliceNft, v1);
+        uint256 paid = marketDriver.withdraw(aliceNft, v1, address(0));
         assertEq(paid, 50 * RATE, "alice: pot (40) + live overage (10 through t=130)");
 
         uint256 bobBefore = usdc.balanceOf(bob);
         vm.prank(bob);
-        assertEq(marketDriver.withdraw(bobNft, v1), 10 * RATE, "bob reclaims overage through t=130");
+        assertEq(marketDriver.withdraw(bobNft, v1, address(0)), 10 * RATE, "bob reclaims overage through t=130");
         assertEq(usdc.balanceOf(bob) - bobBefore, 10 * RATE);
         assertEq(usdc.balanceOf(alice) - aliceBefore, paid);
         assertEq(usdc.balanceOf(address(vault)), 0, "vault fully drained");
@@ -261,7 +301,7 @@ contract VaultResolutionTest is Test {
         vault.collect(v1);
 
         vm.prank(alice);
-        assertEq(marketDriver.withdraw(aliceNft, v1), 20 * RATE, "no overage when maxEnd <= resolvedAt");
+        assertEq(marketDriver.withdraw(aliceNft, v1, address(0)), 20 * RATE, "no overage when maxEnd <= resolvedAt");
         assertEq(vault.overagePaid(v1, Side.Yes, aliceNft), 0, "no live overage accrued");
     }
 
@@ -285,7 +325,7 @@ contract VaultResolutionTest is Test {
         _resolve(Vault.Outcome.Yes);
         vm.warp(135);
         vm.prank(alice);
-        assertEq(marketDriver.withdraw(aliceNft, v1), 0, "no payout before collect");
+        assertEq(marketDriver.withdraw(aliceNft, v1, address(0)), 0, "no payout before collect");
     }
 
     function test_claimablePreviewMatchesWithdraw() public {
@@ -301,7 +341,7 @@ contract VaultResolutionTest is Test {
         assertEq(preview, 100 * RATE, "preview = whole pot");
 
         vm.prank(alice);
-        assertEq(marketDriver.withdraw(aliceNft, v1), preview, "withdraw matches preview");
+        assertEq(marketDriver.withdraw(aliceNft, v1, address(0)), preview, "withdraw matches preview");
         assertEq(vault.claimable(aliceNft, v1, Side.Yes), 0, "0 after withdraw");
     }
 
@@ -338,10 +378,10 @@ contract VaultResolutionTest is Test {
 
         vm.prank(alice);
         vm.expectRevert("MarketDriver: not holder");
-        marketDriver.withdraw(aliceNft, v1);
+        marketDriver.withdraw(aliceNft, v1, address(0));
 
         vm.prank(carol);
-        assertEq(marketDriver.withdraw(aliceNft, v1), 100 * RATE, "new holder paid");
+        assertEq(marketDriver.withdraw(aliceNft, v1, address(0)), 100 * RATE, "new holder paid");
     }
 
     function test_winningSide() public {
