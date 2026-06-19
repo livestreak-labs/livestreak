@@ -23,7 +23,8 @@ interface ITreasuryLoss {
 }
 
 /// @notice Per-market NFT driver: one tokenId == one Drips account, ≤MAX_LANES concurrent lanes —
-/// one lane per vault (a held vault streams YES or NO, never both; hedge by flipping via `switchSide`).
+/// one lane per vault (a held vault streams YES or NO, never both; hedge by flipping a vault's side in
+/// `setLanes`, the single declarative lane-set op).
 /// The lane ceiling is naturally the market's vault count (you cannot fund a vault that does not
 /// exist), hard-capped at MAX_LANES so the shared-balance maxEnd refresh stays bounded.
 contract MarketDriver is SharedDriverUtils, ERC721URIStorage, Managed {
@@ -162,79 +163,107 @@ contract MarketDriver is SharedDriverUtils, ERC721URIStorage, Managed {
         emit LaneStopped(tokenId, vaultId, side);
     }
 
-    /// @notice Hedge by flipping this vault's lane to the opposite side. Banks the current side's
-    /// accrued shares (they survive and still pay out if that side wins), then opens the other side at
-    /// the *current* curve price — you "suffer late incoming". One lane per vault is preserved; pass
-    /// `addDeposit > 0` to top up the shared balance. Switching back later accrues onto the prior side.
-    function switchSide(uint256 tokenId, bytes32 vaultId, uint256 newRate, uint256 addDeposit)
+    /// @notice The single lane-management op: declaratively set this NFT's whole lane set in one tx.
+    /// Diffs `desired` against the current lanes — any lane no longer present (a dropped vault, or one
+    /// whose side or rate changed) is stopped, its accrued shares surviving on its Board for later
+    /// claim; any new or changed lane is opened at the *current* curve price. A hedge is just the same
+    /// vault carrying the other side in `desired` (stop YES, start NO — "suffer late incoming"). Reverts
+    /// if `desired` exceeds MAX_LANES or repeats a vault; no entry is ever silently dropped. So
+    /// "a s d f g h j k e w" over "a s d f g h j k l q" stops l,q and opens e,w, and an 11-entry set
+    /// reverts on the spot. Pass `addDeposit > 0` to top up the shared balance.
+    function setLanes(uint256 tokenId, Lane[] calldata desired, uint256 addDeposit)
         external
         onlyHolder(tokenId)
         whenNotPaused
     {
-        require(newRate > 0, "MarketDriver: zero rate");
+        require(desired.length <= MAX_LANES, "MarketDriver: too many lanes");
         require(addDeposit <= uint256(uint128(type(int128).max)), "MarketDriver: bad deposit");
-        Lane storage lane = _lanes[tokenId][vaultId];
-        require(lane.rate > 0, "MarketDriver: no lane");
-        Side oldSide = lane.side;
-        Side newSide = oldSide == Side.Yes ? Side.No : Side.Yes;
+        bytes32 market = marketIdOf[tokenId];
+
+        for (uint256 i = 0; i < desired.length; i++) {
+            require(desired[i].rate > 0, "MarketDriver: zero rate");
+            require(VAULT.marketId(desired[i].vaultId) == market, "MarketDriver: wrong market");
+            for (uint256 j = 0; j < i; j++) {
+                require(desired[i].vaultId != desired[j].vaultId, "MarketDriver: duplicate vault in set");
+            }
+        }
 
         StreamReceiver[] memory curr = _buildReceivers(tokenId);
-        lane.side = newSide;
-        lane.rate = newRate;
-        StreamReceiver[] memory next = _buildReceivers(tokenId);
 
+        // Removed = current lanes with no exact (vault+side+rate) match in `desired` — captured before
+        // the bookkeeping rewrite. Covers a dropped vault and a vault whose side or rate changed.
+        bytes32[] memory currentKeys = _laneKeys[tokenId];
+        bytes32[] memory removedVaults = new bytes32[](currentKeys.length);
+        Side[] memory removedSides = new Side[](currentKeys.length);
+        uint256 removedN;
+        for (uint256 i = 0; i < currentKeys.length; i++) {
+            Lane memory cl = _lanes[tokenId][currentKeys[i]];
+            if (!_exactlyIn(desired, cl)) {
+                removedVaults[removedN] = cl.vaultId;
+                removedSides[removedN] = cl.side;
+                removedN++;
+            }
+        }
+
+        // Added = desired lanes with no exact match among current lanes (new vault, or changed side/rate).
+        bytes32[] memory addedVaults = new bytes32[](desired.length);
+        Side[] memory addedSides = new Side[](desired.length);
+        uint256[] memory addedRates = new uint256[](desired.length);
+        uint256 addedN;
+        for (uint256 k = 0; k < desired.length; k++) {
+            Lane memory held = _lanes[tokenId][desired[k].vaultId];
+            if (held.rate != desired[k].rate || held.side != desired[k].side) {
+                addedVaults[addedN] = desired[k].vaultId;
+                addedSides[addedN] = desired[k].side;
+                addedRates[addedN] = desired[k].rate;
+                addedN++;
+            }
+        }
+
+        // Rewrite lane bookkeeping to exactly `desired`.
+        for (uint256 i = 0; i < currentKeys.length; i++) {
+            delete _lanes[tokenId][currentKeys[i]];
+        }
+        delete _laneKeys[tokenId];
+        bytes32[] memory allVaults = new bytes32[](desired.length);
+        Side[] memory allSides = new Side[](desired.length);
+        for (uint256 k = 0; k < desired.length; k++) {
+            _laneKeys[tokenId].push(desired[k].vaultId);
+            _lanes[tokenId][desired[k].vaultId] =
+                Lane({vaultId: desired[k].vaultId, side: desired[k].side, rate: desired[k].rate});
+            allVaults[k] = desired[k].vaultId;
+            allSides[k] = desired[k].side;
+        }
+
+        StreamReceiver[] memory next = _buildReceivers(tokenId);
         if (addDeposit > 0) _transferFromCaller(USDC, uint128(addDeposit));
         DRIPS.setStreams(tokenId, USDC, curr, int128(uint128(addDeposit)), next, 0, 0);
         (,,,, uint32 maxEnd) = DRIPS.streamsState(tokenId, USDC);
 
-        VAULT.onStop(tokenId, vaultId, oldSide);
-        VAULT.onFund(tokenId, vaultId, newSide, newRate, maxEnd);
-        _refreshOtherLanes(tokenId, vaultId, maxEnd);
-
-        emit LaneStopped(tokenId, vaultId, oldSide);
-        emit LaneFunded(tokenId, vaultId, newSide, newRate, addDeposit, maxEnd);
+        // Stop removed (banks their shares) before opening added, so a same-vault side flip settles its
+        // old side before the new one opens.
+        for (uint256 i = 0; i < removedN; i++) {
+            VAULT.onStop(tokenId, removedVaults[i], removedSides[i]);
+            emit LaneStopped(tokenId, removedVaults[i], removedSides[i]);
+        }
+        for (uint256 i = 0; i < addedN; i++) {
+            VAULT.onFund(tokenId, addedVaults[i], addedSides[i], addedRates[i], maxEnd);
+            emit LaneFunded(tokenId, addedVaults[i], addedSides[i], addedRates[i], 0, maxEnd);
+        }
+        // Re-peg every desired lane to the new shared maxEnd (just-opened lanes are already there -> no-op).
+        if (desired.length > 0) {
+            VAULT.refreshMaxEnds(tokenId, allVaults, allSides, maxEnd);
+        }
     }
 
-    /// @notice Atomically free a slot and move on: stop the lane on `dropVaultId` (its accrued shares
-    /// survive on its Board for later claim) and open a fresh lane on `newVaultId`. Net lane count is
-    /// unchanged, so this is how you keep streaming a new vault once you are at MAX_LANES — clean up a
-    /// spent/unwanted lane and step to the next one, no separate stop tx and no intermediate gap.
-    /// The caller chooses which lane to drop (auto-evicting a live lane would silently kill a position,
-    /// and shared-balance lanes run dry together so there is no single "dead" one to detect).
-    function replaceLane(
-        uint256 tokenId,
-        bytes32 dropVaultId,
-        bytes32 newVaultId,
-        Side newSide,
-        uint256 newRate,
-        uint256 addDeposit
-    ) external onlyHolder(tokenId) whenNotPaused {
-        require(newRate > 0, "MarketDriver: zero rate");
-        require(addDeposit <= uint256(uint128(type(int128).max)), "MarketDriver: bad deposit");
-        require(dropVaultId != newVaultId, "MarketDriver: same vault");
-        require(VAULT.marketId(newVaultId) == marketIdOf[tokenId], "MarketDriver: wrong market");
-
-        Lane storage dropLane = _lanes[tokenId][dropVaultId];
-        require(dropLane.rate > 0, "MarketDriver: no lane to drop");
-        require(_lanes[tokenId][newVaultId].rate == 0, "MarketDriver: vault already has a lane");
-        Side dropSide = dropLane.side;
-
-        StreamReceiver[] memory curr = _buildReceivers(tokenId);
-        _removeLane(tokenId, dropVaultId);
-        _laneKeys[tokenId].push(newVaultId);
-        _lanes[tokenId][newVaultId] = Lane({vaultId: newVaultId, side: newSide, rate: newRate});
-        StreamReceiver[] memory next = _buildReceivers(tokenId);
-
-        if (addDeposit > 0) _transferFromCaller(USDC, uint128(addDeposit));
-        DRIPS.setStreams(tokenId, USDC, curr, int128(uint128(addDeposit)), next, 0, 0);
-        (,,,, uint32 maxEnd) = DRIPS.streamsState(tokenId, USDC);
-
-        VAULT.onStop(tokenId, dropVaultId, dropSide);
-        VAULT.onFund(tokenId, newVaultId, newSide, newRate, maxEnd);
-        _refreshOtherLanes(tokenId, newVaultId, maxEnd);
-
-        emit LaneStopped(tokenId, dropVaultId, dropSide);
-        emit LaneFunded(tokenId, newVaultId, newSide, newRate, addDeposit, maxEnd);
+    /// @dev True iff `lane` (vault + side + rate) appears exactly in `set`.
+    function _exactlyIn(Lane[] calldata set, Lane memory lane) private pure returns (bool) {
+        for (uint256 i = 0; i < set.length; i++) {
+            if (set[i].vaultId == lane.vaultId && set[i].side == lane.side && set[i].rate == lane.rate) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function stopAll(uint256 tokenId) external onlyHolder(tokenId) {

@@ -1644,20 +1644,6 @@ export const marketDriverAbi = [
   },
   {
     type: 'function',
-    inputs: [
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
-      { name: 'dropVaultId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'newVaultId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'newSide', internalType: 'enum Side', type: 'uint8' },
-      { name: 'newRate', internalType: 'uint256', type: 'uint256' },
-      { name: 'addDeposit', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'replaceLane',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
     inputs: [{ name: 'pauser', internalType: 'address', type: 'address' }],
     name: 'revokePauser',
     outputs: [],
@@ -1700,6 +1686,26 @@ export const marketDriverAbi = [
     type: 'function',
     inputs: [
       { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'desired',
+        internalType: 'struct MarketDriver.Lane[]',
+        type: 'tuple[]',
+        components: [
+          { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+          { name: 'side', internalType: 'enum Side', type: 'uint8' },
+          { name: 'rate', internalType: 'uint256', type: 'uint256' },
+        ],
+      },
+      { name: 'addDeposit', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'setLanes',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
       { name: 'side', internalType: 'enum Side', type: 'uint8' },
     ],
@@ -1720,18 +1726,6 @@ export const marketDriverAbi = [
     name: 'supportsInterface',
     outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'newRate', internalType: 'uint256', type: 'uint256' },
-      { name: 'addDeposit', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'switchSide',
-    outputs: [],
-    stateMutability: 'nonpayable',
   },
   {
     type: 'function',

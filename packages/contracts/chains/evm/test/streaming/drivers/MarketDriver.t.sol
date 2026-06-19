@@ -104,14 +104,17 @@ contract MarketDriverTest is Test {
         assertEq(marketDriver.laneCount(aliceNft), 0, "all lanes cleared");
     }
 
-    /// Hedge = flip the vault's single lane to the other side; prior-side shares survive the switch.
-    function test_switchSide_flipsLaneKeepingPriorSideShares() public {
+    /// Hedge via the diff: setLanes carrying the vault on the other side stops YES and starts NO,
+    /// prior-side shares surviving.
+    function test_setLanes_hedgeFlipsSideKeepingShares() public {
         _fund(alice, aliceNft, v1, Side.Yes, RATE, 50 * RATE);
         vm.warp(START + 20);
-        assertGt(vault.pendingShares(v1, Side.Yes, aliceNft), 0, "accrued YES shares before switch");
+        assertGt(vault.pendingShares(v1, Side.Yes, aliceNft), 0, "accrued YES shares before hedge");
 
+        MarketDriver.Lane[] memory desired = new MarketDriver.Lane[](1);
+        desired[0] = MarketDriver.Lane({vaultId: v1, side: Side.No, rate: RATE});
         vm.prank(alice);
-        marketDriver.switchSide(aliceNft, v1, RATE, 0);
+        marketDriver.setLanes(aliceNft, desired, 0);
 
         assertEq(marketDriver.laneCount(aliceNft), 1, "still one lane after hedge");
         (, Side laneSide,) = marketDriver.laneAt(aliceNft, 0);
@@ -120,7 +123,7 @@ contract MarketDriverTest is Test {
         (uint256 yesRate,, uint256 yesAccrued,,) = vault.getPosition(v1, Side.Yes, aliceNft);
         (uint256 noRate,,,,) = vault.getPosition(v1, Side.No, aliceNft);
         assertEq(yesRate, 0, "YES lane stopped");
-        assertGt(yesAccrued, 0, "YES shares survive the switch");
+        assertGt(yesAccrued, 0, "YES shares survive the hedge");
         assertEq(noRate, RATE, "NO lane now active at current price");
 
         (, uint256 noSideRate,,) = vault.getBoard(v1, Side.No);
@@ -181,49 +184,59 @@ contract MarketDriverTest is Test {
         assertEq(rateAfter, rateBefore, "existing lane position unchanged");
     }
 
-    /// At the cap you don't get walled off — clean up one lane and step into a new vault in one tx.
-    /// The dropped lane's accrued shares survive (claimable later); net lane count stays 10.
-    function test_replaceLane_swapsOneOutKeepingShares() public {
-        bytes32 first;
+    /// Batch reconcile at the cap: a desired set that drops two lanes and adds two — the dropped lanes
+    /// stop (shares survive), the new ones open, net count stays 10. No wall-off, no reject.
+    function test_setLanes_reconcileDropsTwoAddsTwo() public {
+        bytes32[] memory v = new bytes32[](10);
         for (uint256 i = 0; i < 10; i++) {
-            bytes32 vid =
-                VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, string(abi.encodePacked("R", i)), Side.Yes);
-            _fund(alice, aliceNft, vid, Side.Yes, RATE, 10 * RATE);
-            if (i == 0) first = vid;
+            v[i] = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, string(abi.encodePacked("S", i)), Side.Yes);
+            _fund(alice, aliceNft, v[i], Side.Yes, RATE, 10 * RATE);
         }
         assertEq(marketDriver.laneCount(aliceNft), 10, "at the lane cap");
-        vm.warp(START + 5); // accrue some shares on the lane we'll drop
+        vm.warp(START + 5); // accrue on the lanes we'll drop
 
-        bytes32 v11 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "R11", Side.Yes);
-        usdc.mint(alice, 10 * RATE);
+        bytes32 e = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Se", Side.Yes);
+        bytes32 w = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Sw", Side.Yes);
+
+        // keep v[0..7] unchanged, drop v[8],v[9], add e,w
+        MarketDriver.Lane[] memory desired = new MarketDriver.Lane[](10);
+        for (uint256 i = 0; i < 8; i++) {
+            desired[i] = MarketDriver.Lane({vaultId: v[i], side: Side.Yes, rate: RATE});
+        }
+        desired[8] = MarketDriver.Lane({vaultId: e, side: Side.No, rate: RATE});
+        desired[9] = MarketDriver.Lane({vaultId: w, side: Side.No, rate: RATE});
+
+        usdc.mint(alice, 20 * RATE);
         vm.startPrank(alice);
-        usdc.approve(address(marketDriver), 10 * RATE);
-        marketDriver.replaceLane(aliceNft, first, v11, Side.No, RATE, 10 * RATE);
+        usdc.approve(address(marketDriver), 20 * RATE);
+        marketDriver.setLanes(aliceNft, desired, 20 * RATE);
         vm.stopPrank();
 
-        assertEq(marketDriver.laneCount(aliceNft), 10, "still 10 lanes after the swap");
-        (uint256 droppedRate,, uint256 droppedShares,,) = vault.getPosition(first, Side.Yes, aliceNft);
-        (uint256 newRate,,,,) = vault.getPosition(v11, Side.No, aliceNft);
-        assertEq(droppedRate, 0, "dropped vault lane stopped");
-        assertGt(droppedShares, 0, "dropped lane's accrued shares survive the swap");
-        assertEq(newRate, RATE, "moved into the 11th vault");
+        assertEq(marketDriver.laneCount(aliceNft), 10, "still 10 lanes after reconcile");
+        (uint256 r8,, uint256 s8,,) = vault.getPosition(v[8], Side.Yes, aliceNft);
+        (uint256 r9,,,,) = vault.getPosition(v[9], Side.Yes, aliceNft);
+        assertEq(r8, 0, "v8 dropped");
+        assertEq(r9, 0, "v9 dropped");
+        assertGt(s8, 0, "dropped lane's shares survive");
+        (uint256 eRate,,,,) = vault.getPosition(e, Side.No, aliceNft);
+        (uint256 wRate,,,,) = vault.getPosition(w, Side.No, aliceNft);
+        assertEq(eRate, RATE, "e opened");
+        assertEq(wRate, RATE, "w opened");
     }
 
-    function test_replaceLane_guards() public {
-        bytes32 v2 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "RG2", Side.Yes);
-        _fund(alice, aliceNft, v1, Side.Yes, RATE, 50 * RATE);
-        _fund(alice, aliceNft, v2, Side.Yes, RATE, 50 * RATE);
-        bytes32 v3 = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "RG3", Side.Yes);
-
-        usdc.mint(alice, 30 * RATE);
+    /// More than MAX_LANES in one desired set reverts on the spot — no entry is silently dropped.
+    function test_setLanes_revertsOverMaxLanes() public {
+        MarketDriver.Lane[] memory desired = new MarketDriver.Lane[](11);
+        for (uint256 i = 0; i < 11; i++) {
+            bytes32 vid =
+                VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, string(abi.encodePacked("O", i)), Side.Yes);
+            desired[i] = MarketDriver.Lane({vaultId: vid, side: Side.Yes, rate: RATE});
+        }
+        usdc.mint(alice, 100 * RATE);
         vm.startPrank(alice);
-        usdc.approve(address(marketDriver), 30 * RATE);
-        vm.expectRevert("MarketDriver: same vault");
-        marketDriver.replaceLane(aliceNft, v1, v1, Side.No, RATE, 10 * RATE);
-        vm.expectRevert("MarketDriver: no lane to drop");
-        marketDriver.replaceLane(aliceNft, v3, v1, Side.No, RATE, 10 * RATE);
-        vm.expectRevert("MarketDriver: vault already has a lane");
-        marketDriver.replaceLane(aliceNft, v1, v2, Side.No, RATE, 10 * RATE);
+        usdc.approve(address(marketDriver), 100 * RATE);
+        vm.expectRevert("MarketDriver: too many lanes");
+        marketDriver.setLanes(aliceNft, desired, 100 * RATE);
         vm.stopPrank();
     }
 

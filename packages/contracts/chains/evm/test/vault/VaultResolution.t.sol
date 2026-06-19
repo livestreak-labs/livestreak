@@ -90,12 +90,14 @@ contract VaultResolutionTest is Test {
         assertEq(usdc.balanceOf(alice), 100 * RATE);
     }
 
-    /// Hedge mid-market: alice flips YES->NO; her new side wins and pays, her abandoned side is a loss.
-    function test_switchSide_newSideWinsAndPaysAbandonedSideLoses() public {
+    /// Hedge mid-market via setLanes: alice flips YES->NO; her new side wins and pays, abandoned is a loss.
+    function test_setLanes_hedgeNewSideWinsAbandonedLoses() public {
         _fund(alice, aliceNft, Side.Yes, RATE, 50 * RATE);
         vm.warp(120); // accrue 20s on YES, then hedge to NO with the remaining balance
+        MarketDriver.Lane[] memory desired = new MarketDriver.Lane[](1);
+        desired[0] = MarketDriver.Lane({vaultId: v1, side: Side.No, rate: RATE});
         vm.prank(alice);
-        marketDriver.switchSide(aliceNft, v1, RATE, 0);
+        marketDriver.setLanes(aliceNft, desired, 0);
         _fund(bob, bobNft, Side.Yes, RATE, 50 * RATE); // someone now holds the YES alice left
 
         vm.warp(160);
