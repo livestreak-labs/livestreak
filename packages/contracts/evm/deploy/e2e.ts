@@ -80,7 +80,8 @@ const ABIS = {
   steward: abi("out/StewardRegistry.sol/StewardRegistry.json"),
   driver: abi("out/AddressDriver.sol/AddressDriver.json"),
   drips: abi("out/IDrips.sol/IDrips.json"),
-  lvst: abi("out/LvstToken.sol/LvstToken.json")
+  lvst: abi("out/LvstToken.sol/LvstToken.json"),
+  treasury: abi("out/Treasury.sol/Treasury.json")
 };
 
 // ── clients ──────────────────────────────────────────────────────────────────
@@ -217,16 +218,16 @@ async function main() {
   // ── ACT 6: the loser mints LVST; the winner-skim fed the house pot ────────────
   act("ACT 6 — the NO loser mints LVST against their loss; the house pot took the skim");
   const lostUsdc = (await read(A.vault, ABIS.vault, "lossClaimable", [addrOf(bob), vaultId, Side.No])) as bigint;
-  const flowPreview = (await read(A.lvstToken, ABIS.lvst, "lossLvstClaimable", [addrOf(bob), vaultId, Side.No])) as bigint;
+  const flowPreview = (await read(A.treasury, ABIS.treasury, "lossLvstClaimable", [addrOf(bob), vaultId, Side.No])) as bigint;
   info(`bob lost ${lostUsdc} USDC-units -> ${flowPreview} LVST claimable`);
   assert(lostUsdc > 0n && flowPreview > 0n, "loser has a loss basis and LVST to mint");
 
   const bobLvstBefore = (await read(A.lvstToken, ABIS.lvst, "balanceOf", [addrOf(bob)])) as bigint;
-  await send(bob, A.lvstToken, ABIS.lvst, "claimLossLvst", [vaultId, Side.No]);
+  await send(bob, A.treasury, ABIS.treasury, "claimLossLvst", [vaultId, Side.No]);
   const bobMinted = ((await read(A.lvstToken, ABIS.lvst, "balanceOf", [addrOf(bob)])) as bigint) - bobLvstBefore;
   assert(bobMinted === flowPreview, "minted LVST matches the preview (lostUSD x mintRate)");
 
-  const housePot = (await read(A.lvstToken, ABIS.lvst, "totalSkimmed", [])) as bigint;
+  const housePot = (await read(A.treasury, ABIS.treasury, "totalSkimmed", [])) as bigint;
   info(`house pot (cumulative skim) = ${housePot}`);
   assert(housePot > 0n, "the winner-skim fed the LVST house pot");
 

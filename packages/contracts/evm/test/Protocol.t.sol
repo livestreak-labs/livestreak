@@ -47,6 +47,7 @@ contract ProtocolTest is Test {
         address driver = makeAddr("driver");
         address steward = makeAddr("steward");
         address lvst = makeAddr("lvst");
+        address treasury = makeAddr("treasury");
 
         vm.startPrank(owner);
         protocol.setMarketRegistry(market);
@@ -57,6 +58,7 @@ contract ProtocolTest is Test {
         protocol.setAddressDriver(driver);
         protocol.setStewardRegistry(steward);
         protocol.setLvstToken(lvst);
+        protocol.setTreasury(treasury);
         vm.stopPrank();
 
         assertEq(protocol.marketRegistry(), market);
@@ -67,5 +69,6 @@ contract ProtocolTest is Test {
         assertEq(protocol.addressDriver(), driver);
         assertEq(protocol.stewardRegistry(), steward);
         assertEq(protocol.lvstToken(), lvst);
+        assertEq(protocol.treasury(), treasury);
     }
 }

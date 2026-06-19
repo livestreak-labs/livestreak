@@ -27,7 +27,7 @@ export async function deployWire(
   }
 
   const { dripsProxy, caller } = streaming.contracts as Record<string, Address>;
-  const { protocol, vault, vaultFactory, marketRegistry, bookmakerRegistry, mockUsdc, stewardRegistry, lvstToken } =
+  const { protocol, vault, vaultFactory, marketRegistry, bookmakerRegistry, mockUsdc, stewardRegistry, lvstToken, treasury } =
     protocolScope.contracts as Record<string, Address>;
   const { deployer } = config;
 
@@ -50,6 +50,7 @@ export async function deployWire(
     await write(protocol, protocolAbi, "setVaultFactory", [vaultFactory]);
     await write(protocol, protocolAbi, "setStewardRegistry", [stewardRegistry]);
     await write(protocol, protocolAbi, "setLvstToken", [lvstToken]);
+    await write(protocol, protocolAbi, "setTreasury", [treasury]);
     await write(protocol, protocolAbi, "setDripsStreaming", [dripsProxy]);
 
     // Vault registers as the Drips receiver driver before the user driver slot is reserved.
@@ -82,7 +83,7 @@ export async function deployWire(
     await write(protocol, protocolAbi, "setAddressDriver", [addressDriverProxy]);
     console.log(`    addressDriverProxy → ${addressDriverProxy}`);
 
-    // Vault one-shot sync of factory, funding driver, resolver, and LVST from Protocol.
+    // Vault one-shot sync of factory, funding driver, resolver, and Treasury from Protocol.
     await write(vault, vaultAbi, "syncFromProtocol", []);
     console.log(`    vault synced from Protocol`);
 

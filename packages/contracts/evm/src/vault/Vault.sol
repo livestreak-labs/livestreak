@@ -9,8 +9,8 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 
-/// @dev LVST house-pot sink: the Vault skims a slice of the bounty here at resolution.
-interface ILvstSkim {
+/// @dev Treasury house-pot sink: the Vault skims a slice of the bounty here at resolution.
+interface ITreasurySkim {
     function skimBps() external view returns (uint256);
     function notifySkim(uint256 amount) external;
 }
@@ -110,7 +110,7 @@ contract Vault {
     mapping(address => bytes32[]) private _userVaults; // every vault a user has funded, first-funded order
     mapping(address => mapping(bytes32 => bool)) private _userInVault; // dedupe guard for _userVaults
 
-    ILvstSkim public lvstToken; // LVST house pot; receives the winner-skim at resolution (0 = skim off)
+    ITreasurySkim public treasury; // house pot; receives the winner-skim at resolution (0 = skim off)
     mapping(bytes32 => uint256) public skimOwed; // skim computed at first collect, flushed once cash is in
 
     event VaultCreated(bytes32 indexed vaultId, bytes32 indexed marketId, address indexed creator, string question);
@@ -118,7 +118,7 @@ contract Vault {
     event StreamingSet(address indexed drips, address indexed usdc, uint32 driverId);
     event FundingDriverSet(address indexed fundingDriver);
     event ResolverSet(address indexed resolver);
-    event LvstTokenSet(address indexed lvstToken);
+    event TreasurySet(address indexed treasury);
     event Skimmed(bytes32 indexed vaultId, uint256 amount);
     event Funded(bytes32 indexed vaultId, Side indexed side, address indexed funder, uint256 rate, uint32 maxEnd);
     event Stopped(bytes32 indexed vaultId, Side indexed side, address indexed funder, uint256 sharesAccrued);
@@ -173,7 +173,7 @@ contract Vault {
         address factory_ = protocol.vaultFactory();
         address fundingDriver_ = protocol.addressDriver();
         address resolver_ = protocol.stewardRegistry();
-        address lvst_ = protocol.lvstToken();
+        address treasury_ = protocol.treasury();
         require(
             factory_ != address(0) && fundingDriver_ != address(0) && resolver_ != address(0),
             "Vault: protocol incomplete"
@@ -182,9 +182,9 @@ contract Vault {
         factory = factory_;
         fundingDriver = fundingDriver_;
         resolver = resolver_;
-        if (lvst_ != address(0)) {
-            lvstToken = ILvstSkim(lvst_);
-            emit LvstTokenSet(lvst_);
+        if (treasury_ != address(0)) {
+            treasury = ITreasurySkim(treasury_);
+            emit TreasurySet(treasury_);
         }
 
         emit FundingDriverSet(fundingDriver_);
@@ -583,8 +583,8 @@ contract Vault {
             uint256 winPool = _boards[vaultId][winning].pool;
             uint256 losePool = _boards[vaultId][winning == Side.Yes ? Side.No : Side.Yes].pool;
             uint256 skim;
-            if (address(lvstToken) != address(0) && losePool > 0) {
-                skim = (losePool * lvstToken.skimBps()) / 10_000;
+            if (address(treasury) != address(0) && losePool > 0) {
+                skim = (losePool * treasury.skimBps()) / 10_000;
             }
             skimOwed[vaultId] = skim;
             pot[vaultId] = winPool + losePool - skim;
@@ -599,8 +599,8 @@ contract Vault {
         uint256 owed = skimOwed[vaultId];
         if (owed > 0 && usdc.balanceOf(address(this)) >= owed) {
             skimOwed[vaultId] = 0;
-            usdc.safeTransfer(address(lvstToken), owed);
-            lvstToken.notifySkim(owed);
+            usdc.safeTransfer(address(treasury), owed);
+            treasury.notifySkim(owed);
             emit Skimmed(vaultId, owed);
         }
 

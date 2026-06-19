@@ -71,9 +71,18 @@ export async function deployProtocol(
       walletClient,
       client,
       "out/LvstToken.sol/LvstToken.json",
-      [deployer, mockUsdc, protocol],
+      [protocol],
       undefined,
       `${LABEL}.lvstToken`
+    );
+
+    const treasury = await deployFromArtifact(
+      walletClient,
+      client,
+      "out/Treasury.sol/Treasury.json",
+      [deployer, mockUsdc, protocol],
+      undefined,
+      `${LABEL}.treasury`
     );
 
     const stewardRegistry = await deployFromArtifact(
@@ -96,6 +105,7 @@ export async function deployProtocol(
         vaultFactory,
         mockUsdc,
         lvstToken,
+        treasury,
         stewardRegistry
       }
     };

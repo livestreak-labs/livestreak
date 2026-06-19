@@ -13,6 +13,7 @@ export default defineConfig({
         "VaultFactory.sol/VaultFactory.json",
         "Vault.sol/Vault.json",
         "LvstToken.sol/LvstToken.json",
+        "Treasury.sol/Treasury.json",
         "StewardRegistry.sol/StewardRegistry.json",
         "DripsStreaming.sol/DripsStreaming.json",
         "IDrips.sol/IDrips.json",

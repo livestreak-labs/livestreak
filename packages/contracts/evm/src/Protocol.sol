@@ -14,6 +14,7 @@ contract Protocol is Ownable {
     address public addressDriver;
     address public stewardRegistry;
     address public lvstToken;
+    address public treasury;
 
     event MarketRegistrySet(address indexed marketRegistry);
     event BookmakerRegistrySet(address indexed bookmakerRegistry);
@@ -23,6 +24,7 @@ contract Protocol is Ownable {
     event AddressDriverSet(address indexed addressDriver);
     event StewardRegistrySet(address indexed stewardRegistry);
     event LvstTokenSet(address indexed lvstToken);
+    event TreasurySet(address indexed treasury);
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
@@ -72,6 +74,12 @@ contract Protocol is Ownable {
         _setOnce(lvstToken, addr);
         lvstToken = addr;
         emit LvstTokenSet(addr);
+    }
+
+    function setTreasury(address addr) external onlyOwner {
+        _setOnce(treasury, addr);
+        treasury = addr;
+        emit TreasurySet(addr);
     }
 
     function _setOnce(address current, address next) private pure {

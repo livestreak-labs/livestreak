@@ -6,6 +6,7 @@ import {BookmakerRegistry} from "../../src/registries/BookmakerRegistry.sol";
 import {MarketRegistry} from "../../src/registries/MarketRegistry.sol";
 import {StewardRegistry} from "../../src/steward/StewardRegistry.sol";
 import {LvstToken} from "../../src/treasury/LvstToken.sol";
+import {Treasury} from "../../src/treasury/Treasury.sol";
 import {Vault} from "../../src/vault/Vault.sol";
 import {VaultFactory} from "../../src/vault/VaultFactory.sol";
 import {DripsStreaming} from "../../src/streaming/DripsStreaming.sol";
@@ -28,6 +29,7 @@ library ProtocolWire {
         VaultFactory vaultFactory;
         StewardRegistry stewardRegistry;
         LvstToken lvstToken;
+        Treasury treasury;
         MockUSDC usdc;
     }
 
@@ -43,7 +45,8 @@ library ProtocolWire {
         core.vault = new Vault(core.protocol);
         core.vaultFactory = new VaultFactory(core.bookmakerRegistry, core.marketRegistry, core.vault);
         core.stewardRegistry = new StewardRegistry(owner, core.protocol);
-        core.lvstToken = new LvstToken(owner, usdc, core.protocol);
+        core.lvstToken = new LvstToken(core.protocol);
+        core.treasury = new Treasury(owner, usdc, core.protocol);
         core.usdc = MockUSDC(address(usdc));
     }
 
@@ -55,6 +58,7 @@ library ProtocolWire {
         core.protocol.setVaultFactory(address(core.vaultFactory));
         core.protocol.setStewardRegistry(address(core.stewardRegistry));
         core.protocol.setLvstToken(address(core.lvstToken));
+        core.protocol.setTreasury(address(core.treasury));
         vm.stopPrank();
     }
 
@@ -96,10 +100,7 @@ library ProtocolWire {
         vault.syncFromProtocol();
     }
 
-    function wireAll(address owner, Core memory core, Streaming memory streaming)
-        internal
-        returns (Streaming memory)
-    {
+    function wireAll(address owner, Core memory core, Streaming memory streaming) internal returns (Streaming memory) {
         return wireAll(owner, core, streaming, true);
     }
 
@@ -115,6 +116,7 @@ library ProtocolWire {
         core.protocol.setStewardRegistry(address(core.stewardRegistry));
         if (withLvst) {
             core.protocol.setLvstToken(address(core.lvstToken));
+            core.protocol.setTreasury(address(core.treasury));
         }
         core.protocol.setDripsStreaming(address(streaming.drips));
         vm.stopPrank();

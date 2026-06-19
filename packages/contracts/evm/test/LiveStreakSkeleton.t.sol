@@ -15,7 +15,7 @@ import {ProtocolWire} from "./helpers/ProtocolWire.sol";
 
 /// @notice Skeleton coverage for the non-funding surfaces: market/vault registry, bookmaker gating,
 /// and steward hot/dispute writes. Funding + pricing is proven in test/vault/VaultBoard.t.sol, and
-/// the LVST house token (loss-mint, skim, staking, dividends) in test/treasury/LvstToken.t.sol.
+/// the LVST house token (loss-mint, skim, staking, dividends) in test/treasury/Treasury.t.sol.
 contract LiveStreakSkeletonTest is Test {
     BookmakerRegistry internal bookmakerRegistry;
     MarketRegistry internal marketRegistry;
