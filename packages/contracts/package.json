@@ -2,19 +2,31 @@
   "name": "@livestreak/contracts",
   "version": "0.1.0",
   "private": true,
+  "description": "LiveStreak protocol ABIs, types, and per-chain deploy addresses",
   "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "exports": {
-    ".": "./evm/generated/contracts.ts"
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package": {
+      "default": "./package.json"
+    }
   },
   "files": [
-    "evm/generated/",
+    "dist",
+    "src",
+    "evm/generated",
+    "evm/deploy/output",
     "evm/foundry.toml",
-    "evm/src/"
+    "evm/src"
   ],
   "scripts": {
-    "clean": "rm -rf evm/out evm/cache evm/generated/contracts.ts",
-    "build": "cd evm && forge build && FOUNDRY_PROFILE=aa forge build && wagmi generate",
-    "check": "tsc -p evm/tsconfig.json --noEmit",
+    "clean": "rm -rf dist evm/out evm/cache evm/generated/contracts.ts",
+    "build": "cd evm && forge build && FOUNDRY_PROFILE=aa forge build && wagmi generate && cd .. && tsc -p tsconfig.build.json",
+    "check": "tsc -p tsconfig.json --noEmit",
     "lint": "cd evm && forge fmt --check src test",
     "test": "cd evm && forge test"
   },
@@ -23,6 +35,7 @@
   },
   "devDependencies": {
     "@wagmi/cli": "^2.10.0",
+    "@types/node": "^22.15.30",
     "tsx": "^4.19.0",
     "typescript": "6.0.3"
   }

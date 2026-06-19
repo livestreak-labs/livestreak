@@ -13,6 +13,9 @@ out/
 
 node_modules/
 
+# TS facade build output (regenerate via `npm run build`)
+dist/
+
 # Local deploy manifests (keep .gitkeep only)
 evm/deploy/output/*.json
 !evm/deploy/output/.gitkeep
