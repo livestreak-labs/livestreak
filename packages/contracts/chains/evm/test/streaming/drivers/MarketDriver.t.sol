@@ -240,6 +240,41 @@ contract MarketDriverTest is Test {
         vm.stopPrank();
     }
 
+    /// setLanes is order-agnostic: place changed/new vaults anywhere (even mid-array). The driver sorts
+    /// the Drips receivers internally (_buildReceivers/_sortReceivers), so a scrambled desired set
+    /// reconciles exactly like a sorted one — the caller never has to order the array.
+    function test_setLanes_orderAgnostic() public {
+        bytes32 a = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Oa", Side.Yes);
+        bytes32 b = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Ob", Side.Yes);
+        bytes32 c = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Oc", Side.Yes);
+        _fund(alice, aliceNft, a, Side.Yes, RATE, 10 * RATE);
+        _fund(alice, aliceNft, b, Side.Yes, RATE, 10 * RATE);
+        _fund(alice, aliceNft, c, Side.Yes, RATE, 10 * RATE);
+        bytes32 d = VaultDriverHarness.bondVault(vaultDriver, usdc, marketId, "Od", Side.Yes);
+
+        // Scrambled: keep c (was last), add NEW d in the MIDDLE, keep a (was first); drop b.
+        MarketDriver.Lane[] memory desired = new MarketDriver.Lane[](3);
+        desired[0] = MarketDriver.Lane({vaultId: c, side: Side.Yes, rate: RATE});
+        desired[1] = MarketDriver.Lane({vaultId: d, side: Side.No, rate: RATE});
+        desired[2] = MarketDriver.Lane({vaultId: a, side: Side.Yes, rate: RATE});
+
+        usdc.mint(alice, 10 * RATE);
+        vm.startPrank(alice);
+        usdc.approve(address(marketDriver), 10 * RATE);
+        marketDriver.setLanes(aliceNft, desired, 10 * RATE);
+        vm.stopPrank();
+
+        assertEq(marketDriver.laneCount(aliceNft), 3, "three lanes after reconcile");
+        (uint256 bRate,,,,) = vault.getPosition(b, Side.Yes, aliceNft);
+        (uint256 dRate,,,,) = vault.getPosition(d, Side.No, aliceNft);
+        (uint256 aRate,,,,) = vault.getPosition(a, Side.Yes, aliceNft);
+        (uint256 cRate,,,,) = vault.getPosition(c, Side.Yes, aliceNft);
+        assertEq(bRate, 0, "b dropped");
+        assertEq(dRate, RATE, "new vault added from the middle of the array");
+        assertEq(aRate, RATE, "a kept");
+        assertEq(cRate, RATE, "c kept");
+    }
+
     /// Shared-balance maxEnd ripple now spans two distinct vaults (one lane each), not two sides.
     function test_maxEndRipple_afterSecondVaultFund() public {
         _fund(alice, aliceNft, v1, Side.Yes, RATE, 20 * RATE);
