@@ -49,9 +49,9 @@ USDC / LVST       -> Coin<USDC> / Coin<LVST>
 - [x] Confirm the Sui-native divergence list against the framework
 
 ### Stage 1 — Streaming substrate (quarry; GPL under `streaming/`)
-- [ ] `streams` cycle math — parity with `Streams.sol`: cycles, `amtPerSec`, `g`-index / receivable accounting
-- [ ] trimmed `drips` core — register / receivable / cycle (drop splits / router / give)
-- [ ] driver utils — `driver_utils` + `driver_transfer_utils` → `SharedDriverUtils` parity
+- [x] `streams` cycle math — parity with `Streams.sol`: cycles, `amtPerSec`, `g`-index / receivable accounting
+- [x] trimmed `drips` core — register / receivable / cycle (drop splits / router / give)
+- [x] driver utils — `driver_utils` + `driver_transfer_utils` → `SharedDriverUtils` parity
 
 ### Stage 2 — Drivers
 - [ ] NFT driver (`nft_driver` → `MarketDriver`): position = owned object; ≤10 lanes, one-side-per-vault, `setLanes` hedge; `mint` / `fund` / `stop` / `stopAll` / `withdraw` / `claimLossLvst`
