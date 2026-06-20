@@ -43,10 +43,10 @@ USDC / LVST       -> Coin<USDC> / Coin<LVST>
 ```
 
 ### Stage 0 — Scaffold + quarry permutation
-- [ ] `chains/sui/` package — `Move.toml`, `sources/` domain folders mirroring EVM, `tests/`
-- [ ] `sui-quarry.md` — per-module table (all ~10 ref modules: keep/adapt/drop + justification)
-- [ ] Quarry `i128` / `i256` math libs (rename clean, math verbatim, GPL header) → `sui move build` green
-- [ ] Confirm the Sui-native divergence list against the framework
+- [x] `chains/sui/` package — `Move.toml`, `sources/` domain folders mirroring EVM, `tests/`
+- [x] `sui-quarry.md` — per-module table (all ~10 ref modules: keep/adapt/drop + justification)
+- [x] Quarry `i128` / `i256` math libs (rename clean, math verbatim, GPL header) → `sui move build` green
+- [x] Confirm the Sui-native divergence list against the framework
 
 ### Stage 1 — Streaming substrate (quarry; GPL under `streaming/`)
 - [ ] `streams` cycle math — parity with `Streams.sol`: cycles, `amtPerSec`, `g`-index / receivable accounting
