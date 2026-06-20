@@ -2,9 +2,9 @@
 
 import { LiveStreakConfigError } from "@livestreak/core";
 
-import type { OptionsContractAddresses } from "../read/contracts/addresses.js";
-import type { OptionsContractAbis } from "../read/contracts/transport.js";
-import type { ContractWriter } from "./transport.js";
+import type { OptionsContractAddresses } from "../chains/addresses.js";
+import type { OptionsChainWriter } from "../chains/types.js";
+import type { OptionsContractAbis } from "../read/reader.js";
 
 export type StakeLvstInput = {
   readonly amount: bigint;
@@ -15,12 +15,12 @@ export type UnstakeLvstInput = {
 };
 
 type LvstWriteDeps = {
-  readonly writer: ContractWriter;
+  readonly writer: OptionsChainWriter;
   readonly addresses: OptionsContractAddresses;
   readonly abis: Pick<OptionsContractAbis, "Treasury">;
 };
 
-export const stakeLvst = async (deps: LvstWriteDeps, input: StakeLvstInput): Promise<unknown> => {
+export const stakeLvst = async (deps: LvstWriteDeps, input: StakeLvstInput): Promise<string> => {
   const amount = requirePositiveBigInt(input.amount, "amount");
 
   return deps.writer.write({
@@ -31,7 +31,7 @@ export const stakeLvst = async (deps: LvstWriteDeps, input: StakeLvstInput): Pro
   });
 };
 
-export const unstakeLvst = async (deps: LvstWriteDeps, input: UnstakeLvstInput): Promise<unknown> => {
+export const unstakeLvst = async (deps: LvstWriteDeps, input: UnstakeLvstInput): Promise<string> => {
   const amount = requirePositiveBigInt(input.amount, "amount");
 
   return deps.writer.write({
@@ -42,7 +42,7 @@ export const unstakeLvst = async (deps: LvstWriteDeps, input: UnstakeLvstInput):
   });
 };
 
-export const claimDividends = async (deps: LvstWriteDeps): Promise<unknown> =>
+export const claimDividends = async (deps: LvstWriteDeps): Promise<string> =>
   deps.writer.write({
     address: deps.addresses.treasury,
     abi: deps.abis.Treasury,

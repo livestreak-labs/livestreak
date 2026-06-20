@@ -1,11 +1,14 @@
 import { LiveStreakConfigError } from "@livestreak/core";
-import { marketDriverAbi } from "@livestreak/contracts/evm/abis";
+import { marketDriverAbi, treasuryAbi } from "@livestreak/contracts/evm/abis";
 import { describe, expect, it } from "vitest";
 
 import { asTokenId, asUserAddress, asVaultId } from "../../src/model/ids.js";
-import type { OptionsContractAddresses } from "../../src/read/contracts/addresses.js";
-import { createContractsOptionsWriteTransport } from "../../src/write/transport.js";
-import { createFakeContractWriter } from "../helpers/fake-writer.js";
+import { claimLossLvst, withdraw, withdrawMany } from "../../src/write/claim.js";
+import {
+  createFakeChainWriter,
+  DEFAULT_FAKE_ADDRESSES,
+  type FakeChainWriter
+} from "../helpers/fake-chain.js";
 
 const TOKEN_ID = asTokenId(42n);
 const VAULT_ID = asVaultId(
@@ -16,32 +19,24 @@ const VAULT_ID_B = asVaultId(
 );
 const TO = asUserAddress("0x00000000000000000000000000000000000000dd");
 
-const ADDRESSES: OptionsContractAddresses = {
-  marketRegistry: "0x0000000000000000000000000000000000000011",
-  vault: "0x0000000000000000000000000000000000000014",
-  marketDriver: "0x0000000000000000000000000000000000000015",
-  stewardRegistry: "0x0000000000000000000000000000000000000017",
-  treasury: "0x0000000000000000000000000000000000000018",
-  lvstToken: "0x0000000000000000000000000000000000000016",
-  dripsStreaming: "0x0000000000000000000000000000000000000019"
-};
+const writeDeps = (writer: FakeChainWriter = createFakeChainWriter()) => ({
+  writer,
+  addresses: DEFAULT_FAKE_ADDRESSES,
+  abis: { MarketDriver: marketDriverAbi, Treasury: treasuryAbi }
+});
 
 describe("write claim", () => {
   it("withdraw encodes tokenId, vault, and recipient", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await transport.withdraw({
+    await withdraw(writeDeps(writer), {
       tokenId: TOKEN_ID,
       vaultId: VAULT_ID,
       to: TO
     });
 
     expect(writer.requests[0]).toEqual({
-      address: ADDRESSES.marketDriver,
+      address: DEFAULT_FAKE_ADDRESSES.marketDriver,
       abi: marketDriverAbi,
       functionName: "withdraw",
       args: [TOKEN_ID, VAULT_ID, TO]
@@ -49,20 +44,16 @@ describe("write claim", () => {
   });
 
   it("withdrawMany encodes tokenId, vault list, and recipient", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await transport.withdrawMany({
+    await withdrawMany(writeDeps(writer), {
       tokenId: TOKEN_ID,
       vaultIds: [VAULT_ID, VAULT_ID_B],
       to: TO
     });
 
     expect(writer.requests[0]).toEqual({
-      address: ADDRESSES.marketDriver,
+      address: DEFAULT_FAKE_ADDRESSES.marketDriver,
       abi: marketDriverAbi,
       functionName: "withdraw",
       args: [TOKEN_ID, [VAULT_ID, VAULT_ID_B], TO]
@@ -70,13 +61,9 @@ describe("write claim", () => {
   });
 
   it("claimLossLvst encodes tokenId, vault, side, and recipient", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await transport.claimLossLvst({
+    await claimLossLvst(writeDeps(writer), {
       tokenId: TOKEN_ID,
       vaultId: VAULT_ID,
       side: "yes",
@@ -84,7 +71,7 @@ describe("write claim", () => {
     });
 
     expect(writer.requests[0]).toEqual({
-      address: ADDRESSES.marketDriver,
+      address: DEFAULT_FAKE_ADDRESSES.marketDriver,
       abi: marketDriverAbi,
       functionName: "claimLossLvst",
       args: [TOKEN_ID, VAULT_ID, 0, TO]
@@ -92,13 +79,9 @@ describe("write claim", () => {
   });
 
   it("claimLossLvst encodes no side as 1", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await transport.claimLossLvst({
+    await claimLossLvst(writeDeps(writer), {
       tokenId: TOKEN_ID,
       vaultId: VAULT_ID,
       side: "no",
@@ -109,14 +92,10 @@ describe("write claim", () => {
   });
 
   it("rejects invalid vaultId before withdraw write", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
     await expect(
-      transport.withdraw({
+      withdraw(writeDeps(writer), {
         tokenId: TOKEN_ID,
         vaultId: asVaultId("short"),
         to: TO
@@ -127,14 +106,10 @@ describe("write claim", () => {
   });
 
   it("rejects invalid tokenId before claimLossLvst write", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
     await expect(
-      transport.claimLossLvst({
+      claimLossLvst(writeDeps(writer), {
         tokenId: asTokenId(-1n),
         vaultId: VAULT_ID,
         side: "yes",
@@ -143,5 +118,17 @@ describe("write claim", () => {
     ).rejects.toBeInstanceOf(LiveStreakConfigError);
 
     expect(writer.requests).toHaveLength(0);
+  });
+
+  it("returns userOp hash from chain writer", async () => {
+    const writer = createFakeChainWriter();
+
+    const hash = await withdraw(writeDeps(writer), {
+      tokenId: TOKEN_ID,
+      vaultId: VAULT_ID,
+      to: TO
+    });
+
+    expect(hash).toBe("0xfake_user_op_hash");
   });
 });

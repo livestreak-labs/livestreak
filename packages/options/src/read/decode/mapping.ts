@@ -4,7 +4,7 @@ import { LiveStreakConfigError } from "@livestreak/core";
 import type { PointerScheme } from "@livestreak/host";
 
 import { sideFromSolidityValue } from "./sides.js";
-import type { OptionsStreamState } from "../../model/media.js";
+import type { OptionsStreamState } from "../../model/stream.js";
 
 import { asMarketId, asTokenId, asUserAddress, asVaultId } from "../../model/ids.js";
 import type { LvstAccount } from "../../model/lvst.js";

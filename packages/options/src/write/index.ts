@@ -34,10 +34,4 @@ export {
   type TransferNftInput,
   transferNft
 } from "./nft.js";
-export {
-  type ContractWriteRequest,
-  type ContractWriter,
-  type ContractsOptionsWriteTransportInput,
-  createContractsOptionsWriteTransport,
-  type OptionsWriteTransport
-} from "./transport.js";
+export type { OptionsWriteDeps } from "./types.js";

@@ -2,33 +2,28 @@ import { LiveStreakConfigError } from "@livestreak/core";
 import { treasuryAbi } from "@livestreak/contracts/evm/abis";
 import { describe, expect, it } from "vitest";
 
-import type { OptionsContractAddresses } from "../../src/read/contracts/addresses.js";
-import { createContractsOptionsWriteTransport } from "../../src/write/transport.js";
-import { createFakeContractWriter } from "../helpers/fake-writer.js";
+import { claimDividends, stakeLvst, unstakeLvst } from "../../src/write/lvst.js";
+import {
+  createFakeChainWriter,
+  DEFAULT_FAKE_ADDRESSES,
+  type FakeChainWriter
+} from "../helpers/fake-chain.js";
 
-const ADDRESSES: OptionsContractAddresses = {
-  marketRegistry: "0x0000000000000000000000000000000000000011",
-  vault: "0x0000000000000000000000000000000000000014",
-  marketDriver: "0x0000000000000000000000000000000000000015",
-  stewardRegistry: "0x0000000000000000000000000000000000000017",
-  treasury: "0x0000000000000000000000000000000000000018",
-  lvstToken: "0x0000000000000000000000000000000000000016",
-  dripsStreaming: "0x0000000000000000000000000000000000000019"
-};
+const writeDeps = (writer: FakeChainWriter = createFakeChainWriter()) => ({
+  writer,
+  addresses: DEFAULT_FAKE_ADDRESSES,
+  abis: { Treasury: treasuryAbi }
+});
 
 describe("write lvst", () => {
   it("stakeLvst calls treasury stakeLvst with amount", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
-
+    const writer = createFakeChainWriter();
     const amount = 250_000_000_000_000_000n;
-    await transport.stakeLvst({ amount });
+
+    await stakeLvst(writeDeps(writer), { amount });
 
     expect(writer.requests[0]).toEqual({
-      address: ADDRESSES.treasury,
+      address: DEFAULT_FAKE_ADDRESSES.treasury,
       abi: treasuryAbi,
       functionName: "stakeLvst",
       args: [amount]
@@ -36,17 +31,13 @@ describe("write lvst", () => {
   });
 
   it("unstakeLvst calls treasury unstakeLvst with amount", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
-
+    const writer = createFakeChainWriter();
     const amount = 100_000_000_000_000_000n;
-    await transport.unstakeLvst({ amount });
+
+    await unstakeLvst(writeDeps(writer), { amount });
 
     expect(writer.requests[0]).toEqual({
-      address: ADDRESSES.treasury,
+      address: DEFAULT_FAKE_ADDRESSES.treasury,
       abi: treasuryAbi,
       functionName: "unstakeLvst",
       args: [amount]
@@ -54,16 +45,12 @@ describe("write lvst", () => {
   });
 
   it("claimDividends calls treasury claimDividends with no args", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await transport.claimDividends();
+    await claimDividends(writeDeps(writer));
 
     expect(writer.requests[0]).toEqual({
-      address: ADDRESSES.treasury,
+      address: DEFAULT_FAKE_ADDRESSES.treasury,
       abi: treasuryAbi,
       functionName: "claimDividends",
       args: []
@@ -71,13 +58,9 @@ describe("write lvst", () => {
   });
 
   it("rejects zero stake amount before write", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await expect(transport.stakeLvst({ amount: 0n })).rejects.toBeInstanceOf(
+    await expect(stakeLvst(writeDeps(writer), { amount: 0n })).rejects.toBeInstanceOf(
       LiveStreakConfigError
     );
 
@@ -85,13 +68,9 @@ describe("write lvst", () => {
   });
 
   it("rejects zero unstake amount before write", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await expect(transport.unstakeLvst({ amount: 0n })).rejects.toBeInstanceOf(
+    await expect(unstakeLvst(writeDeps(writer), { amount: 0n })).rejects.toBeInstanceOf(
       LiveStreakConfigError
     );
 

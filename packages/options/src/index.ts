@@ -14,11 +14,8 @@ export type {
   OptionsProtocolSummary,
   OptionsSessionPnlView,
   OptionsStreamAccrualView,
-  OptionsStreamMedia,
   OptionsStreamState,
   OptionsStreamStatus,
-  OptionsMediaResolver,
-  OptionsMediaResolvers,
   OptionsUserOptionsSnapshot,
   OptionsVault,
   OptionsVaultOutcome,
@@ -53,11 +50,6 @@ export {
   projectSessionPnl,
   projectShares,
   projectStreamAccrual,
-  DEFAULT_MEDIA_RESOLVERS,
-  resolveStreamMedia,
-  walrusAggregatorResolver,
-  WALRUS_MAINNET_AGGREGATOR,
-  WALRUS_TESTNET_AGGREGATOR,
   segMath,
   SHARE_SCALE,
   sharesPerUsdc,
@@ -67,21 +59,17 @@ export {
 } from "./model/index.js";
 export type { OptionsReadTransport } from "./read/index.js";
 export {
-  type ContractReadRequest,
-  type ContractReader,
-  type ContractsOptionsReadTransportInput,
-  type ContractsReadEntity,
   contractsReadFailed,
   contractsReadNotFound,
-  createContractsOptionsReadTransport,
+  createOptionsReader,
   gatherUserVaultClaims,
-  getStreamMedia,
   readClaimsView,
   readMarketSnapshot,
   readSessionPnl,
+  readStreamState,
   readUserOptionsSnapshot,
   readVaultSnapshot,
-  type OptionsContractAddresses
+  type ContractsReadEntity
 } from "./read/index.js";
 export type {
   OptionsLanePanel,
@@ -105,12 +93,9 @@ export { createOptionsRuntime, validateOptionsRuntimeConfig } from "./runtime/in
 export type {
   ApproveNftInput,
   ClaimLossLvstInput,
-  ContractWriteRequest,
-  ContractWriter,
-  ContractsOptionsWriteTransportInput,
   FundStreamInput,
   LaneWriteInput,
-  OptionsWriteTransport,
+  OptionsWriteDeps,
   SetApprovalForAllInput,
   SetLanesInput,
   StakeLvstInput,
@@ -125,7 +110,6 @@ export {
   approveNft,
   claimDividends,
   claimLossLvst,
-  createContractsOptionsWriteTransport,
   fundStream,
   setApprovalForAll,
   setLanes,
@@ -137,3 +121,11 @@ export {
   withdraw,
   withdrawMany
 } from "./write/index.js";
+export type {
+  OptionsChain,
+  OptionsChainConfig,
+  OptionsChainReader,
+  OptionsChainWriter,
+  OptionsContractAddresses
+} from "./chains/index.js";
+export { createOptionsChain, validateOptionsChainConfig } from "./chains/index.js";

@@ -17,11 +17,14 @@ describe("options public exports", () => {
     expect(publicExport("asTokenId")).toBeTypeOf("function");
   });
 
-  it("exports read transport type surface and read helpers", () => {
+  it("exports chain factory and read helpers", () => {
+    expect(publicExport("createOptionsChain")).toBeTypeOf("function");
+    expect(publicExport("validateOptionsChainConfig")).toBeTypeOf("function");
     expect(publicExport("readMarketSnapshot")).toBeTypeOf("function");
     expect(publicExport("readVaultSnapshot")).toBeTypeOf("function");
     expect(publicExport("readUserOptionsSnapshot")).toBeTypeOf("function");
-    expect(publicExport("createContractsOptionsReadTransport")).toBeTypeOf("function");
+    expect(publicExport("createOptionsReader")).toBeTypeOf("function");
+    expect(publicExport("readStreamState")).toBeTypeOf("function");
     expect(publicExport("createOptionsRuntime")).toBeTypeOf("function");
     expect(publicExport("validateOptionsRuntimeConfig")).toBeTypeOf("function");
   });
@@ -30,8 +33,7 @@ describe("options public exports", () => {
     expect(publicExport("projectOptionsPanel")).toBeTypeOf("function");
   });
 
-  it("exports NFT-lane write transport and write helpers", () => {
-    expect(publicExport("createContractsOptionsWriteTransport")).toBeTypeOf("function");
+  it("exports NFT-lane write helpers", () => {
     expect(publicExport("fundStream")).toBeTypeOf("function");
     expect(publicExport("setLanes")).toBeTypeOf("function");
     expect(publicExport("stopFunding")).toBeTypeOf("function");
@@ -87,12 +89,16 @@ describe("options public exports", () => {
     expect(publicExport("gatherUserVaultClaims")).toBeTypeOf("function");
   });
 
-  it("exports consumer media read helpers", () => {
-    expect(publicExport("getStreamMedia")).toBeTypeOf("function");
-    expect(publicExport("resolveStreamMedia")).toBeTypeOf("function");
-    expect(publicExport("DEFAULT_MEDIA_RESOLVERS")).toBeTypeOf("object");
-    expect(publicExport("walrusAggregatorResolver")).toBeTypeOf("function");
+  it("does not export stripped R4/R5 media or retired contract ports", () => {
+    expect(publicExport("getStreamMedia")).toBeUndefined();
+    expect(publicExport("resolveStreamMedia")).toBeUndefined();
+    expect(publicExport("DEFAULT_MEDIA_RESOLVERS")).toBeUndefined();
+    expect(publicExport("walrusAggregatorResolver")).toBeUndefined();
     expect(publicExport("OptionsStreamMedia")).toBeUndefined();
+    expect(publicExport("createContractsOptionsReadTransport")).toBeUndefined();
+    expect(publicExport("createContractsOptionsWriteTransport")).toBeUndefined();
+    expect(publicExport("ContractReader")).toBeUndefined();
+    expect(publicExport("ContractWriter")).toBeUndefined();
     expect(publicExport("SCHEME_GATEWAY")).toBeUndefined();
     expect(publicExport("GatewayOverrides")).toBeUndefined();
   });

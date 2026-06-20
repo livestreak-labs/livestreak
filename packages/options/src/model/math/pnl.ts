@@ -1,7 +1,7 @@
 // --- exports ---
 
-import type { TokenId, VaultId } from "./ids.js";
-import type { OptionsVaultSide } from "./vault.js";
+import type { TokenId, VaultId } from "../ids.js";
+import type { OptionsVaultSide } from "../vault.js";
 
 export type SessionPnlClaimRow = {
   readonly tokenId: TokenId;

@@ -2,20 +2,21 @@ import { LiveStreakConfigError } from "@livestreak/core";
 import { describe, expect, it, vi } from "vitest";
 
 import { asMarketId, asTokenId, asUserAddress, asVaultId } from "../../src/model/ids.js";
-import {
-  createContractsOptionsReadTransport,
-  type OptionsContractAddresses
-} from "../../src/read/contracts/index.js";
+import type { OptionsContractAddresses } from "../../src/chains/addresses.js";
+import { createOptionsReader } from "../../src/read/reader.js";
 import {
   createOptionsRuntime,
   validateOptionsRuntimeConfig,
   type OptionsRuntimeInput
 } from "../../src/runtime/index.js";
 import {
-  createFakeOptionsReadTransport,
+  createFakeChainConfig,
+  createFakeChainWriter,
+  createFakeOptionsReader,
+  FakeTransportInMemory,
   fixtureSeed,
   fixtureUser
-} from "../helpers/fake-transport.js";
+} from "../helpers/fake-chain.js";
 import type { OptionsReadTransport } from "../../src/read/transport.js";
 
 const HEX_MARKET_ID = asMarketId(
@@ -39,6 +40,7 @@ const baseInput = (transport: OptionsReadTransport): OptionsRuntimeInput => ({
     marketIds: [asMarketId("market_01")],
     defaultMarketId: asMarketId("market_01")
   },
+  chainConfig: createFakeChainConfig(fixtureSeed()),
   transport
 });
 
@@ -126,7 +128,7 @@ describe("options runtime config", () => {
 
 describe("options runtime store and refresh", () => {
   it("refreshMarket stores market snapshot", async () => {
-    const transport = createFakeOptionsReadTransport(fixtureSeed());
+    const transport = createFakeOptionsReader(fixtureSeed());
     const runtime = createOptionsRuntime(baseInput(transport));
 
     const state = await runtime.refreshMarket(asMarketId("market_01"));
@@ -137,7 +139,7 @@ describe("options runtime store and refresh", () => {
   });
 
   it("refreshVault stores vault snapshot with share totals", async () => {
-    const transport = createFakeOptionsReadTransport(fixtureSeed());
+    const transport = createFakeOptionsReader(fixtureSeed());
     const runtime = createOptionsRuntime(baseInput(transport));
 
     const state = await runtime.refreshVault(asVaultId("vault_01"));
@@ -148,7 +150,7 @@ describe("options runtime store and refresh", () => {
 
   it("refreshUser stores user snapshot with NFTs and LVST account", async () => {
     const user = fixtureUser();
-    const transport = createFakeOptionsReadTransport(fixtureSeed(user));
+    const transport = createFakeOptionsReader(fixtureSeed(user));
     const runtime = createOptionsRuntime(baseInput(transport));
 
     const state = await runtime.refreshUser(user, asMarketId("market_01"));
@@ -163,7 +165,7 @@ describe("options runtime store and refresh", () => {
   it("readPanel projects NFT lanes from stored data without calling transport again", async () => {
     const user = fixtureUser();
     let transportCalls = 0;
-    const transport = wrapTransport(createFakeOptionsReadTransport(fixtureSeed(user)), () => {
+    const transport = wrapTransport(createFakeOptionsReader(fixtureSeed(user)), () => {
       transportCalls += 1;
     });
     const runtime = createOptionsRuntime(baseInput(transport));
@@ -180,7 +182,7 @@ describe("options runtime store and refresh", () => {
   });
 
   it("fails with LiveStreakConfigError when market is missing", async () => {
-    const transport = createFakeOptionsReadTransport(fixtureSeed());
+    const transport = createFakeOptionsReader(fixtureSeed());
     const runtime = createOptionsRuntime(baseInput(transport));
 
     await expect(runtime.refreshMarket(asMarketId("missing"))).rejects.toBeInstanceOf(
@@ -189,7 +191,7 @@ describe("options runtime store and refresh", () => {
   });
 
   it("fails with LiveStreakConfigError when vault is missing", async () => {
-    const transport = createFakeOptionsReadTransport(fixtureSeed());
+    const transport = createFakeOptionsReader(fixtureSeed());
     const runtime = createOptionsRuntime(baseInput(transport));
 
     await expect(runtime.refreshVault(asVaultId("missing"))).rejects.toBeInstanceOf(
@@ -198,7 +200,7 @@ describe("options runtime store and refresh", () => {
   });
 
   it("fails with LiveStreakConfigError when LVST account is missing", async () => {
-    const transport = createFakeOptionsReadTransport(fixtureSeed());
+    const transport = createFakeOptionsReader(fixtureSeed());
     const runtime = createOptionsRuntime(baseInput(transport));
 
     await expect(
@@ -207,15 +209,17 @@ describe("options runtime store and refresh", () => {
   });
 
   it("isolates two runtimes with two fake transports", async () => {
-    const transportA = createFakeOptionsReadTransport(fixtureSeed());
-    const transportB = createFakeOptionsReadTransport(fixtureSeed());
+    const transportA = createFakeOptionsReader(fixtureSeed());
+    const transportB = createFakeOptionsReader(fixtureSeed()) as FakeTransportInMemory;
 
     const runtimeA = createOptionsRuntime({
       config: { runtimeId: "runtime_a", user: fixtureUser() },
+      chainConfig: createFakeChainConfig(fixtureSeed()),
       transport: transportA
     });
     const runtimeB = createOptionsRuntime({
       config: { runtimeId: "runtime_b", user: fixtureUser() },
+      chainConfig: createFakeChainConfig(fixtureSeed()),
       transport: transportB
     });
 
@@ -235,7 +239,7 @@ describe("options runtime store and refresh", () => {
 
   it("subscription receives snapshot update and unsubscribe works", async () => {
     const user = fixtureUser();
-    const transport = createFakeOptionsReadTransport(fixtureSeed(user));
+    const transport = createFakeOptionsReader(fixtureSeed(user));
     const runtime = createOptionsRuntime(baseInput(transport));
 
     const seen: number[] = [];
@@ -259,7 +263,7 @@ describe("options runtime store and refresh", () => {
   });
 
   it("notifies subscribers when refreshMarket fails and clears lastError on success", async () => {
-    const transport = createFakeOptionsReadTransport(fixtureSeed());
+    const transport = createFakeOptionsReader(fixtureSeed());
     const runtime = createOptionsRuntime(baseInput(transport));
 
     const revisions: number[] = [];
@@ -281,7 +285,7 @@ describe("options runtime store and refresh", () => {
   });
 
   it("does not let returned snapshot mutation affect the store", async () => {
-    const transport = createFakeOptionsReadTransport(fixtureSeed());
+    const transport = createFakeOptionsReader(fixtureSeed());
     const runtime = createOptionsRuntime(baseInput(transport));
 
     await runtime.refreshMarket(asMarketId("market_01"));
@@ -312,15 +316,18 @@ describe("options runtime store and refresh", () => {
 
     try {
       let readerCalls = 0;
-      const transport = createContractsOptionsReadTransport({
-        reader: {
-          read: async () => {
-            readerCalls += 1;
-            throw new LiveStreakConfigError({
-              message: "polling read failed",
-              metadata: { details: "test" }
-            });
-          }
+      const transport = createOptionsReader({
+        chain: {
+          reader: {
+            read: async () => {
+              readerCalls += 1;
+              throw new LiveStreakConfigError({
+                message: "polling read failed",
+                metadata: { details: "test" }
+              });
+            }
+          },
+          writer: createFakeChainWriter()
         },
         addresses: CONTRACT_ADDRESSES
       });
@@ -331,6 +338,7 @@ describe("options runtime store and refresh", () => {
           marketIds: [HEX_MARKET_ID],
           refreshIntervalMs: 1_000
         },
+        chainConfig: createFakeChainConfig(),
         transport
       });
 

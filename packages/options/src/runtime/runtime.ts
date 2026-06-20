@@ -4,8 +4,10 @@ import { LiveStreakConfigError } from "@livestreak/core";
 
 import type { MarketId, UserAddress, VaultId } from "../model/ids.js";
 import type { OptionsUserOptionsSnapshot } from "../model/snapshot.js";
+import { createOptionsChain } from "../chains/index.js";
 import { projectOptionsPanel } from "../panel/project.js";
 import type { OptionsPanel } from "../panel/types.js";
+import { createOptionsReader } from "../read/reader.js";
 import type { OptionsReadTransport } from "../read/transport.js";
 import type { OptionsRuntimeConfig, OptionsRuntimeInput } from "./config.js";
 import { validateOptionsRuntimeConfig } from "./config.js";
@@ -49,7 +51,19 @@ class OptionsRuntimeFacade implements OptionsRuntime {
   constructor(input: OptionsRuntimeInput) {
     this.config = validateOptionsRuntimeConfig(input.config);
     this.store = createOptionsRuntimeStore(this.config.runtimeId);
-    this.transport = input.transport;
+    const chainConfig = input.chainConfig;
+    this.transport =
+      input.transport ??
+      createOptionsReader({
+        chain: createOptionsChain(chainConfig),
+        addresses: chainConfig.addresses,
+        ...(chainConfig.includeProtocolSummary === true
+          ? { includeProtocolSummary: true }
+          : {}),
+        ...(chainConfig.transferOperator === undefined
+          ? {}
+          : { transferOperator: chainConfig.transferOperator })
+      });
   }
 
   private readonly transport: OptionsReadTransport;

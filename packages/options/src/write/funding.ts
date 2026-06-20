@@ -5,14 +5,14 @@ import { LiveStreakConfigError } from "@livestreak/core";
 import type { TokenId, VaultId } from "../model/ids.js";
 import type { OptionsVaultSide } from "../model/vault.js";
 import { validateOptionsVaultSide } from "../model/vault.js";
-import { sideToSolidityValue } from "../read/contracts/sides.js";
-import type { OptionsContractAddresses } from "../read/contracts/addresses.js";
-import type { OptionsContractAbis } from "../read/contracts/transport.js";
+import { sideToSolidityValue } from "../read/decode/sides.js";
+import type { OptionsContractAddresses } from "../chains/addresses.js";
+import type { OptionsContractAbis } from "../read/reader.js";
 import {
   validateTokenIdForContracts,
   validateVaultIdForContracts
-} from "../read/contracts/validation.js";
-import type { ContractWriter } from "./transport.js";
+} from "../read/decode/validation.js";
+import type { OptionsChainWriter } from "../chains/types.js";
 
 export type FundStreamInput = {
   readonly tokenId: TokenId;
@@ -45,7 +45,7 @@ export type StopAllFundingInput = {
 };
 
 type FundingWriteDeps = {
-  readonly writer: ContractWriter;
+  readonly writer: OptionsChainWriter;
   readonly addresses: OptionsContractAddresses;
   readonly abis: Pick<OptionsContractAbis, "MarketDriver">;
 };
@@ -53,7 +53,7 @@ type FundingWriteDeps = {
 export const fundStream = async (
   deps: FundingWriteDeps,
   input: FundStreamInput
-): Promise<unknown> => {
+): Promise<string> => {
   const tokenId = validateTokenIdForContracts(input.tokenId);
   const vaultBytes = validateVaultIdForContracts(input.vaultId);
   const side = sideToSolidityValue(validateOptionsVaultSide(input.side));
@@ -68,7 +68,7 @@ export const fundStream = async (
   });
 };
 
-export const setLanes = async (deps: FundingWriteDeps, input: SetLanesInput): Promise<unknown> => {
+export const setLanes = async (deps: FundingWriteDeps, input: SetLanesInput): Promise<string> => {
   const tokenId = validateTokenIdForContracts(input.tokenId);
   const addDeposit = requireNonNegativeBigInt(input.addDeposit, "addDeposit");
   const lanes = input.lanes.map((lane) => ({
@@ -88,7 +88,7 @@ export const setLanes = async (deps: FundingWriteDeps, input: SetLanesInput): Pr
 export const stopFunding = async (
   deps: FundingWriteDeps,
   input: StopFundingInput
-): Promise<unknown> => {
+): Promise<string> => {
   const tokenId = validateTokenIdForContracts(input.tokenId);
   const vaultBytes = validateVaultIdForContracts(input.vaultId);
   const side = sideToSolidityValue(validateOptionsVaultSide(input.side));
@@ -104,7 +104,7 @@ export const stopFunding = async (
 export const stopAllFunding = async (
   deps: FundingWriteDeps,
   input: StopAllFundingInput
-): Promise<unknown> => {
+): Promise<string> => {
   const tokenId = validateTokenIdForContracts(input.tokenId);
 
   return deps.writer.write({

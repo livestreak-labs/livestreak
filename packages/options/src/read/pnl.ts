@@ -1,8 +1,8 @@
 // --- exports ---
 
 import type { UserAddress } from "../model/ids.js";
-import type { OptionsSessionPnlView } from "../model/pnl.js";
-import { projectSessionPnl } from "../model/pnl.js";
+import type { OptionsSessionPnlView } from "../model/math/pnl.js";
+import { projectSessionPnl } from "../model/math/pnl.js";
 import { gatherUserVaultClaims } from "./aggregation.js";
 import type { OptionsReadTransport } from "./transport.js";
 

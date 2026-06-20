@@ -2,12 +2,10 @@ import { LiveStreakConfigError } from "@livestreak/core";
 import { describe, expect, it } from "vitest";
 
 import { asMarketId, asTokenId, asUserAddress, asVaultId } from "../../src/model/ids.js";
-import {
-  createContractsOptionsReadTransport,
-  type ContractReader,
-  type ContractReadRequest,
-  type OptionsContractAddresses
-} from "../../src/read/contracts/index.js";
+import type { ChainReadRequest, OptionsChainReader } from "../../src/chains/types.js";
+import type { OptionsContractAddresses } from "../../src/chains/addresses.js";
+import { createOptionsReader } from "../../src/read/reader.js";
+import { createFakeChainWriter } from "../helpers/fake-chain.js";
 
 const MARKET_ID = asMarketId(
   "0x0000000000000000000000000000000000000000000000000000000000000001"
@@ -29,10 +27,10 @@ const ADDRESSES: OptionsContractAddresses = {
   dripsStreaming: "0x0000000000000000000000000000000000000019"
 };
 
-describe("contracts read transport", () => {
+describe("options reader", () => {
   it("maps stream state from marketRegistry", async () => {
-    const transport = createContractsOptionsReadTransport({
-      reader: createFakeReader(),
+    const transport = createOptionsReader({
+      chain: { reader: createFakeReader(), writer: createFakeChainWriter() },
       addresses: ADDRESSES
     });
 
@@ -44,8 +42,8 @@ describe("contracts read transport", () => {
   });
 
   it("maps market read with creator", async () => {
-    const transport = createContractsOptionsReadTransport({
-      reader: createFakeReader(),
+    const transport = createOptionsReader({
+      chain: { reader: createFakeReader(), writer: createFakeChainWriter() },
       addresses: ADDRESSES
     });
 
@@ -57,8 +55,8 @@ describe("contracts read transport", () => {
   });
 
   it("maps market vault ids via listMarketVaults", async () => {
-    const transport = createContractsOptionsReadTransport({
-      reader: createFakeReader(),
+    const transport = createOptionsReader({
+      chain: { reader: createFakeReader(), writer: createFakeChainWriter() },
       addresses: ADDRESSES
     });
 
@@ -67,8 +65,8 @@ describe("contracts read transport", () => {
   });
 
   it("maps vault read with steward state and pools", async () => {
-    const transport = createContractsOptionsReadTransport({
-      reader: createFakeReader(),
+    const transport = createOptionsReader({
+      chain: { reader: createFakeReader(), writer: createFakeChainWriter() },
       addresses: ADDRESSES
     });
 
@@ -80,8 +78,8 @@ describe("contracts read transport", () => {
   });
 
   it("maps vault share totals via getVaultPools", async () => {
-    const transport = createContractsOptionsReadTransport({
-      reader: createFakeReader(),
+    const transport = createOptionsReader({
+      chain: { reader: createFakeReader(), writer: createFakeChainWriter() },
       addresses: ADDRESSES
     });
 
@@ -91,8 +89,8 @@ describe("contracts read transport", () => {
   });
 
   it("maps tokensOfOwner for multi-NFT holders", async () => {
-    const transport = createContractsOptionsReadTransport({
-      reader: createFakeReader(),
+    const transport = createOptionsReader({
+      chain: { reader: createFakeReader(), writer: createFakeChainWriter() },
       addresses: ADDRESSES
     });
 
@@ -101,8 +99,8 @@ describe("contracts read transport", () => {
   });
 
   it("maps NFT lanes from MarketDriver and Vault getPosition", async () => {
-    const transport = createContractsOptionsReadTransport({
-      reader: createFakeReader(),
+    const transport = createOptionsReader({
+      chain: { reader: createFakeReader(), writer: createFakeChainWriter() },
       addresses: ADDRESSES
     });
 
@@ -119,8 +117,8 @@ describe("contracts read transport", () => {
   });
 
   it("maps LVST account from token balance and treasury staking", async () => {
-    const transport = createContractsOptionsReadTransport({
-      reader: createFakeReader(),
+    const transport = createOptionsReader({
+      chain: { reader: createFakeReader(), writer: createFakeChainWriter() },
       addresses: ADDRESSES
     });
 
@@ -131,8 +129,8 @@ describe("contracts read transport", () => {
   });
 
   it("maps protocol summary when enabled", async () => {
-    const transport = createContractsOptionsReadTransport({
-      reader: createFakeReader(),
+    const transport = createOptionsReader({
+      chain: { reader: createFakeReader(), writer: createFakeChainWriter() },
       addresses: ADDRESSES,
       includeProtocolSummary: true
     });
@@ -142,8 +140,8 @@ describe("contracts read transport", () => {
   });
 
   it("fails typed when market is missing", async () => {
-    const transport = createContractsOptionsReadTransport({
-      reader: createFakeReader({ marketExists: false }),
+    const transport = createOptionsReader({
+      chain: { reader: createFakeReader({ marketExists: false }), writer: createFakeChainWriter() },
       addresses: ADDRESSES
     });
 
@@ -151,8 +149,8 @@ describe("contracts read transport", () => {
   });
 
   it("fails typed when vault is missing", async () => {
-    const transport = createContractsOptionsReadTransport({
-      reader: createFakeReader({ vaultExists: false }),
+    const transport = createOptionsReader({
+      chain: { reader: createFakeReader({ vaultExists: false }), writer: createFakeChainWriter() },
       addresses: ADDRESSES
     });
 
@@ -163,12 +161,12 @@ describe("contracts read transport", () => {
     const callsA: string[] = [];
     const callsB: string[] = [];
 
-    const transportA = createContractsOptionsReadTransport({
-      reader: createRecordingReader(callsA),
+    const transportA = createOptionsReader({
+      chain: { reader: createRecordingReader(callsA), writer: createFakeChainWriter() },
       addresses: ADDRESSES
     });
-    const transportB = createContractsOptionsReadTransport({
-      reader: createRecordingReader(callsB),
+    const transportB = createOptionsReader({
+      chain: { reader: createRecordingReader(callsB), writer: createFakeChainWriter() },
       addresses: ADDRESSES
     });
 
@@ -182,8 +180,8 @@ describe("contracts read transport", () => {
 
   it("rejects invalid contract addresses at construction", () => {
     expect(() =>
-      createContractsOptionsReadTransport({
-        reader: createFakeReader(),
+      createOptionsReader({
+        chain: { reader: createFakeReader(), writer: createFakeChainWriter() },
         addresses: {
           ...ADDRESSES,
           marketRegistry: "not-an-address" as `0x${string}`
@@ -194,15 +192,15 @@ describe("contracts read transport", () => {
 
   it("rejects invalid market, vault, token, and user ids before reader calls", async () => {
     let readerCalls = 0;
-    const reader: ContractReader = {
+    const reader: OptionsChainReader = {
       read: async () => {
         readerCalls += 1;
         return true;
       }
     };
 
-    const transport = createContractsOptionsReadTransport({
-      reader,
+    const transport = createOptionsReader({
+      chain: { reader, writer: createFakeChainWriter() },
       addresses: ADDRESSES
     });
 
@@ -223,12 +221,15 @@ describe("contracts read transport", () => {
 
   it("accepts valid hex ids and reaches reader", async () => {
     let readerCalls = 0;
-    const transport = createContractsOptionsReadTransport({
-      reader: {
-        read: async (request) => {
-          readerCalls += 1;
-          return respond(request, {});
-        }
+    const transport = createOptionsReader({
+      chain: {
+        reader: {
+          read: async (request) => {
+            readerCalls += 1;
+            return respond(request, {});
+          }
+        },
+        writer: createFakeChainWriter()
       },
       addresses: ADDRESSES
     });
@@ -243,18 +244,18 @@ type FakeReaderOptions = {
   readonly vaultExists?: boolean;
 };
 
-const createFakeReader = (options: FakeReaderOptions = {}): ContractReader => ({
+const createFakeReader = (options: FakeReaderOptions = {}): OptionsChainReader => ({
   read: async (request) => respond(request, options)
 });
 
-const createRecordingReader = (calls: string[]): ContractReader => ({
+const createRecordingReader = (calls: string[]): OptionsChainReader => ({
   read: async (request) => {
     calls.push(`${request.address}:${request.functionName}`);
     return respond(request, {});
   }
 });
 
-const respond = (request: ContractReadRequest, options: FakeReaderOptions): unknown => {
+const respond = (request: ChainReadRequest, options: FakeReaderOptions): unknown => {
   const { address, functionName, args = [] } = request;
 
   if (address === ADDRESSES.marketRegistry) {

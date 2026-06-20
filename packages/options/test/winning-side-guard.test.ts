@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { asVaultId } from "../src/model/ids.js";
-import {
-  createContractsOptionsReadTransport,
-  type ContractReader,
-  type ContractReadRequest,
-  type OptionsContractAddresses
-} from "../src/read/contracts/index.js";
+import type { ChainReadRequest, OptionsChainReader } from "../src/chains/types.js";
+import type { OptionsContractAddresses } from "../src/chains/addresses.js";
+import { createOptionsReader } from "../src/read/reader.js";
+import { createFakeChainWriter } from "./helpers/fake-chain.js";
 
 const VAULT_ID = asVaultId(
   "0x00000000000000000000000000000000000000000000000000000000000000aa"
@@ -25,8 +23,11 @@ const ADDRESSES: OptionsContractAddresses = {
 describe("readWinningSide guard", () => {
   it("never calls winningSide for an open vault", async () => {
     const calls: string[] = [];
-    const transport = createContractsOptionsReadTransport({
-      reader: createGuardReader(calls, { status: 0 }),
+    const transport = createOptionsReader({
+      chain: {
+        reader: createGuardReader(calls, { status: 0 }),
+        writer: createFakeChainWriter()
+      },
       addresses: ADDRESSES
     });
 
@@ -39,8 +40,11 @@ describe("readWinningSide guard", () => {
 
   it("calls winningSide only when vault status is resolved", async () => {
     const calls: string[] = [];
-    const transport = createContractsOptionsReadTransport({
-      reader: createGuardReader(calls, { status: 3, winningSide: 0 }),
+    const transport = createOptionsReader({
+      chain: {
+        reader: createGuardReader(calls, { status: 3, winningSide: 0 }),
+        writer: createFakeChainWriter()
+      },
       addresses: ADDRESSES
     });
 
@@ -54,7 +58,7 @@ describe("readWinningSide guard", () => {
 const createGuardReader = (
   calls: string[],
   vault: { readonly status: number; readonly winningSide?: number }
-): ContractReader => ({
+): OptionsChainReader => ({
   read: async (request) => {
     calls.push(request.functionName);
     return respondGuard(request, vault);
@@ -62,7 +66,7 @@ const createGuardReader = (
 });
 
 const respondGuard = (
-  request: ContractReadRequest,
+  request: ChainReadRequest,
   vault: { readonly status: number; readonly winningSide?: number }
 ): unknown => {
   const { address, functionName } = request;

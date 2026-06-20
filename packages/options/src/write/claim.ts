@@ -3,15 +3,15 @@
 import type { TokenId, UserAddress, VaultId } from "../model/ids.js";
 import type { OptionsVaultSide } from "../model/vault.js";
 import { validateOptionsVaultSide } from "../model/vault.js";
-import { sideToSolidityValue } from "../read/contracts/sides.js";
-import type { OptionsContractAddresses } from "../read/contracts/addresses.js";
-import { validateUserAddress } from "../read/contracts/validation.js";
-import type { OptionsContractAbis } from "../read/contracts/transport.js";
+import { sideToSolidityValue } from "../read/decode/sides.js";
+import type { OptionsContractAddresses } from "../chains/addresses.js";
+import { validateUserAddress } from "../read/decode/validation.js";
+import type { OptionsContractAbis } from "../read/reader.js";
 import {
   validateTokenIdForContracts,
   validateVaultIdForContracts
-} from "../read/contracts/validation.js";
-import type { ContractWriter } from "./transport.js";
+} from "../read/decode/validation.js";
+import type { OptionsChainWriter } from "../chains/types.js";
 
 export type WithdrawInput = {
   readonly tokenId: TokenId;
@@ -33,12 +33,12 @@ export type ClaimLossLvstInput = {
 };
 
 type ClaimWriteDeps = {
-  readonly writer: ContractWriter;
+  readonly writer: OptionsChainWriter;
   readonly addresses: OptionsContractAddresses;
   readonly abis: Pick<OptionsContractAbis, "MarketDriver">;
 };
 
-export const withdraw = async (deps: ClaimWriteDeps, input: WithdrawInput): Promise<unknown> => {
+export const withdraw = async (deps: ClaimWriteDeps, input: WithdrawInput): Promise<string> => {
   const tokenId = validateTokenIdForContracts(input.tokenId);
   const vaultBytes = validateVaultIdForContracts(input.vaultId);
   const to = validateUserAddress(input.to, "to");
@@ -54,7 +54,7 @@ export const withdraw = async (deps: ClaimWriteDeps, input: WithdrawInput): Prom
 export const withdrawMany = async (
   deps: ClaimWriteDeps,
   input: WithdrawManyInput
-): Promise<unknown> => {
+): Promise<string> => {
   const tokenId = validateTokenIdForContracts(input.tokenId);
   const to = validateUserAddress(input.to, "to");
   const vaultIds = input.vaultIds.map((vaultId) => validateVaultIdForContracts(vaultId));
@@ -70,7 +70,7 @@ export const withdrawMany = async (
 export const claimLossLvst = async (
   deps: ClaimWriteDeps,
   input: ClaimLossLvstInput
-): Promise<unknown> => {
+): Promise<string> => {
   const tokenId = validateTokenIdForContracts(input.tokenId);
   const vaultBytes = validateVaultIdForContracts(input.vaultId);
   const side = sideToSolidityValue(validateOptionsVaultSide(input.side));

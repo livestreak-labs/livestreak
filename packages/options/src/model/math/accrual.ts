@@ -1,6 +1,6 @@
 // --- exports ---
 
-import type { OptionsVaultPools, OptionsVaultShareTotals, OptionsVaultSide } from "./vault.js";
+import type { OptionsVaultPools, OptionsVaultShareTotals, OptionsVaultSide } from "../vault.js";
 import { priceOf, projectShares } from "./curve.js";
 
 export type OptionsBoardState = {

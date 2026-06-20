@@ -19,7 +19,60 @@ import {
   type UserAddress,
   type VaultId
 } from "../../src/model/index.js";
+import type { OptionsContractAddresses } from "../../src/chains/addresses.js";
+import type { ChainReadRequest, ChainWriteRequest, OptionsChain, OptionsChainConfig } from "../../src/chains/types.js";
 import type { OptionsReadTransport } from "../../src/read/transport.js";
+
+export const DEFAULT_FAKE_ADDRESSES: OptionsContractAddresses = {
+  marketRegistry: "0x0000000000000000000000000000000000000011",
+  vault: "0x0000000000000000000000000000000000000014",
+  marketDriver: "0x0000000000000000000000000000000000000015",
+  stewardRegistry: "0x0000000000000000000000000000000000000017",
+  treasury: "0x0000000000000000000000000000000000000018",
+  lvstToken: "0x0000000000000000000000000000000000000016",
+  dripsStreaming: "0x0000000000000000000000000000000000000019"
+};
+
+export const createFakeOptionsReader = (
+  seed: FakeTransportSeed = {}
+): OptionsReadTransport => new FakeTransportInMemory(seed);
+
+export const createFakeOptionsChain = (
+  seed: FakeTransportSeed = {}
+): { readonly chain: OptionsChain; readonly addresses: OptionsContractAddresses } => ({
+  chain: {
+    reader: createFakeChainReader(seed),
+    writer: createFakeChainWriter()
+  },
+  addresses: DEFAULT_FAKE_ADDRESSES
+});
+
+export const createFakeChainConfig = (
+  seed: FakeTransportSeed = {}
+): OptionsChainConfig => ({
+  walletInit: {
+    chain: "evm",
+    seedSource: "raw",
+    config: {
+      chainId: 31_337,
+      provider: "http://127.0.0.1:8545",
+      bundlerUrl: "http://127.0.0.1:4337",
+      isSponsored: false,
+      useNativeCoins: false,
+      entryPointAddress: "0x0000000000000000000000000000000000000001",
+      safe4337ModuleAddress: "0x0000000000000000000000000000000000000002",
+      safeModulesSetupAddress: "0x0000000000000000000000000000000000000003",
+      safeModulesVersion: "0.3.0",
+      contractNetworks: {}
+    }
+  },
+  seed: "test-seed",
+  addresses: DEFAULT_FAKE_ADDRESSES,
+  ...(seed.protocol === undefined ? {} : { includeProtocolSummary: true })
+});
+
+/** @deprecated use createFakeOptionsReader */
+export const createFakeOptionsReadTransport = createFakeOptionsReader;
 
 export interface FakeTransportSeed {
   readonly markets?: readonly OptionsMarket[];
@@ -43,10 +96,6 @@ export interface FakeTransportSeed {
   readonly approvedForAll?: Readonly<Record<string, boolean>>;
   readonly streamStates?: Readonly<Record<string, OptionsStreamState>>;
 }
-
-export const createFakeOptionsReadTransport = (
-  seed: FakeTransportSeed = {}
-): FakeTransportInMemory => new FakeTransportInMemory(seed);
 
 export class FakeTransportInMemory implements OptionsReadTransport {
   private readonly markets = new Map<string, OptionsMarket>();
@@ -496,3 +545,42 @@ const claimKey = (tokenId: TokenId, vaultId: VaultId, side: OptionsVaultSide): s
   `${tokenId.toString()}:${vaultId}:${side}`;
 
 const boardKey = (vaultId: VaultId, side: OptionsVaultSide): string => `${vaultId}:${side}`;
+
+export type FakeChainWriter = OptionsChain["writer"] & {
+  readonly requests: readonly ChainWriteRequest[];
+  readonly clear: () => void;
+};
+
+export const createFakeChainWriter = (): FakeChainWriter => {
+  const requests: ChainWriteRequest[] = [];
+
+  return {
+    get requests() {
+      return requests;
+    },
+    clear() {
+      requests.length = 0;
+    },
+    write(request: ChainWriteRequest): Promise<string> {
+      requests.push(request);
+      return Promise.resolve("0xfake_user_op_hash");
+    }
+  };
+};
+
+const createFakeChainReader = (seed: FakeTransportSeed): OptionsChain["reader"] => {
+  const transport = new FakeTransportInMemory(seed);
+
+  return {
+    read: async (request: ChainReadRequest) => {
+      if (request.functionName === "marketExists") {
+        const marketId = String(request.args?.[0] ?? "");
+        return transport.readMarket(asMarketId(marketId)).then(() => true).catch(() => false);
+      }
+
+      throw new LiveStreakConfigError({
+        message: `Fake chain reader does not implement ${request.functionName}; use createFakeOptionsReader for high-level reads`
+      });
+    }
+  };
+};

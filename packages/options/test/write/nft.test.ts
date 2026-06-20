@@ -3,37 +3,32 @@ import { marketDriverAbi } from "@livestreak/contracts/evm/abis";
 import { describe, expect, it } from "vitest";
 
 import { asTokenId, asUserAddress } from "../../src/model/ids.js";
-import type { OptionsContractAddresses } from "../../src/read/contracts/addresses.js";
-import { createContractsOptionsWriteTransport } from "../../src/write/transport.js";
-import { createFakeContractWriter } from "../helpers/fake-writer.js";
+import { approveNft, setApprovalForAll, transferNft } from "../../src/write/nft.js";
+import {
+  createFakeChainWriter,
+  DEFAULT_FAKE_ADDRESSES,
+  type FakeChainWriter
+} from "../helpers/fake-chain.js";
 
 const TOKEN_ID = asTokenId(42n);
 const FROM = asUserAddress("0x0000000000000000000000000000000000000001");
 const TO = asUserAddress("0x0000000000000000000000000000000000000002");
 const OPERATOR = asUserAddress("0x0000000000000000000000000000000000000003");
 
-const ADDRESSES: OptionsContractAddresses = {
-  marketRegistry: "0x0000000000000000000000000000000000000011",
-  vault: "0x0000000000000000000000000000000000000014",
-  marketDriver: "0x0000000000000000000000000000000000000015",
-  stewardRegistry: "0x0000000000000000000000000000000000000017",
-  treasury: "0x0000000000000000000000000000000000000018",
-  lvstToken: "0x0000000000000000000000000000000000000016",
-  dripsStreaming: "0x0000000000000000000000000000000000000019"
-};
+const writeDeps = (writer: FakeChainWriter = createFakeChainWriter()) => ({
+  writer,
+  addresses: DEFAULT_FAKE_ADDRESSES,
+  abis: { MarketDriver: marketDriverAbi }
+});
 
 describe("write nft", () => {
   it("transferNft encodes from, to, and tokenId", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await transport.transferNft({ from: FROM, to: TO, tokenId: TOKEN_ID });
+    await transferNft(writeDeps(writer), { from: FROM, to: TO, tokenId: TOKEN_ID });
 
     expect(writer.requests[0]).toEqual({
-      address: ADDRESSES.marketDriver,
+      address: DEFAULT_FAKE_ADDRESSES.marketDriver,
       abi: marketDriverAbi,
       functionName: "transferFrom",
       args: [FROM, TO, TOKEN_ID]
@@ -41,16 +36,12 @@ describe("write nft", () => {
   });
 
   it("approveNft encodes operator and tokenId", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await transport.approveNft({ operator: OPERATOR, tokenId: TOKEN_ID });
+    await approveNft(writeDeps(writer), { operator: OPERATOR, tokenId: TOKEN_ID });
 
     expect(writer.requests[0]).toEqual({
-      address: ADDRESSES.marketDriver,
+      address: DEFAULT_FAKE_ADDRESSES.marketDriver,
       abi: marketDriverAbi,
       functionName: "approve",
       args: [OPERATOR, TOKEN_ID]
@@ -58,16 +49,12 @@ describe("write nft", () => {
   });
 
   it("setApprovalForAll encodes operator and approved flag", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await transport.setApprovalForAll({ operator: OPERATOR, approved: true });
+    await setApprovalForAll(writeDeps(writer), { operator: OPERATOR, approved: true });
 
     expect(writer.requests[0]).toEqual({
-      address: ADDRESSES.marketDriver,
+      address: DEFAULT_FAKE_ADDRESSES.marketDriver,
       abi: marketDriverAbi,
       functionName: "setApprovalForAll",
       args: [OPERATOR, true]
@@ -75,14 +62,10 @@ describe("write nft", () => {
   });
 
   it("rejects invalid tokenId before transfer write", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
     await expect(
-      transport.transferNft({
+      transferNft(writeDeps(writer), {
         from: FROM,
         to: TO,
         tokenId: asTokenId(-1n)
@@ -93,14 +76,10 @@ describe("write nft", () => {
   });
 
   it("rejects invalid operator before approve write", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
     await expect(
-      transport.approveNft({
+      approveNft(writeDeps(writer), {
         operator: asUserAddress("bad"),
         tokenId: TOKEN_ID
       })

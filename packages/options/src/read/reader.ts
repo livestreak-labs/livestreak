@@ -11,19 +11,20 @@ import {
   vaultAbi
 } from "@livestreak/contracts/evm/abis";
 
-import { asMarketId, asTokenId, asVaultId } from "../../model/ids.js";
-import type { LvstAccount } from "../../model/lvst.js";
-import type { MarketId, TokenId, UserAddress, VaultId } from "../../model/ids.js";
-import type { OptionsBoardState } from "../../model/accrual.js";
-import type { OptionsStreamState } from "../../model/media.js";
-import type { OptionsMarket } from "../../model/market.js";
-import type { OptionsNft } from "../../model/nft.js";
-import type { OptionsProtocolSummary } from "../../model/snapshot.js";
-import type { OptionsVault } from "../../model/vault.js";
-import type { OptionsVaultShareTotals, OptionsVaultSide } from "../../model/vault.js";
-import type { OptionsReadTransport } from "../transport.js";
-import type { OptionsContractAddresses } from "./addresses.js";
-import { contractsReadFailed, contractsReadNotFound } from "./errors.js";
+import { asMarketId, asTokenId, asVaultId } from "../model/ids.js";
+import type { LvstAccount } from "../model/lvst.js";
+import type { MarketId, TokenId, UserAddress, VaultId } from "../model/ids.js";
+import type { OptionsBoardState } from "../model/math/accrual.js";
+import type { OptionsStreamState } from "../model/stream.js";
+import type { OptionsMarket } from "../model/market.js";
+import type { OptionsNft } from "../model/nft.js";
+import type { OptionsProtocolSummary } from "../model/snapshot.js";
+import type { OptionsVault } from "../model/vault.js";
+import type { OptionsVaultShareTotals, OptionsVaultSide } from "../model/vault.js";
+import type { OptionsReadTransport } from "./transport.js";
+import type { OptionsChain } from "../chains/types.js";
+import type { OptionsContractAddresses } from "../chains/addresses.js";
+import { contractsReadFailed, contractsReadNotFound } from "./decode/errors.js";
 import {
   bytes32ToHex,
   enrichLane,
@@ -50,8 +51,8 @@ import {
   type RawStreamState,
   type RawVaultData,
   type RawVaultPools
-} from "./mapping.js";
-import { sideFromSolidityValue, sideToSolidityValue } from "./sides.js";
+} from "./decode/mapping.js";
+import { sideFromSolidityValue, sideToSolidityValue } from "./decode/sides.js";
 import {
   validateContractAddress,
   validateMarketIdForContracts,
@@ -59,18 +60,7 @@ import {
   validateTokenIdForContracts,
   validateUserAddress,
   validateVaultIdForContracts
-} from "./validation.js";
-
-export type ContractReadRequest = {
-  readonly address: `0x${string}`;
-  readonly abi: readonly unknown[];
-  readonly functionName: string;
-  readonly args?: readonly unknown[];
-};
-
-export type ContractReader = {
-  readonly read: (request: ContractReadRequest) => Promise<unknown>;
-};
+} from "./decode/validation.js";
 
 export type OptionsContractAbis = {
   readonly MarketRegistry: typeof marketRegistryAbi;
@@ -92,30 +82,27 @@ const DEFAULT_ABIS: OptionsContractAbis = {
   DripsStreaming: dripsStreamingAbi
 };
 
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
-
-export type ContractsOptionsReadTransportInput = {
-  readonly reader: ContractReader;
+export type OptionsReaderInput = {
+  readonly chain: OptionsChain;
   readonly addresses: OptionsContractAddresses;
   readonly abis?: OptionsContractAbis;
   readonly includeProtocolSummary?: boolean;
   readonly transferOperator?: UserAddress;
 };
 
-export const createContractsOptionsReadTransport = (
-  input: ContractsOptionsReadTransportInput
-): OptionsReadTransport => new ContractsOptionsReadTransport(input);
+export const createOptionsReader = (input: OptionsReaderInput): OptionsReadTransport =>
+  new OptionsReader(input);
 
-class ContractsOptionsReadTransport implements OptionsReadTransport {
-  private readonly reader: ContractReader;
+class OptionsReader implements OptionsReadTransport {
+  private readonly chain: OptionsChain;
   private readonly addresses: OptionsContractAddresses;
   private readonly abis: OptionsContractAbis;
   private readonly transferOperator?: UserAddress;
   private usdcAddress?: `0x${string}`;
   readonly readProtocolSummary?: () => Promise<OptionsProtocolSummary>;
 
-  constructor(input: ContractsOptionsReadTransportInput) {
-    this.reader = input.reader;
+  constructor(input: OptionsReaderInput) {
+    this.chain = input.chain;
     this.addresses = validateOptionsContractAddresses(input.addresses);
     this.abis = input.abis ?? DEFAULT_ABIS;
     this.transferOperator =
@@ -641,7 +628,7 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
     functionName: string,
     args: readonly unknown[] = []
   ): Promise<T> {
-    return (await this.reader.read({ address, abi, functionName, args })) as T;
+    return (await this.chain.reader.read({ address, abi, functionName, args })) as T;
   }
 
   private async readTransferFlags(

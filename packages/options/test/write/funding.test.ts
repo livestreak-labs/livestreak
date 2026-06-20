@@ -3,34 +3,35 @@ import { marketDriverAbi } from "@livestreak/contracts/evm/abis";
 import { describe, expect, it } from "vitest";
 
 import { asTokenId, asVaultId } from "../../src/model/ids.js";
-import type { OptionsContractAddresses } from "../../src/read/contracts/addresses.js";
-import { createContractsOptionsWriteTransport } from "../../src/write/transport.js";
-import { createFakeContractWriter } from "../helpers/fake-writer.js";
+import { validateOptionsContractAddresses } from "../../src/read/decode/validation.js";
+import {
+  fundStream,
+  setLanes,
+  stopAllFunding,
+  stopFunding
+} from "../../src/write/funding.js";
+import {
+  createFakeChainWriter,
+  DEFAULT_FAKE_ADDRESSES,
+  type FakeChainWriter
+} from "../helpers/fake-chain.js";
 
 const TOKEN_ID = asTokenId(42n);
 const VAULT_ID = asVaultId(
   "0x00000000000000000000000000000000000000000000000000000000000000aa"
 );
 
-const ADDRESSES: OptionsContractAddresses = {
-  marketRegistry: "0x0000000000000000000000000000000000000011",
-  vault: "0x0000000000000000000000000000000000000014",
-  marketDriver: "0x0000000000000000000000000000000000000015",
-  stewardRegistry: "0x0000000000000000000000000000000000000017",
-  treasury: "0x0000000000000000000000000000000000000018",
-  lvstToken: "0x0000000000000000000000000000000000000016",
-  dripsStreaming: "0x0000000000000000000000000000000000000019"
-};
+const writeDeps = (writer: FakeChainWriter = createFakeChainWriter()) => ({
+  writer,
+  addresses: DEFAULT_FAKE_ADDRESSES,
+  abis: { MarketDriver: marketDriverAbi }
+});
 
 describe("write funding", () => {
   it("fundStream encodes tokenId, vault, side, rate, and deposit", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await transport.fundStream({
+    await fundStream(writeDeps(writer), {
       tokenId: TOKEN_ID,
       vaultId: VAULT_ID,
       side: "yes",
@@ -40,7 +41,7 @@ describe("write funding", () => {
 
     expect(writer.requests).toHaveLength(1);
     expect(writer.requests[0]).toEqual({
-      address: ADDRESSES.marketDriver,
+      address: DEFAULT_FAKE_ADDRESSES.marketDriver,
       abi: marketDriverAbi,
       functionName: "fund",
       args: [TOKEN_ID, VAULT_ID, 0, 13_333n, 1_000_000n]
@@ -48,13 +49,9 @@ describe("write funding", () => {
   });
 
   it("fundStream encodes no side as 1", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await transport.fundStream({
+    await fundStream(writeDeps(writer), {
       tokenId: TOKEN_ID,
       vaultId: VAULT_ID,
       side: "no",
@@ -66,13 +63,9 @@ describe("write funding", () => {
   });
 
   it("setLanes encodes lanes and addDeposit", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await transport.setLanes({
+    await setLanes(writeDeps(writer), {
       tokenId: TOKEN_ID,
       addDeposit: 500_000n,
       lanes: [
@@ -82,7 +75,7 @@ describe("write funding", () => {
     });
 
     expect(writer.requests[0]).toEqual({
-      address: ADDRESSES.marketDriver,
+      address: DEFAULT_FAKE_ADDRESSES.marketDriver,
       abi: marketDriverAbi,
       functionName: "setLanes",
       args: [
@@ -97,20 +90,16 @@ describe("write funding", () => {
   });
 
   it("stopFunding encodes tokenId, vault, and side", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await transport.stopFunding({
+    await stopFunding(writeDeps(writer), {
       tokenId: TOKEN_ID,
       vaultId: VAULT_ID,
       side: "no"
     });
 
     expect(writer.requests[0]).toEqual({
-      address: ADDRESSES.marketDriver,
+      address: DEFAULT_FAKE_ADDRESSES.marketDriver,
       abi: marketDriverAbi,
       functionName: "stop",
       args: [TOKEN_ID, VAULT_ID, 1]
@@ -118,16 +107,12 @@ describe("write funding", () => {
   });
 
   it("stopAllFunding encodes tokenId only", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
-    await transport.stopAllFunding({ tokenId: TOKEN_ID });
+    await stopAllFunding(writeDeps(writer), { tokenId: TOKEN_ID });
 
     expect(writer.requests[0]).toEqual({
-      address: ADDRESSES.marketDriver,
+      address: DEFAULT_FAKE_ADDRESSES.marketDriver,
       abi: marketDriverAbi,
       functionName: "stopAll",
       args: [TOKEN_ID]
@@ -135,14 +120,10 @@ describe("write funding", () => {
   });
 
   it("rejects invalid vaultId before write", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
     await expect(
-      transport.fundStream({
+      fundStream(writeDeps(writer), {
         tokenId: TOKEN_ID,
         vaultId: asVaultId("not_bytes32"),
         side: "yes",
@@ -155,28 +136,20 @@ describe("write funding", () => {
   });
 
   it("rejects invalid tokenId before write", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
     await expect(
-      transport.stopAllFunding({ tokenId: asTokenId(-1n) })
+      stopAllFunding(writeDeps(writer), { tokenId: asTokenId(-1n) })
     ).rejects.toBeInstanceOf(LiveStreakConfigError);
 
     expect(writer.requests).toHaveLength(0);
   });
 
   it("rejects zero rate before fundStream write", async () => {
-    const writer = createFakeContractWriter();
-    const transport = createContractsOptionsWriteTransport({
-      writer,
-      addresses: ADDRESSES
-    });
+    const writer = createFakeChainWriter();
 
     await expect(
-      transport.fundStream({
+      fundStream(writeDeps(writer), {
         tokenId: TOKEN_ID,
         vaultId: VAULT_ID,
         side: "yes",
@@ -188,16 +161,11 @@ describe("write funding", () => {
     expect(writer.requests).toHaveLength(0);
   });
 
-  it("rejects invalid addresses at transport construction", () => {
-    const writer = createFakeContractWriter();
-
+  it("rejects invalid addresses at validation", () => {
     expect(() =>
-      createContractsOptionsWriteTransport({
-        writer,
-        addresses: {
-          ...ADDRESSES,
-          marketDriver: "bad" as `0x${string}`
-        }
+      validateOptionsContractAddresses({
+        ...DEFAULT_FAKE_ADDRESSES,
+        marketDriver: "bad" as `0x${string}`
       })
     ).toThrow(LiveStreakConfigError);
   });

@@ -3,7 +3,7 @@
 import { LiveStreakConfigError } from "@livestreak/core";
 
 import type { MarketId, TokenId, UserAddress, VaultId } from "../../model/ids.js";
-import type { OptionsContractAddresses } from "./addresses.js";
+import type { OptionsContractAddresses } from "../../chains/addresses.js";
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/;
