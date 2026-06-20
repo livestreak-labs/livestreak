@@ -1,11 +1,18 @@
 export type { OptionsLane } from "./lane.js";
 export type {
-  GatewayOverrides,
+  OptionsMediaResolver,
+  OptionsMediaResolvers,
   OptionsStreamMedia,
   OptionsStreamState,
   OptionsStreamStatus
 } from "./media.js";
-export { resolveStreamMedia, SCHEME_GATEWAY } from "./media.js";
+export {
+  DEFAULT_MEDIA_RESOLVERS,
+  resolveStreamMedia,
+  walrusAggregatorResolver,
+  WALRUS_MAINNET_AGGREGATOR,
+  WALRUS_TESTNET_AGGREGATOR
+} from "./media.js";
 export type {
   OptionsClaimEntry,
   OptionsClaimsView,

@@ -90,7 +90,10 @@ describe("options public exports", () => {
   it("exports consumer media read helpers", () => {
     expect(publicExport("getStreamMedia")).toBeTypeOf("function");
     expect(publicExport("resolveStreamMedia")).toBeTypeOf("function");
-    expect(publicExport("SCHEME_GATEWAY")).toBeTypeOf("object");
+    expect(publicExport("DEFAULT_MEDIA_RESOLVERS")).toBeTypeOf("object");
+    expect(publicExport("walrusAggregatorResolver")).toBeTypeOf("function");
     expect(publicExport("OptionsStreamMedia")).toBeUndefined();
+    expect(publicExport("SCHEME_GATEWAY")).toBeUndefined();
+    expect(publicExport("GatewayOverrides")).toBeUndefined();
   });
 });
