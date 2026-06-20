@@ -67,15 +67,15 @@ USDC / LVST       -> Coin<USDC> / Coin<LVST>
 - [x] `Treasury` + `LvstToken` — `Coin<LVST>`, loss-mint, skim, stake, dividends
 
 ### Stage 4 — Reads + kit
-- [ ] Market reads — `marketCount` / `marketIdAt` / `getMarket` / `getVaultIds` / `marketExists`
-- [ ] Vault reads — `getVault` / `getPosition` / `getBoard` / `pot` / `lossClaimable` / `caughtUp` / `pendingShares`
-- [ ] Steward reads — hot / dispute metadata
-- [ ] Sui TS kit — Sui SDK type-gen (parallel to wagmi) + a `deployments` analog
-- [ ] resolution helper reads consolidated for options consumers
+- [x] Market reads — `marketCount` / `marketIdAt` / `getMarket` / `getVaultIds` / `marketExists`
+- [x] Vault reads — `getVault` / `getPosition` / `getBoard` / `pot` / `lossClaimable` / `caughtUp` / `pendingShares`
+- [x] Steward reads — hot / dispute metadata
+- [x] Sui TS kit — `@livestreak/contracts/sui` (`LiveStreakSuiClient`, `loadDeployment`, `deploy:sui`)
+- [x] resolution helper reads — `resolution_reads::view_vault`
 
 ### Stage 5 — Parity verification
 - [ ] Move unit tests mirroring the forge suite (the 137 EVM cases → Move equivalents)
-- [ ] Sui e2e — port the AI Labs Demo Day conservation stress story (≥12 vaults, edge matrix, conservation ledger)
+- [x] Sui e2e — localnet Demo Day + **n=130 bounded-advance** via SDK (`npm run e2e:sui`; needs `sui start`, not testnet)
 - [ ] Invariants — conservation, `endedAt`-set-once, one-side-per-vault, flow-guard
 
 **Cross-chain coherence:** `architecture.md` / `streamed-funding-explained.md` are the shared protocol law (why they live at package-level `docs/`). `chains/evm` and `chains/sui` are two implementations of it.
@@ -90,7 +90,9 @@ Run after touching this package. Full checklist: [repo TODO § Hardening loop](.
 # EVM
 cd packages/contracts && forge fmt --check && forge build && forge test -vv && npm run gen
 # Sui
-cd packages/contracts/chains/sui && sui move build && sui move test
+cd packages/contracts/chains/sui && sui move build && sui move test --build-env testnet
+# Sui localnet kit (requires `sui start --with-faucet`, Sui CLI ≥1.73)
+cd packages/contracts && npm run deploy:sui -- --name localnet && npm run e2e:sui
 ```
 
 Also scan:
