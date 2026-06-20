@@ -10,8 +10,9 @@ use livestreak::side;
 use livestreak::streams::{Self, StreamReceiver, StreamsRegistry};
 use livestreak::vault::{Self, VaultRegistry};
 use livestreak::drips::{Self, DripsRegistry};
+use livestreak::treasury::{Self, TreasuryRegistry};
 use sui::clock::Clock;
-use sui::coin::Coin;
+use sui::coin::{Self, Coin};
 use sui::event;
 use sui::table::{Self, Table};
 
@@ -115,9 +116,9 @@ public fun receiver_account_view(registry: &VaultDriverRegistry, vault_id: vecto
     receiver_from_pool(registry.driver_id, pool_id)
 }
 
-public(package) fun receiver_account(
+public(package) fun receiver_account<T>(
     registry: &mut VaultDriverRegistry,
-    vault: &VaultRegistry,
+    vault: &VaultRegistry<T>,
     vault_id: vector<u8>,
     side: u8,
 ): u256 {
@@ -137,7 +138,7 @@ public(package) fun receiver_account(
 
 public fun create_vault<T>(
     registry: &mut VaultDriverRegistry,
-    vault_registry: &mut VaultRegistry,
+    vault_registry: &mut VaultRegistry<T>,
     market_registry: &mut MarketRegistry,
     drips_registry: &mut DripsRegistry<T>,
     streams_registry: &mut StreamsRegistry<T>,
@@ -195,7 +196,7 @@ public fun create_vault<T>(
     );
 
     let (_, _, _, _, max_end) = streams::streams_state(streams_registry, account);
-    vault::on_fund(vault_registry, account, vault_id, seed_side, rate, max_end, ctx);
+    vault::on_fund(vault_registry, account, vault_id, seed_side, rate, max_end, clock, ctx);
 
     table::add(
         &mut registry.seeds,
@@ -217,7 +218,7 @@ public fun create_vault<T>(
 
 public fun stop_seed<T>(
     registry: &mut VaultDriverRegistry,
-    vault_registry: &mut VaultRegistry,
+    vault_registry: &mut VaultRegistry<T>,
     drips_registry: &mut DripsRegistry<T>,
     streams_registry: &mut StreamsRegistry<T>,
     vault_id: vector<u8>,
@@ -250,7 +251,7 @@ public fun stop_seed<T>(
         ctx,
     );
 
-    vault::on_stop(vault_registry, account, vault_id, lane.side);
+    vault::on_stop(vault_registry, account, vault_id, lane.side, clock);
     let seed = table::borrow_mut(&mut registry.seeds, seed_key);
     seed.active = false;
 
@@ -294,15 +295,49 @@ public fun harvest<T>(
     amt
 }
 
-public fun withdraw_seed(
-    vault_registry: &VaultRegistry,
+public fun withdraw_seed<T>(
+    vault_registry: &mut VaultRegistry<T>,
     registry: &VaultDriverRegistry,
     vault_id: vector<u8>,
-    ctx: &TxContext,
+    clock: &Clock,
+    ctx: &mut TxContext,
 ): u128 {
     let creator = ctx.sender();
     let account = seed_account(registry, creator, vault_id);
-    vault::withdraw(vault_registry, account, vault_id, creator) as u128
+    vault::withdraw(vault_registry, account, vault_id, creator, clock, ctx) as u128
+}
+
+public fun collect_vault<T>(
+    registry: &VaultDriverRegistry,
+    vault_registry: &mut VaultRegistry<T>,
+    drips_registry: &mut DripsRegistry<T>,
+    streams_registry: &mut StreamsRegistry<T>,
+    treasury: &mut TreasuryRegistry<T>,
+    vault_id: vector<u8>,
+    clock: &Clock,
+    ctx: &mut TxContext,
+) {
+    let yes_receiver = receiver_account_view(registry, vault_id, side::yes());
+    let no_receiver = receiver_account_view(registry, vault_id, side::no());
+    let skim_bps = treasury::skim_bps(treasury);
+    vault::collect(
+        vault_registry,
+        drips_registry,
+        streams_registry,
+        vault_id,
+        yes_receiver,
+        no_receiver,
+        skim_bps,
+        clock,
+        ctx,
+    );
+    let (payment, owed) = vault::drain_skim(vault_registry, vault_id, ctx);
+    if (owed > 0) {
+        treasury::deposit_skim(treasury, payment);
+        treasury::notify_skim(treasury, owed);
+    } else {
+        coin::destroy_zero(payment);
+    };
 }
 
 // --- helpers ---

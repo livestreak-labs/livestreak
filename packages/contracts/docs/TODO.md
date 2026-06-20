@@ -59,12 +59,12 @@ USDC / LVST       -> Coin<USDC> / Coin<LVST>
 - [x] holder enumeration via native object ownership (no `Enumerable` analog needed)
 
 ### Stage 3 — Product contracts (parity with Solidity)
-- [ ] `Protocol` — wiring object holding module refs / shared state
-- [ ] `MarketRegistry` writes — `registerMarket` (marketId = `hash(observer, streamId)`, non-zero), `addVault`
-- [ ] `MarketRegistry` streamState — `goLive` / `setEnded` / `isLocked`, `(scheme: StorageScheme, id: string 1..64)`, `endedAt`-set-once lock, creator-gated
-- [ ] `Vault` + `BondingBoard` + `Side` — binary YES/NO pool, streamed-funding `g`-index Board: `onFund` / `advance` / `settle` / `collect` / `harvest` / `withdraw` / `resolve`; flow guard (`caughtUp`)
-- [ ] `StewardRegistry` — default + per-market override, `resolveVault` → `Vault.resolve` (challenge/finalize/penalty/veto tracks the EVM open item)
-- [ ] `Treasury` + `LvstToken` — `Coin<LVST>`, loss-mint, skim, stake, dividends
+- [x] `Protocol` — wiring object holding module refs / shared state
+- [x] `MarketRegistry` writes — `registerMarket` (marketId = `hash(observer, streamId)`, non-zero), `addVault`
+- [x] `MarketRegistry` streamState — `goLive` / `setEnded` / `isLocked`, `(scheme: StorageScheme, id: string 1..64)`, `endedAt`-set-once lock, creator-gated
+- [x] `Vault` + `BondingBoard` + `Side` — binary YES/NO pool, streamed-funding `g`-index Board: `onFund` / `advance` / `settle` / `collect` / `harvest` / `withdraw` / `resolve`; flow guard (`caughtUp`)
+- [x] `StewardRegistry` — default + per-market override, `resolveVault` → `Vault.resolve` (challenge/finalize/penalty/veto tracks the EVM open item)
+- [x] `Treasury` + `LvstToken` — `Coin<LVST>`, loss-mint, skim, stake, dividends
 
 ### Stage 4 — Reads + kit
 - [ ] Market reads — `marketCount` / `marketIdAt` / `getMarket` / `getVaultIds` / `marketExists`

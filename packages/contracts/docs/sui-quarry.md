@@ -16,8 +16,10 @@ Target: semantic parity with `chains/evm/solidity/` per `docs/architecture.md` +
 | `movemate i256` | native `int256` | **KEEP** | Quarried to `sources/i256.move` (`livestreak::i256`) |
 | `nft_driver.move` | `MarketDriver.sol` | **ADAPT** | `sources/drivers/market_driver.move` — `MarketPositionNFT` owned object; ≤10 lanes; native holder enum |
 | (new) | `VaultDriver.sol` | **ADAPT** | `sources/drivers/vault_driver.move` — seed accounts, harvest, `createVault` |
-| (new) | `Vault.sol` (hooks) | **ADAPT** | `sources/vault/vault.move` — driver-facing hooks; Board math in Stage 3 |
-| (new) | `MarketRegistry.sol` (index) | **ADAPT** | `sources/registries/market_registry.move` — `marketExists` / `addVault` |
+| (new) | `Vault.sol` | **ADAPT** | `sources/vault/vault.move` + `bonding_board.move` — full streamed-funding Board |
+| (new) | `MarketRegistry.sol` | **ADAPT** | `sources/registries/market_registry.move` + `protocol.move` |
+| (new) | `StewardRegistry.sol` | **ADAPT** | `sources/steward/steward_registry.move` — resolve + hot/dispute (challenge quorum deferred) |
+| (new) | `Treasury.sol` / LVST | **ADAPT** | `sources/treasury/treasury.move` + `lvst.move` |
 | `splits.move` | (unused in EVM) | **DROP** | Removed from EVM drivers; no product use |
 | `address_driver.move` | `AddressDriver` (removed) | **DROP** | EVM removed; NFT driver replaces |
 | `yield_manager.move` | (none) | **DROP** | No EVM analog in LiveStreak protocol |
@@ -38,7 +40,7 @@ Target: semantic parity with `chains/evm/solidity/` per `docs/architecture.md` +
 | --- | --- |
 | 0 — Scaffold + math libs | **done** (`7ac6480`) |
 | 1 — Streaming substrate | **done** (`437323c`) |
-| 2 — Drivers | **done** (commit pending) |
-| 3 — Product contracts | pending |
+| 2 — Drivers | **done** (`4358520`) |
+| 3 — Product contracts | **done** (this run) |
 | 4 — Reads + kit | pending |
 | 5 — Parity verification | pending |

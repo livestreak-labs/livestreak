@@ -8,7 +8,8 @@ use livestreak::i128::{Self, I128};
 use livestreak::market_registry::{Self, MarketRegistry};
 use livestreak::side;
 use livestreak::streams::{Self, StreamReceiver, StreamsRegistry};
-use livestreak::treasury;
+use livestreak::lvst::LvstTreasuryCap;
+use livestreak::treasury::{Self, TreasuryRegistry};
 use livestreak::vault::{Self, VaultRegistry};
 use livestreak::vault_driver::{Self, VaultDriverRegistry};
 use livestreak::drips::{Self, DripsRegistry};
@@ -208,7 +209,7 @@ public fun fund<T>(
     registry: &mut MarketDriverRegistry,
     nft: &MarketPositionNFT,
     vault_driver: &VaultDriverRegistry,
-    vault_registry: &mut VaultRegistry,
+    vault_registry: &mut VaultRegistry<T>,
     drips_registry: &mut DripsRegistry<T>,
     streams_registry: &mut StreamsRegistry<T>,
     vault_id: vector<u8>,
@@ -256,8 +257,8 @@ public fun fund<T>(
     );
 
     let (_, _, _, _, max_end) = streams::streams_state(streams_registry, token_id);
-    vault::on_fund(vault_registry, token_id, vault_id, side, rate, max_end, ctx);
-    refresh_other_lanes(registry, vault_registry, token_id, vault_id, max_end);
+    vault::on_fund(vault_registry, token_id, vault_id, side, rate, max_end, clock, ctx);
+    refresh_other_lanes(registry, vault_registry, token_id, vault_id, max_end, clock, ctx);
 
     event::emit(LaneFunded {
         token_id,
@@ -273,7 +274,7 @@ public fun stop<T>(
     registry: &mut MarketDriverRegistry,
     nft: &MarketPositionNFT,
     vault_driver: &VaultDriverRegistry,
-    vault_registry: &mut VaultRegistry,
+    vault_registry: &mut VaultRegistry<T>,
     drips_registry: &mut DripsRegistry<T>,
     streams_registry: &mut StreamsRegistry<T>,
     vault_id: vector<u8>,
@@ -304,10 +305,10 @@ public fun stop<T>(
         ctx,
     );
 
-    vault::on_stop(vault_registry, token_id, vault_id, side);
+    vault::on_stop(vault_registry, token_id, vault_id, side, clock);
     let (_, _, _, _, max_end) = streams::streams_state(streams_registry, token_id);
     if (lane_count(registry, token_id) > 0) {
-        refresh_all_lanes(registry, vault_registry, token_id, max_end);
+        refresh_all_lanes(registry, vault_registry, token_id, max_end, clock, ctx);
     };
 
     event::emit(LaneStopped { token_id, vault_id, side });
@@ -317,7 +318,7 @@ public fun set_lanes<T>(
     registry: &mut MarketDriverRegistry,
     nft: &MarketPositionNFT,
     vault_driver: &VaultDriverRegistry,
-    vault_registry: &mut VaultRegistry,
+    vault_registry: &mut VaultRegistry<T>,
     drips_registry: &mut DripsRegistry<T>,
     streams_registry: &mut StreamsRegistry<T>,
     desired_vault_ids: vector<vector<u8>>,
@@ -397,7 +398,7 @@ public fun set_lanes<T>(
     while (r < removed_n) {
         let vault_id = *vector::borrow(&removed_vaults, r);
         let side = *vector::borrow(&removed_sides, r);
-        vault::on_stop(vault_registry, token_id, vault_id, side);
+        vault::on_stop(vault_registry, token_id, vault_id, side, clock);
         event::emit(LaneStopped { token_id, vault_id, side });
         r = r + 1;
     };
@@ -407,7 +408,7 @@ public fun set_lanes<T>(
         let vault_id = *vector::borrow(&added_vaults, a);
         let side = *vector::borrow(&added_sides, a);
         let rate = *vector::borrow(&added_rates, a);
-        vault::on_fund(vault_registry, token_id, vault_id, side, rate, max_end, ctx);
+        vault::on_fund(vault_registry, token_id, vault_id, side, rate, max_end, clock, ctx);
         event::emit(LaneFunded {
             token_id,
             vault_id,
@@ -420,7 +421,7 @@ public fun set_lanes<T>(
     };
 
     if (desired_len > 0) {
-        vault::refresh_max_ends(vault_registry, token_id, desired_vault_ids, desired_sides, max_end);
+        vault::refresh_max_ends(vault_registry, token_id, desired_vault_ids, desired_sides, max_end, clock, ctx);
     };
 }
 
@@ -428,7 +429,7 @@ public fun stop_all<T>(
     registry: &mut MarketDriverRegistry,
     nft: &MarketPositionNFT,
     vault_driver: &VaultDriverRegistry,
-    vault_registry: &mut VaultRegistry,
+    vault_registry: &mut VaultRegistry<T>,
     drips_registry: &mut DripsRegistry<T>,
     streams_registry: &mut StreamsRegistry<T>,
     clock: &Clock,
@@ -436,7 +437,7 @@ public fun stop_all<T>(
 ) {
     let token_id = nft.token_id;
     let curr = build_receivers(registry, vault_driver, token_id);
-    stop_all_lanes_on_vault(registry, vault_registry, token_id);
+    stop_all_lanes_on_vault(registry, vault_registry, token_id, clock);
 
     let empty = vector[];
     let withdraw_all = i128::neg_from(1_000_000_000_000_000_000_000_000);
@@ -462,30 +463,44 @@ public fun stop_all<T>(
     event::emit(AllLanesStopped { token_id, refunded });
 }
 
-public fun withdraw(
+public fun withdraw<T>(
     _registry: &MarketDriverRegistry,
     nft: &MarketPositionNFT,
-    vault_registry: &VaultRegistry,
+    vault_registry: &mut VaultRegistry<T>,
     vault_id: vector<u8>,
     to: address,
-    ctx: &TxContext,
+    clock: &Clock,
+    ctx: &mut TxContext,
 ): u128 {
     let token_id = nft.token_id;
     let payee = payee(nft, to, ctx);
-    vault::withdraw(vault_registry, token_id, vault_id, payee)
+    vault::withdraw(vault_registry, token_id, vault_id, payee, clock, ctx)
 }
 
-public fun claim_loss_lvst(
+public fun claim_loss_lvst<T>(
     _registry: &MarketDriverRegistry,
     nft: &MarketPositionNFT,
+    treasury: &mut TreasuryRegistry<T>,
+    lvst_cap: &mut LvstTreasuryCap,
+    vault_registry: &VaultRegistry<T>,
     vault_id: vector<u8>,
     side: u8,
     to: address,
-    ctx: &TxContext,
+    ctx: &mut TxContext,
 ): u256 {
     let token_id = nft.token_id;
     let payee = payee(nft, to, ctx);
-    treasury::mint_loss_lvst(token_id, payee, vault_id, side)
+    let lost_usdc = vault::loss_claimable(vault_registry, token_id, &vault_id, side) as u256;
+    treasury::mint_loss_lvst(
+        treasury,
+        lvst_cap,
+        token_id,
+        payee,
+        vault_id,
+        side,
+        lost_usdc,
+        ctx,
+    )
 }
 
 // --- helpers ---
@@ -624,9 +639,9 @@ fun addr_to_u160(addr: address): u256 {
     result & 0x000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 }
 
-fun assert_market_vault(
+fun assert_market_vault<T>(
     registry: &MarketDriverRegistry,
-    vault_registry: &VaultRegistry,
+    vault_registry: &VaultRegistry<T>,
     token_id: u256,
     vault_id: &vector<u8>,
 ) {
@@ -712,12 +727,14 @@ fun remove_lane(registry: &mut MarketDriverRegistry, token_id: u256, vault_id: v
     };
 }
 
-fun refresh_other_lanes(
+fun refresh_other_lanes<T>(
     registry: &MarketDriverRegistry,
-    vault_registry: &mut VaultRegistry,
+    vault_registry: &mut VaultRegistry<T>,
     token_id: u256,
     new_vault_id: vector<u8>,
     max_end: u64,
+    clock: &Clock,
+    ctx: &mut TxContext,
 ) {
     if (!table::contains(&registry.lane_keys, token_id)) {
         return
@@ -739,14 +756,16 @@ fun refresh_other_lanes(
         };
         i = i + 1;
     };
-    vault::refresh_max_ends(vault_registry, token_id, vault_ids, sides, max_end);
+    vault::refresh_max_ends(vault_registry, token_id, vault_ids, sides, max_end, clock, ctx);
 }
 
-fun refresh_all_lanes(
+fun refresh_all_lanes<T>(
     registry: &MarketDriverRegistry,
-    vault_registry: &mut VaultRegistry,
+    vault_registry: &mut VaultRegistry<T>,
     token_id: u256,
     max_end: u64,
+    clock: &Clock,
+    ctx: &mut TxContext,
 ) {
     if (!table::contains(&registry.lane_keys, token_id)) {
         return
@@ -763,13 +782,14 @@ fun refresh_all_lanes(
         vector::push_back(&mut sides, lane.side);
         i = i + 1;
     };
-    vault::refresh_max_ends(vault_registry, token_id, vault_ids, sides, max_end);
+    vault::refresh_max_ends(vault_registry, token_id, vault_ids, sides, max_end, clock, ctx);
 }
 
-fun stop_all_lanes_on_vault(
+fun stop_all_lanes_on_vault<T>(
     registry: &mut MarketDriverRegistry,
-    vault_registry: &mut VaultRegistry,
+    vault_registry: &mut VaultRegistry<T>,
     token_id: u256,
+    clock: &Clock,
 ) {
     if (!table::contains(&registry.lane_keys, token_id)) {
         return
@@ -780,7 +800,7 @@ fun stop_all_lanes_on_vault(
     while (i < len) {
         let vault_id = *vector::borrow(&keys, i);
         let lane = *table::borrow(&registry.lanes, LaneKey { token_id, vault_id });
-        vault::on_stop(vault_registry, token_id, vault_id, lane.side);
+        vault::on_stop(vault_registry, token_id, vault_id, lane.side, clock);
         i = i + 1;
     };
     table::remove(&mut registry.lane_keys, token_id);

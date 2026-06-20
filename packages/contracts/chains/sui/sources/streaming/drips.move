@@ -107,13 +107,21 @@ public(package) fun withdraw<T>(
     amt: u128,
     ctx: &mut TxContext,
 ) {
+    let payment = withdraw_coin(registry, amt, ctx);
+    transfer::public_transfer(payment, receiver);
+}
+
+public(package) fun withdraw_coin<T>(
+    registry: &mut DripsRegistry<T>,
+    amt: u128,
+    ctx: &mut TxContext,
+): Coin<T> {
     let (streams_balance, collectable_balance) = balances(registry);
     let held_balance = token_balance(registry);
     let managed_balance = streams_balance + collectable_balance;
     let withdrawable = held_balance - managed_balance;
     assert!(amt <= withdrawable, E_WITHDRAWAL_AMOUNT_TOO_HIGH);
-    let payment = coin::split(&mut registry.vault, (amt as u64), ctx);
-    transfer::public_transfer(payment, receiver);
+    coin::split(&mut registry.vault, (amt as u64), ctx)
 }
 
 public fun receive_streams<T>(
