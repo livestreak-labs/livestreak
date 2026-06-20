@@ -107,7 +107,7 @@ public struct AccountVaultKey has copy, drop, store {
     vault_id: vector<u8>,
 }
 
-public struct VaultCreated has copy, drop {
+public struct VaultOpened has copy, drop {
     vault_id: vector<u8>,
     market_id: vector<u8>,
     creator: address,
@@ -215,6 +215,18 @@ public fun get_vault<T>(registry: &VaultRegistry<T>, vault_id: &vector<u8>): Vau
     *table::borrow(&registry.vaults, *vault_id)
 }
 
+public fun vault_status(data: &VaultData): u8 {
+    data.status
+}
+
+public fun vault_outcome(data: &VaultData): u8 {
+    data.outcome
+}
+
+public fun vault_resolved_at(data: &VaultData): u64 {
+    data.resolved_at
+}
+
 public fun pot<T>(registry: &VaultRegistry<T>, vault_id: &vector<u8>): u256 {
     if (!table::contains(&registry.pot, *vault_id)) {
         0
@@ -289,6 +301,24 @@ public fun caught_up<T>(
 ): bool {
     side::assert_valid(side);
     board_caught_up(registry, vault_id, side, clock)
+}
+
+public fun status_resolved(): u8 {
+    STATUS_RESOLVED
+}
+
+public fun get_vault_pools<T>(
+    registry: &VaultRegistry<T>,
+    vault_id: &vector<u8>,
+): (u256, u256, u256, u256) {
+    assert!(vault_exists(registry, vault_id), E_UNKNOWN_VAULT);
+    let yes_key = BoardKey { vault_id: *vault_id, side: side::yes() };
+    let no_key = BoardKey { vault_id: *vault_id, side: side::no() };
+    let yes_pool = board_pool(registry, yes_key);
+    let no_pool = board_pool(registry, no_key);
+    let yes_shares = board_side_shares(registry, yes_key) / bonding_board::wad();
+    let no_shares = board_side_shares(registry, no_key) / bonding_board::wad();
+    (yes_pool, no_pool, yes_shares, no_shares)
 }
 
 public fun loss_claimable<T>(
@@ -430,7 +460,7 @@ public(package) fun create_vault<T>(
     };
     table::add(&mut registry.vaults, vault_id, data);
 
-    event::emit(VaultCreated {
+    event::emit(VaultOpened {
         vault_id,
         market_id: data.market_id,
         creator,

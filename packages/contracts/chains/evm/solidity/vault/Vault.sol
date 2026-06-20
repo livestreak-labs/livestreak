@@ -114,7 +114,7 @@ contract Vault {
     ITreasurySkim public treasury; // house pot; receives the winner-skim at resolution (0 = skim off)
     mapping(bytes32 => uint256) public skimOwed; // skim computed at first collect, flushed once cash is in
 
-    event VaultCreated(bytes32 indexed vaultId, bytes32 indexed marketId, address indexed creator, string question);
+    event VaultOpened(bytes32 indexed vaultId, bytes32 indexed marketId, address indexed creator, string question);
     event VaultResolved(bytes32 indexed vaultId, Outcome outcome);
     event MarketDriverSet(address indexed marketDriver);
     event ResolverSet(address indexed resolver);
@@ -205,7 +205,7 @@ contract Vault {
             exists: true
         });
 
-        emit VaultCreated(vaultId, marketId, creator, question);
+        emit VaultOpened(vaultId, marketId, creator, question);
     }
 
     function vaultExists(bytes32 vaultId) external view returns (bool) {

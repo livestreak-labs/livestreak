@@ -3562,20 +3562,20 @@ export const vaultAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
-      { name: 'marketId', internalType: 'bytes32', type: 'bytes32', indexed: true },
-      { name: 'creator', internalType: 'address', type: 'address', indexed: true },
-      { name: 'question', internalType: 'string', type: 'string', indexed: false },
+      { name: 'vaultDriver', internalType: 'address', type: 'address', indexed: true },
     ],
-    name: 'VaultCreated',
+    name: 'VaultDriverSet',
   },
   {
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'vaultDriver', internalType: 'address', type: 'address', indexed: true },
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      { name: 'marketId', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      { name: 'creator', internalType: 'address', type: 'address', indexed: true },
+      { name: 'question', internalType: 'string', type: 'string', indexed: false },
     ],
-    name: 'VaultDriverSet',
+    name: 'VaultOpened',
   },
   {
     type: 'event',
