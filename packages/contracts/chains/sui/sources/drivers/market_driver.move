@@ -169,6 +169,19 @@ public fun lane_count(registry: &MarketDriverRegistry, token_id: u256): u64 {
     }
 }
 
+public fun lane_vault_at(registry: &MarketDriverRegistry, token_id: u256, index: u64): vector<u8> {
+    *vector::borrow(table::borrow(&registry.lane_keys, token_id), index)
+}
+
+public fun lane_at(
+    registry: &MarketDriverRegistry,
+    token_id: u256,
+    vault_id: &vector<u8>,
+): (u8, u256) {
+    let lane = *table::borrow(&registry.lanes, LaneKey { token_id, vault_id: *vault_id });
+    (lane.side, lane.rate)
+}
+
 public fun get_token_id(nft: &MarketPositionNFT): u256 {
     nft.token_id
 }

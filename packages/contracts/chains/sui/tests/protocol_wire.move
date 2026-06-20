@@ -3,6 +3,7 @@
 #[test_only]
 module livestreak::protocol_wire;
 
+use livestreak::lvst::LVST;
 use livestreak::driver_utils::AccountMetadata;
 use livestreak::drips::{Self, DripsRegistry};
 use livestreak::driver_registry::{Self, DriverRegistry};
@@ -19,6 +20,7 @@ use livestreak::vault_driver::{Self, VaultDriverRegistry};
 use sui::clock::{Self, Clock};
 use sui::coin::{Self, Coin};
 use sui::test_scenario::{Self as ts, Scenario};
+use sui::transfer;
 
 const CYCLE_SECS: u64 = 10;
 const START_SECS: u64 = 100;
@@ -32,7 +34,11 @@ public fun creator(): address { @0xC0DE }
 public fun stranger(): address { @0xBEEF }
 public fun alice(): address { @0xA11CE }
 public fun bob(): address { @0xB0B }
+public fun carol(): address { @0xCA801 }
+public fun dave(): address { @0xDADE }
 public fun steward(): address { @0x57E4 }
+public fun steward_a(): address { @0x57EAD }
+public fun steward_b(): address { @0x57EEB }
 public fun seed_creator(): address { @0x0128e63b55775c5b2cd5ed9aeb1beac84b3a081f }
 
 public fun rate(): u256 { RATE }
@@ -111,7 +117,7 @@ public fun setup_stack(scenario: &mut Scenario, owner: address) {
         let drips = ts::take_shared<DripsRegistry<TEST_USDC>>(scenario);
         let streams = ts::take_shared<StreamsRegistry<TEST_USDC>>(scenario);
         let vault_driver = ts::take_shared<VaultDriverRegistry>(scenario);
-        let market_driver = ts::take_shared<MarketDriverRegistry>(scenario);
+        let mut market_driver = ts::take_shared<MarketDriverRegistry>(scenario);
         let steward = ts::take_shared<StewardRegistry>(scenario);
         let ctx = ts::ctx(scenario);
         protocol::set_market_registry(&mut protocol, object::id(&market_registry), ctx);
@@ -298,7 +304,16 @@ public fun mint_nft(
     who: address,
     market_id: vector<u8>,
 ): u256 {
-    ts::next_tx(scenario, who);
+    mint_nft_to(scenario, who, who, market_id)
+}
+
+public fun mint_nft_to(
+    scenario: &mut Scenario,
+    sender: address,
+    recipient: address,
+    market_id: vector<u8>,
+): u256 {
+    ts::next_tx(scenario, sender);
     let mut market_driver = ts::take_shared<MarketDriverRegistry>(scenario);
     let market_registry = ts::take_shared<MarketRegistry>(scenario);
     let ctx = ts::ctx(scenario);
@@ -307,7 +322,7 @@ public fun mint_nft(
         &mut market_driver,
         &market_registry,
         market_id,
-        who,
+        recipient,
         metadata,
         ctx,
     );
@@ -449,7 +464,7 @@ public fun withdraw_market(
     clock: &Clock,
 ): u128 {
     ts::next_tx(scenario, who);
-    let market_driver = ts::take_shared<MarketDriverRegistry>(scenario);
+    let mut market_driver = ts::take_shared<MarketDriverRegistry>(scenario);
     let mut vault_registry = ts::take_shared<VaultRegistry<TEST_USDC>>(scenario);
     let nft = ts::take_from_address<MarketPositionNFT>(scenario, who);
     let ctx = ts::ctx(scenario);
@@ -549,11 +564,248 @@ public fun stop_all_if_lanes(
     clock: &Clock,
 ): u128 {
     ts::next_tx(scenario, who);
-    let market_driver = ts::take_shared<MarketDriverRegistry>(scenario);
+    let mut market_driver = ts::take_shared<MarketDriverRegistry>(scenario);
     if (market_driver::lane_count(&market_driver, token_id) == 0) {
         ts::return_shared(market_driver);
         return 0
     };
     ts::return_shared(market_driver);
     stop_all_refund(scenario, who, clock)
+}
+
+public fun setup_market_driver_fixture(
+    scenario: &mut Scenario,
+    clock: &Clock,
+): (vector<u8>, vector<u8>, u256, u256) {
+    setup_stack(scenario, admin());
+    let market_id = register_market(scenario, admin(), b"market", b"s", clock);
+    let v1 = bond_vault(scenario, market_id, b"Q1?", side::yes(), clock);
+    let alice_token = mint_nft(scenario, alice(), market_id);
+    let bob_token = mint_nft(scenario, bob(), market_id);
+    (market_id, v1, alice_token, bob_token)
+}
+
+public fun mint_with_salt_nft(
+    scenario: &mut Scenario,
+    who: address,
+    market_id: vector<u8>,
+    salt: u64,
+): u256 {
+    ts::next_tx(scenario, who);
+    let mut market_driver = ts::take_shared<MarketDriverRegistry>(scenario);
+    let market_registry = ts::take_shared<MarketRegistry>(scenario);
+    let token_id = market_driver::calc_token_id_with_salt(&market_driver, who, salt);
+    let ctx = ts::ctx(scenario);
+    let metadata = vector<AccountMetadata>[];
+    market_driver::mint_with_salt(
+        &mut market_driver,
+        &market_registry,
+        market_id,
+        salt,
+        who,
+        metadata,
+        ctx,
+    );
+    ts::return_shared(market_driver);
+    ts::return_shared(market_registry);
+    token_id
+}
+
+public fun transfer_nft(scenario: &mut Scenario, from: address, to: address) {
+    ts::next_tx(scenario, from);
+    let nft = ts::take_from_address<MarketPositionNFT>(scenario, from);
+    transfer::public_transfer(nft, to);
+}
+
+public fun stop_lane(
+    scenario: &mut Scenario,
+    who: address,
+    vault_id: vector<u8>,
+    stop_side: u8,
+    clock: &Clock,
+) {
+    ts::next_tx(scenario, who);
+    let mut market_driver = ts::take_shared<MarketDriverRegistry>(scenario);
+    let mut vault_driver = ts::take_shared<VaultDriverRegistry>(scenario);
+    let mut vault_registry = ts::take_shared<VaultRegistry<TEST_USDC>>(scenario);
+    let mut drips = ts::take_shared<DripsRegistry<TEST_USDC>>(scenario);
+    let mut streams = ts::take_shared<StreamsRegistry<TEST_USDC>>(scenario);
+    let nft = ts::take_from_address<MarketPositionNFT>(scenario, who);
+    let ctx = ts::ctx(scenario);
+    market_driver::stop(
+        &mut market_driver,
+        &nft,
+        &mut vault_driver,
+        &mut vault_registry,
+        &mut drips,
+        &mut streams,
+        vault_id,
+        stop_side,
+        clock,
+        ctx,
+    );
+    ts::return_to_address(who, nft);
+    ts::return_shared(market_driver);
+    ts::return_shared(vault_driver);
+    ts::return_shared(vault_registry);
+    ts::return_shared(drips);
+    ts::return_shared(streams);
+}
+
+public fun set_lanes(
+    scenario: &mut Scenario,
+    who: address,
+    vault_ids: vector<vector<u8>>,
+    sides: vector<u8>,
+    rates: vector<u256>,
+    add_deposit: u64,
+    clock: &Clock,
+) {
+    ts::next_tx(scenario, who);
+    let mut market_driver = ts::take_shared<MarketDriverRegistry>(scenario);
+    let mut vault_driver = ts::take_shared<VaultDriverRegistry>(scenario);
+    let mut vault_registry = ts::take_shared<VaultRegistry<TEST_USDC>>(scenario);
+    let mut drips = ts::take_shared<DripsRegistry<TEST_USDC>>(scenario);
+    let mut streams = ts::take_shared<StreamsRegistry<TEST_USDC>>(scenario);
+    let nft = ts::take_from_address<MarketPositionNFT>(scenario, who);
+    let payment = if (add_deposit > 0) {
+        option::some(mint_usdc(scenario, add_deposit))
+    } else {
+        option::none()
+    };
+    let ctx = ts::ctx(scenario);
+    market_driver::set_lanes(
+        &mut market_driver,
+        &nft,
+        &mut vault_driver,
+        &mut vault_registry,
+        &mut drips,
+        &mut streams,
+        vault_ids,
+        sides,
+        rates,
+        (add_deposit as u128),
+        payment,
+        clock,
+        ctx,
+    );
+    ts::return_to_address(who, nft);
+    ts::return_shared(market_driver);
+    ts::return_shared(vault_driver);
+    ts::return_shared(vault_registry);
+    ts::return_shared(drips);
+    ts::return_shared(streams);
+}
+
+public fun advance_side(
+    scenario: &mut Scenario,
+    who: address,
+    vault_id: vector<u8>,
+    advance_side: u8,
+    clock: &Clock,
+) {
+    ts::next_tx(scenario, who);
+    let mut vault_registry = ts::take_shared<VaultRegistry<TEST_USDC>>(scenario);
+    vault::advance(&mut vault_registry, vault_id, advance_side, 64, clock);
+    ts::return_shared(vault_registry);
+}
+
+public fun claim_loss_lvst(
+    scenario: &mut Scenario,
+    who: address,
+    vault_id: vector<u8>,
+    loss_side: u8,
+): u256 {
+    ts::next_tx(scenario, who);
+    let mut treasury = ts::take_shared<TreasuryRegistry<TEST_USDC>>(scenario);
+    let vault_registry = ts::take_shared<VaultRegistry<TEST_USDC>>(scenario);
+    let nft = ts::take_from_address<MarketPositionNFT>(scenario, who);
+    let token_id = market_driver::get_token_id(&nft);
+    let lost_usdc = vault::loss_claimable(&vault_registry, token_id, &vault_id, loss_side);
+    let ctx = ts::ctx(scenario);
+    let minted = treasury::mint_loss_lvst_for_test(
+        &mut treasury,
+        token_id,
+        who,
+        vault_id,
+        loss_side,
+        lost_usdc,
+        ctx,
+    );
+    ts::return_to_address(who, nft);
+    ts::return_shared(treasury);
+    ts::return_shared(vault_registry);
+    minted
+}
+
+public fun stake_lvst_from_wallet(scenario: &mut Scenario, who: address) {
+    ts::next_tx(scenario, who);
+    let mut treasury = ts::take_shared<TreasuryRegistry<TEST_USDC>>(scenario);
+    let payment = ts::take_from_address<Coin<LVST>>(scenario, who);
+    let ctx = ts::ctx(scenario);
+    treasury::stake_lvst(&mut treasury, payment, ctx);
+    ts::return_shared(treasury);
+}
+
+public fun claim_dividends_usdc(
+    scenario: &mut Scenario,
+    who: address,
+): u128 {
+    ts::next_tx(scenario, who);
+    let mut treasury = ts::take_shared<TreasuryRegistry<TEST_USDC>>(scenario);
+    let ctx = ts::ctx(scenario);
+    let paid = treasury::claim_dividends(&mut treasury, ctx);
+    ts::return_shared(treasury);
+    paid
+}
+
+public fun usdc_balance_of(scenario: &mut Scenario, who: address): u64 {
+    ts::next_tx(scenario, who);
+    if (!ts::has_most_recent_for_address<Coin<TEST_USDC>>(who)) {
+        return 0
+    };
+    let coin = ts::take_from_address<Coin<TEST_USDC>>(scenario, who);
+    let bal = coin::value(&coin);
+    ts::return_to_address(who, coin);
+    bal
+}
+
+public fun lvst_balance_of(scenario: &mut Scenario, who: address): u64 {
+    ts::next_tx(scenario, who);
+    if (!ts::has_most_recent_for_address<Coin<LVST>>(who)) {
+        return 0
+    };
+    let coin = ts::take_from_address<Coin<LVST>>(scenario, who);
+    let bal = coin::value(&coin);
+    ts::return_to_address(who, coin);
+    bal
+}
+
+public fun setup_stewards(
+    scenario: &mut Scenario,
+    owner: address,
+    steward_a_addr: address,
+    steward_b_addr: address,
+    market_id: vector<u8>,
+) {
+    ts::next_tx(scenario, owner);
+    {
+        let mut reg = ts::take_shared<StewardRegistry>(scenario);
+        let ctx = ts::ctx(scenario);
+        steward_registry::register_steward(&mut reg, steward_a_addr, ctx);
+        steward_registry::register_steward(&mut reg, steward_b_addr, ctx);
+        steward_registry::set_default_steward(&mut reg, steward_a_addr, ctx);
+        steward_registry::set_market_steward(&mut reg, market_id, steward_a_addr, ctx);
+        ts::return_shared(reg);
+    };
+}
+
+public fun bond_vault_question(
+    scenario: &mut Scenario,
+    market_id: vector<u8>,
+    question: vector<u8>,
+    seed_side: u8,
+    clock: &Clock,
+): vector<u8> {
+    bond_vault(scenario, market_id, question, seed_side, clock)
 }

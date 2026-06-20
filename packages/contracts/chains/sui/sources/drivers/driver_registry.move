@@ -17,7 +17,6 @@ fun init(ctx: &mut TxContext) {
     create_registry(ctx);
 }
 
-#[test_only]
 public fun create_registry(ctx: &mut TxContext) {
     let id_obj = object::new(ctx);
     let registry_id = object::uid_to_inner(&id_obj);
