@@ -65,6 +65,8 @@ export interface OptionsVaultPanel {
     readonly hot: boolean;
     readonly hotUntilMs?: number;
     readonly hotReason?: string;
+    readonly severity?: number;
+    readonly exitBurnBps?: number;
     readonly disputeId?: string;
   };
 }
@@ -113,6 +115,7 @@ export interface OptionsProtocolPanel {
 export interface OptionsUserPanel {
   readonly account: string;
   readonly marketId?: string;
+  readonly usdcBalanceUSDC?: string;
 }
 
 export interface OptionsPanel {
@@ -127,6 +130,7 @@ export interface OptionsPanel {
 export interface OptionsControlsView {
   readonly account: string;
   readonly actions: {
+    readonly canMint: boolean;
     readonly canFund: boolean;
     readonly canWithdraw: boolean;
     readonly canClaimLoss: boolean;

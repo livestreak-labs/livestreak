@@ -25,6 +25,11 @@ export type TxId = string & { readonly __brand: "TxId" };
 
 export const asTxId = (hash: string): TxId => hash as TxId;
 
+export type MintNftInput = {
+  readonly marketId: MarketId;
+  readonly to: UserAddress;
+};
+
 export type FundStreamInput = {
   readonly tokenId: TokenId;
   readonly vaultId: VaultId;
@@ -121,6 +126,7 @@ export interface OptionsReader {
     tokenId: TokenId
   ): Promise<bigint>;
   readUsdcAddress(): Promise<`0x${string}`>;
+  readUsdcBalance(owner: UserAddress): Promise<bigint>;
   readNftBalance(tokenId: TokenId): Promise<bigint>;
   readOwnerOf(tokenId: TokenId): Promise<UserAddress>;
   readApproved(tokenId: TokenId): Promise<UserAddress | undefined>;
@@ -129,6 +135,7 @@ export interface OptionsReader {
 }
 
 export interface OptionsWriter {
+  mint(input: MintNftInput): Promise<TxId>;
   fund(input: FundStreamInput): Promise<TxId>;
   setLanes(input: SetLanesInput): Promise<TxId>;
   stopFunding(input: StopFundingInput): Promise<TxId>;
@@ -149,7 +156,7 @@ export type OptionsChain = {
   readonly writer: OptionsWriter;
 };
 
-export type ContractChain = OptionsChain;
+export type ContractChain = "evm" | "sui" | "solana";
 
 export type OptionsChainConfig = {
   readonly walletInit: WalletInit;

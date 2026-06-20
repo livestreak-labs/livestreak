@@ -42,6 +42,17 @@ export interface OptionsBridge {
   readonly runtime: import("../runtime/runtime.js").OptionsRuntime;
   readonly readBoard: (caller: BridgeCaller) => Promise<import("../runtime/board.js").OptionsBoard>;
   readonly readControls: (caller: BridgeCaller) => Promise<import("./panel/types.js").OptionsControlsView>;
+  readonly readClaims: (
+    caller: BridgeCaller
+  ) => Promise<import("../model/claims.js").OptionsClaimsView>;
+  readonly readPnl: (
+    caller: BridgeCaller,
+    investedUSDC?: bigint
+  ) => Promise<import("../model/math/pnl.js").OptionsSessionPnlView>;
+  readonly readStreamState: (
+    caller: BridgeCaller,
+    marketId: import("../model/ids.js").MarketId
+  ) => Promise<import("../model/stream.js").OptionsStreamState>;
   readonly callAction: (
     caller: BridgeCaller,
     envelope: CallActionEnvelope

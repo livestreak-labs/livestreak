@@ -20,6 +20,7 @@ describe("options public exports", () => {
 
   it("exports chain factory, bridge, and flow reads", () => {
     expect(publicExport("createOptionsChain")).toBeTypeOf("function");
+    expect(publicExport("resolveOptionsAccountAddress")).toBeTypeOf("function");
     expect(publicExport("createOptionsBridge")).toBeTypeOf("function");
     expect(publicExport("validateOptionsChainConfig")).toBeTypeOf("function");
     expect(publicExport("readMarketSnapshot")).toBeTypeOf("function");

@@ -67,6 +67,12 @@ export const readUserOptionsSnapshot = async (
     user
   );
 
+  const usdcBalance = await readOrThrow(
+    () => reader.readUsdcBalance(user),
+    "USDC balance",
+    user
+  );
+
   const protocol =
     reader.readProtocolSummary === undefined
       ? undefined
@@ -79,6 +85,7 @@ export const readUserOptionsSnapshot = async (
       vaults: [],
       nfts: [],
       lvstAccount,
+      usdcBalance,
       protocol
     };
   }
@@ -116,6 +123,7 @@ export const readUserOptionsSnapshot = async (
     vaults,
     nfts,
     lvstAccount,
+    usdcBalance,
     protocol
   };
 };

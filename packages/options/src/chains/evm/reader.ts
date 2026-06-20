@@ -161,6 +161,7 @@ const buildReader = (ctx: ReaderContext): OptionsReader => ({
   readPendingShares: (vaultId, side, tokenId) =>
     readPendingShares(ctx, vaultId, side, tokenId),
   readUsdcAddress: () => readUsdcAddress(ctx),
+  readUsdcBalance: (owner) => readUsdcBalance(ctx, owner),
   readNftBalance: (tokenId) => readNftBalance(ctx, tokenId),
   readOwnerOf: (tokenId) => readOwnerOf(ctx, tokenId),
   readApproved: (tokenId) => readApproved(ctx, tokenId),
@@ -706,6 +707,19 @@ const readUsdcAddress = async (ctx: ReaderContext): Promise<`0x${string}`> => {
     return ctx.usdcAddress;
   } catch (error) {
     throw contractsReadFailed("USDC address", error);
+  }
+};
+
+const readUsdcBalance = async (ctx: ReaderContext, owner: UserAddress): Promise<bigint> => {
+  const account = validateUserAddress(owner);
+  const usdc = await readUsdcAddress(ctx);
+
+  try {
+    return await call<bigint>(ctx, usdc, ctx.abis.LvstToken, "balanceOf", [
+      account as `0x${string}`
+    ]);
+  } catch (error) {
+    throw contractsReadFailed("USDC balance", error);
   }
 };
 

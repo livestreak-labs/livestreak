@@ -5,6 +5,10 @@ import { LiveStreakConfigError } from "@livestreak/core";
 import type { MarketId, UserAddress, VaultId } from "../model/ids.js";
 import type { OptionsUserOptionsSnapshot } from "../model/snapshot.js";
 import { createOptionsChain, type OptionsChain } from "../chains/index.js";
+import { readClaimsView, readSessionPnl, readStreamState } from "../flows/index.js";
+import type { OptionsClaimsView } from "../model/claims.js";
+import type { OptionsSessionPnlView } from "../model/math/pnl.js";
+import type { OptionsStreamState } from "../model/stream.js";
 import { projectOptionsPanel } from "../bridge/panel/project.js";
 import type { OptionsPanel } from "../bridge/panel/types.js";
 import { assembleBoard, type OptionsBoard } from "./board.js";
@@ -29,6 +33,9 @@ export interface OptionsRuntime {
   readSnapshot: () => OptionsRuntimeState;
   readPanel: () => OptionsPanel;
   readBoard: () => OptionsBoard;
+  readClaims: () => Promise<OptionsClaimsView>;
+  readPnl: (investedUSDC?: bigint) => Promise<OptionsSessionPnlView>;
+  readStreamState: (marketId: MarketId) => Promise<OptionsStreamState>;
   refresh: () => Promise<OptionsRuntimeState>;
   refreshMarket: (marketId: MarketId) => Promise<OptionsRuntimeState>;
   refreshVault: (vaultId: VaultId) => Promise<OptionsRuntimeState>;
@@ -74,6 +81,18 @@ class OptionsRuntimeFacade implements OptionsRuntime {
     const state = this.store.readState();
     const snapshot = this.requireUserSnapshot();
     return assembleBoard(state.revision, snapshot, projectOptionsPanel(snapshot));
+  }
+
+  async readClaims(): Promise<OptionsClaimsView> {
+    return readClaimsView(this.chain.reader, this.requireUser());
+  }
+
+  async readPnl(investedUSDC?: bigint): Promise<OptionsSessionPnlView> {
+    return readSessionPnl(this.chain.reader, this.requireUser(), investedUSDC);
+  }
+
+  async readStreamState(marketId: MarketId): Promise<OptionsStreamState> {
+    return readStreamState(this.chain.reader, marketId);
   }
 
   async refresh(): Promise<OptionsRuntimeState> {
@@ -227,6 +246,17 @@ class OptionsRuntimeFacade implements OptionsRuntime {
     }
 
     return snapshot;
+  }
+
+  private requireUser(): UserAddress {
+    if (this.config.user === undefined) {
+      throw new LiveStreakConfigError({
+        message: "Options runtime has no user; set user in config to read claims or PnL",
+        metadata: { details: this.config.runtimeId }
+      });
+    }
+
+    return this.config.user;
   }
 
   private publish(): OptionsRuntimeState {

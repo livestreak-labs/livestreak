@@ -10,6 +10,7 @@ import {
   type ApproveNftInput,
   type ClaimLossLvstInput,
   type FundStreamInput,
+  type MintNftInput,
   type OptionsChainConfig,
   type OptionsWriter,
   type SetApprovalForAllInput,
@@ -26,6 +27,7 @@ import { DEFAULT_ABIS } from "./abis.js";
 import { validateOptionsContractAddresses } from "./addresses.js";
 import {
   sideToSolidityValue,
+  validateMarketIdForContracts,
   validateTokenIdForContracts,
   validateUserAddress,
   validateVaultIdForContracts
@@ -73,6 +75,16 @@ export const createEvmOptionsWriter = (config: OptionsChainConfig): OptionsWrite
   };
 
   return {
+    mint: async (input: MintNftInput) => {
+      const marketBytes = validateMarketIdForContracts(input.marketId);
+      const to = validateUserAddress(input.to, "to");
+
+      return send(addresses.marketDriver, abis.MarketDriver, "mint", [
+        marketBytes,
+        to as `0x${string}`
+      ]);
+    },
+
     fund: async (input: FundStreamInput) => {
       const tokenId = validateTokenIdForContracts(input.tokenId);
       const vaultBytes = validateVaultIdForContracts(input.vaultId);

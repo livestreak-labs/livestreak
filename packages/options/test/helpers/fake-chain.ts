@@ -91,6 +91,7 @@ export interface FakeTransportSeed {
   readonly accountVaultIds?: Readonly<Record<string, readonly VaultId[]>>;
   readonly nftBalances?: Readonly<Record<string, bigint>>;
   readonly usdcAddress?: `0x${string}`;
+  readonly usdcBalances?: Readonly<Record<string, bigint>>;
   readonly nftApproved?: Readonly<Record<string, UserAddress>>;
   readonly approvedForAll?: Readonly<Record<string, boolean>>;
   readonly streamStates?: Readonly<Record<string, OptionsStreamState>>;
@@ -113,6 +114,7 @@ export class FakeReaderInMemory implements OptionsReader {
   private readonly accountVaultIds = new Map<string, readonly VaultId[]>();
   private readonly nftBalances = new Map<string, bigint>();
   private usdcAddress: `0x${string}` = "0x00000000000000000000000000000000000000aa";
+  private readonly usdcBalances = new Map<string, bigint>();
   private readonly nftApproved = new Map<string, UserAddress>();
   private readonly approvedForAll = new Map<string, boolean>();
   private readonly streamStates = new Map<string, OptionsStreamState>();
@@ -182,6 +184,10 @@ export class FakeReaderInMemory implements OptionsReader {
 
     if (seed.usdcAddress !== undefined) {
       this.usdcAddress = seed.usdcAddress;
+    }
+
+    for (const [key, value] of Object.entries(seed.usdcBalances ?? {})) {
+      this.usdcBalances.set(key, value);
     }
 
     for (const [key, value] of Object.entries(seed.nftBalances ?? {})) {
@@ -337,6 +343,10 @@ export class FakeReaderInMemory implements OptionsReader {
 
   async readUsdcAddress(): Promise<`0x${string}`> {
     return this.usdcAddress;
+  }
+
+  async readUsdcBalance(owner: UserAddress): Promise<bigint> {
+    return this.usdcBalances.get(owner) ?? 0n;
   }
 
   async readNftBalance(tokenId: TokenId): Promise<bigint> {
@@ -562,6 +572,7 @@ export const createFakeChainWriter = (): FakeChainWriter => {
     clear() {
       requests.length = 0;
     },
+    mint: (input) => record("mint", input),
     fund: (input) => record("fund", input),
     setLanes: (input) => record("setLanes", input),
     stopFunding: (input) => record("stopFunding", input),

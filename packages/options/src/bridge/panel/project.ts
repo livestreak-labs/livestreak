@@ -28,7 +28,10 @@ export const projectOptionsPanel = (snapshot: OptionsUserOptionsSnapshot): Optio
   ...(snapshot.protocol === undefined ? {} : { protocol: snapshot.protocol }),
   user: {
     account: snapshot.account,
-    ...(snapshot.marketId === undefined ? {} : { marketId: snapshot.marketId })
+    ...(snapshot.marketId === undefined ? {} : { marketId: snapshot.marketId }),
+    ...(snapshot.usdcBalance === undefined
+      ? {}
+      : { usdcBalanceUSDC: snapshot.usdcBalance.toString() })
   }
 });
 
@@ -39,20 +42,22 @@ export const projectOptionsControls = (panel: OptionsPanel): OptionsControlsView
   const hasClaimableLoss = panel.nfts.some((nft) =>
     nft.lanes.some((lane) => lane.canClaimLoss === true)
   );
-  const hasActiveLanes = panel.nfts.some((nft) =>
-    nft.lanes.some((lane) => lane.rate !== "0" && !lane.depleted)
-  );
+  const activeMarketId = panel.user.marketId;
+  const canMint =
+    activeMarketId !== undefined &&
+    !panel.nfts.some((nft) => nft.marketId === activeMarketId);
 
   return {
     account: panel.account,
     actions: {
+      canMint,
       canFund: panel.nfts.length > 0,
-      canWithdraw: hasActiveLanes,
+      canWithdraw: hasClaimableWin,
       canClaimLoss: hasClaimableLoss,
       canStakeLvst: panel.lvst.actions.canStake,
       canUnstakeLvst: panel.lvst.actions.canUnstake,
       canClaimDividends: panel.lvst.actions.canClaimDividends,
-      canTransferNft: panel.nfts.length > 0 && hasClaimableWin === false
+      canTransferNft: panel.nfts.length > 0
     }
   };
 };
@@ -138,6 +143,10 @@ const projectVaultPanel = (
         ? {}
         : { hotUntilMs: vault.steward.hotUntilMs }),
       ...(vault.steward.hotReason === undefined ? {} : { hotReason: vault.steward.hotReason }),
+      ...(vault.steward.severity === undefined ? {} : { severity: vault.steward.severity }),
+      ...(vault.steward.exitBurnBps === undefined
+        ? {}
+        : { exitBurnBps: vault.steward.exitBurnBps }),
       ...(vault.steward.disputeId === undefined ? {} : { disputeId: vault.steward.disputeId })
     }
   };

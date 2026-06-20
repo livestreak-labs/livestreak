@@ -55,6 +55,21 @@ export const createOptionsBridge = (input: CreateOptionsBridgeInput): OptionsBri
       return projectOptionsControls(board.panel);
     },
 
+    readClaims: async (caller) => {
+      authorizeBridgeCaller(caller, bridgeBoardReadScope);
+      return runtime.readClaims();
+    },
+
+    readPnl: async (caller, investedUSDC) => {
+      authorizeBridgeCaller(caller, bridgeBoardReadScope);
+      return runtime.readPnl(investedUSDC);
+    },
+
+    readStreamState: async (caller, marketId) => {
+      authorizeBridgeCaller(caller, bridgeBoardReadScope);
+      return runtime.readStreamState(marketId);
+    },
+
     callAction: async (caller, envelope) => {
       authorizeBridgeCaller(caller, bridgeActionScope);
 
@@ -90,6 +105,8 @@ const dispatchWriterAction = async (
   const writer = runtime.chain.writer;
 
   switch (action) {
+    case "mint":
+      return writer.mint(readArgs(args));
     case "fund":
       return writer.fund(readArgs(args));
     case "setLanes":

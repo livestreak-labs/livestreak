@@ -440,6 +440,10 @@ const wrapReader = (
     onCall();
     return reader.readUsdcAddress();
   },
+  readUsdcBalance: async (owner) => {
+    onCall();
+    return reader.readUsdcBalance(owner);
+  },
   readNftBalance: async (tokenId) => {
     onCall();
     return reader.readNftBalance(tokenId);

@@ -166,6 +166,7 @@ export const mapVault = (
   const steward: OptionsVaultStewardState = {
     hot: hot?.active ?? false,
     hotUntilMs: hot?.active ? Number(hot.until) * 1000 : undefined,
+    severity: hot?.active ? hot.severity : undefined,
     disputeId: dispute?.active ? bytes32ToHex(dispute.proofRef) : undefined
   };
 
@@ -302,6 +303,7 @@ export type ContractsReadEntity =
   | "share price"
   | "pending shares"
   | "USDC address"
+  | "USDC balance"
   | "NFT balance"
   | "ownerOf"
   | "getApproved"

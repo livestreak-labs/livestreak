@@ -128,4 +128,9 @@ export type {
   SetApprovalForAllInput,
   LaneWriteInput
 } from "./chains/index.js";
-export { createOptionsChain, validateOptionsChainConfig, asTxId } from "./chains/index.js";
+export {
+  createOptionsChain,
+  resolveOptionsAccountAddress,
+  validateOptionsChainConfig,
+  asTxId
+} from "./chains/index.js";
