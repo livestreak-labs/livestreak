@@ -7,6 +7,7 @@ use livestreak::drips::{Self, DripsRegistry};
 use livestreak::side;
 use livestreak::streams::StreamsRegistry;
 use sui::clock::Clock;
+use sui::balance::{Self, Balance};
 use sui::coin::{Self, Coin};
 use sui::event;
 use sui::table::{Self, Table};
@@ -43,7 +44,7 @@ const E_INSUFFICIENT_USDC: u64 = 13;
 
 public struct VaultRegistry<phantom T> has key {
     id: UID,
-    usdc: Coin<T>,
+    usdc: Balance<T>,
     treasury_id: Option<ID>,
     nonce: u64,
     vaults: Table<vector<u8>, VaultData>,
@@ -180,7 +181,7 @@ public struct Skimmed has copy, drop {
 public fun create_registry<T>(ctx: &mut TxContext) {
     let registry = VaultRegistry<T> {
         id: object::new(ctx),
-        usdc: coin::zero<T>(ctx),
+        usdc: balance::zero<T>(),
         treasury_id: option::none(),
         nonce: 0,
         vaults: table::new(ctx),
@@ -356,12 +357,12 @@ public fun drain_skim<T>(
     if (owed == 0) {
         return (coin::zero<T>(ctx), 0)
     };
-    let balance = coin::value(&registry.usdc) as u256;
-    if (balance < owed) {
+    let bal = balance::value(&registry.usdc) as u256;
+    if (bal < owed) {
         return (coin::zero<T>(ctx), 0)
     };
     *table::borrow_mut(&mut registry.skim_owed, vault_id) = 0;
-    let payment = coin::split(&mut registry.usdc, (owed as u64), ctx);
+    let payment = coin::from_balance(balance::split(&mut registry.usdc, (owed as u64)), ctx);
     event::emit(Skimmed { vault_id, amount: owed });
     (payment, owed)
 }
@@ -650,7 +651,7 @@ public(package) fun withdraw<T>(
 }
 
 public(package) fun join_usdc<T>(registry: &mut VaultRegistry<T>, payment: Coin<T>) {
-    coin::join(&mut registry.usdc, payment);
+    balance::join(&mut registry.usdc, coin::into_balance(payment));
 }
 
 // --- helpers ---
@@ -1114,8 +1115,8 @@ fun transfer_usdc<T>(
     ctx: &mut TxContext,
 ) {
     assert!(amount > 0, E_INSUFFICIENT_USDC);
-    assert!((coin::value(&registry.usdc) as u256) >= amount, E_INSUFFICIENT_USDC);
-    let payment = coin::split(&mut registry.usdc, (amount as u64), ctx);
+    assert!((balance::value(&registry.usdc) as u256) >= amount, E_INSUFFICIENT_USDC);
+    let payment = coin::from_balance(balance::split(&mut registry.usdc, (amount as u64)), ctx);
     transfer::public_transfer(payment, payee);
 }
 
@@ -1141,7 +1142,7 @@ fun harvest_receiver<T>(
     let amt = drips::collect(drips_registry, receiver, ctx);
     if (amt > 0) {
         let payment = drips::withdraw_coin(drips_registry, amt, ctx);
-        coin::join(&mut registry.usdc, payment);
+        balance::join(&mut registry.usdc, coin::into_balance(payment));
     };
 }
 

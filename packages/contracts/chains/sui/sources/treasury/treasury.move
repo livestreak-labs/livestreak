@@ -4,6 +4,7 @@ module livestreak::treasury;
 
 use livestreak::lvst::{Self, LVST, LvstTreasuryCap};
 use livestreak::side;
+use sui::balance::{Self, Balance};
 use sui::coin::{Self, Coin};
 use sui::event;
 use sui::table::{Self, Table};
@@ -30,8 +31,8 @@ public struct TreasuryRegistry<phantom T> has key {
     total_staked: u128,
     acc_usdc_per_stake: u256,
     undistributed: u128,
-    usdc: Coin<T>,
-    staked_lvst: Coin<LVST>,
+    usdc: Balance<T>,
+    staked_lvst: Balance<LVST>,
     stake_of: Table<address, u128>,
     reward_debt: Table<address, u256>,
     accrued_dividends: Table<address, u128>,
@@ -83,8 +84,8 @@ public fun create_registry<T>(ctx: &mut TxContext) {
         total_staked: 0,
         acc_usdc_per_stake: 0,
         undistributed: 0,
-        usdc: coin::zero<T>(ctx),
-        staked_lvst: coin::zero<LVST>(ctx),
+        usdc: balance::zero<T>(),
+        staked_lvst: balance::zero<LVST>(),
         stake_of: table::new(ctx),
         reward_debt: table::new(ctx),
         accrued_dividends: table::new(ctx),
@@ -117,7 +118,7 @@ public(package) fun notify_skim<T>(registry: &mut TreasuryRegistry<T>, amount: u
 }
 
 public(package) fun deposit_skim<T>(registry: &mut TreasuryRegistry<T>, payment: Coin<T>) {
-    coin::join(&mut registry.usdc, payment);
+    balance::join(&mut registry.usdc, coin::into_balance(payment));
 }
 
 public(package) fun mint_loss_lvst<T>(
@@ -156,7 +157,7 @@ public fun stake_lvst<T>(
     let amount = coin::value(&payment) as u128;
     assert!(amount > 0, E_ZERO_STAKE);
     settle_dividends(registry, user);
-    coin::join(&mut registry.staked_lvst, payment);
+    balance::join(&mut registry.staked_lvst, coin::into_balance(payment));
     if (!table::contains(&registry.stake_of, user)) {
         table::add(&mut registry.stake_of, user, amount);
     } else {
@@ -193,7 +194,7 @@ public fun unstake_lvst<T>(
     let new_stake = *table::borrow(&registry.stake_of, user);
     *table::borrow_mut(&mut registry.reward_debt, user) =
         (new_stake as u256) * registry.acc_usdc_per_stake / ACC_SCALE;
-    let payment = coin::split(&mut registry.staked_lvst, (amount as u64), ctx);
+    let payment = coin::from_balance(balance::split(&mut registry.staked_lvst, (amount as u64)), ctx);
     transfer::public_transfer(payment, user);
     event::emit(Unstaked { user, amount });
 }
@@ -208,7 +209,7 @@ public fun claim_dividends<T>(registry: &mut TreasuryRegistry<T>, ctx: &mut TxCo
     };
     if (amount > 0) {
         *table::borrow_mut(&mut registry.accrued_dividends, user) = 0;
-        let payment = coin::split(&mut registry.usdc, (amount as u64), ctx);
+        let payment = coin::from_balance(balance::split(&mut registry.usdc, (amount as u64)), ctx);
         transfer::public_transfer(payment, user);
         event::emit(DividendsClaimed { user, amount });
     };
