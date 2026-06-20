@@ -1,42 +1,58 @@
-import {
-  LiveStreakConfigError,
-  isLiveStreakError,
-  serializeLiveStreakError,
-  serializeUnknownError,
-  type SerializedError
-} from "@livestreak/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { HostRouteDeps, MatchedRoute, RouteDefinition } from "./routes.js";
+import { defaultHostServerConfig } from "../descriptor/config.js";
+import { createHostRouteDeps, type HostRouteDeps } from "./deps.js";
+import { createHostModules, descriptorRoutes } from "./modules.js";
+import { mountEnabledRoutes } from "./registry.js";
+import { jsonFailure, jsonSuccess, type JsonResponse } from "./response.js";
+import type { MatchedRoute, RouteDefinition } from "./types.js";
 
 // --- exports ---
 
-export interface JsonSuccess<T> {
-  readonly ok: true;
-  readonly status: number;
-  readonly body: T;
-}
+export type { JsonResponse, JsonSuccess, JsonFailure } from "./response.js";
+export { jsonSuccess, jsonFailure } from "./response.js";
+export type { RouteContext, RouteDefinition, RouteHandler, MatchedRoute } from "./types.js";
+export { createHostRouteDeps, type HostRouteDeps } from "./deps.js";
 
-export interface JsonFailure {
-  readonly ok: false;
-  readonly status: number;
-  readonly error: SerializedError;
-}
+export const matchRoute = (
+  method: string,
+  pathname: string,
+  routes: readonly RouteDefinition[]
+): MatchedRoute | undefined => {
+  for (const route of routes) {
+    if (route.method !== method) {
+      continue;
+    }
 
-export type JsonResponse<T> = JsonSuccess<T> | JsonFailure;
+    const match = route.pattern.exec(pathname);
+    if (match === null) {
+      continue;
+    }
 
-export const jsonSuccess = <T>(status: number, body: T): JsonSuccess<T> => ({
-  ok: true,
-  status,
-  body
-});
+    return {
+      route,
+      params: match.groups ?? {}
+    };
+  }
 
-export const jsonFailure = (status: number, error: unknown): JsonFailure => ({
-  ok: false,
-  status,
-  error: isLiveStreakError(error)
-    ? serializeLiveStreakError(error)
-    : serializeUnknownError(error)
-});
+  return undefined;
+};
+
+export const routeNotFound = (method: string, pathname: string): JsonResponse<unknown> =>
+  jsonFailure(
+    404,
+    new LiveStreakConfigError({
+      message: `No route for ${method} ${pathname}`,
+      metadata: { retryable: false }
+    })
+  );
+
+export const createHostRoutes = (
+  config = defaultHostServerConfig()
+): RouteDefinition[] => {
+  const deps = createHostRouteDeps(config);
+  return [...descriptorRoutes(), ...mountEnabledRoutes(createHostModules(deps))];
+};
 
 export const readJsonBody = async (request: IncomingMessage): Promise<unknown> => {
   const chunks: Buffer[] = [];
@@ -75,39 +91,6 @@ export const writeJsonResponse = (response: ServerResponse, payload: JsonRespons
   response.setHeader("content-type", "application/json; charset=utf-8");
   response.end(JSON.stringify(body));
 };
-
-export const matchRoute = (
-  method: string,
-  pathname: string,
-  routes: readonly RouteDefinition[]
-): MatchedRoute | undefined => {
-  for (const route of routes) {
-    if (route.method !== method) {
-      continue;
-    }
-
-    const match = route.pattern.exec(pathname);
-    if (match === null) {
-      continue;
-    }
-
-    return {
-      route,
-      params: match.groups ?? {}
-    };
-  }
-
-  return undefined;
-};
-
-export const routeNotFound = (method: string, pathname: string): JsonResponse<unknown> =>
-  jsonFailure(
-    404,
-    new LiveStreakConfigError({
-      message: `No route for ${method} ${pathname}`,
-      metadata: { retryable: false }
-    })
-  );
 
 export const dispatchHttpRequest = async (
   request: IncomingMessage,

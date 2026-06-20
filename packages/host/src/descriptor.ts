@@ -1,28 +1,51 @@
+import { OutputMode } from "@livestreak/schema";
 import { Schema } from "effect";
 
 // --- exports ---
 
-export const HostCapability = Schema.Literal(
-  "webrtc_forwarding",
-  "host_cache",
-  "endpoint_manifests",
-  "thumbnails",
-  "audit_logs",
-  "key_rotation"
+export { OutputMode, type OutputMode as HostOutputMode } from "@livestreak/schema";
+
+export const HostModuleToken = Schema.Literal(
+  "aa",
+  "media",
+  "memory",
+  "discovery",
+  "runtime",
+  "tenancy"
 );
 
-export type HostCapability = Schema.Schema.Type<typeof HostCapability>;
+export type HostModuleToken = Schema.Schema.Type<typeof HostModuleToken>;
 
-export const HostOutputMode = Schema.Literal("forwarder", "local", "file");
+export const MemoryTrustModel = Schema.Literal(
+  "plaintext-relayer",
+  "client-encrypted",
+  "tee-attested"
+);
 
-export type HostOutputMode = Schema.Schema.Type<typeof HostOutputMode>;
+export type MemoryTrustModel = Schema.Schema.Type<typeof MemoryTrustModel>;
+
+export const MemoryDescriptorAdvert = Schema.Struct({
+  relayerUrl: Schema.Union(Schema.Null, Schema.NonEmptyString),
+  namespaceTemplate: Schema.Literal("market:{marketId}"),
+  trustModel: MemoryTrustModel
+});
+
+export type MemoryDescriptorAdvert = Schema.Schema.Type<typeof MemoryDescriptorAdvert>;
+
+export const MediaDescriptorAdvert = Schema.Struct({
+  simulcastAvailable: Schema.Boolean
+});
+
+export type MediaDescriptorAdvert = Schema.Schema.Type<typeof MediaDescriptorAdvert>;
 
 export const HostProviderDescriptor = Schema.Struct({
   version: Schema.Literal("0.1.0"),
   hostId: Schema.NonEmptyString,
   baseUrl: Schema.NonEmptyString,
-  capabilities: Schema.Array(HostCapability),
-  supportedOutputs: Schema.Array(HostOutputMode),
+  modules: Schema.Array(HostModuleToken),
+  supportedOutputs: Schema.Array(OutputMode),
+  media: MediaDescriptorAdvert,
+  memory: MemoryDescriptorAdvert,
   termsVersion: Schema.optional(Schema.NonEmptyString)
 });
 

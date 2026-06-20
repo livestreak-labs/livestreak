@@ -9,12 +9,12 @@ import type {
 
 export type IndexedVault = HostSimilarityIndexRequest;
 
-export interface SimilarityStore {
+export interface DiscoveryStore {
   readonly indexVault: (vault: IndexedVault) => void;
   readonly findSimilar: (query: HostSimilarityRequest) => HostSimilarityResult;
 }
 
-export const createSimilarityStore = (): SimilarityStore => {
+export const createDiscoveryStore = (): DiscoveryStore => {
   const vaults: IndexedVault[] = [];
 
   return {

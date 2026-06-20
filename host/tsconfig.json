@@ -6,14 +6,10 @@
     "paths": {
       "#server/*": ["./src/server/*"],
       "#descriptor/*": ["./src/descriptor/*"],
-      "#policy/*": ["./src/policy/*"],
-      "#sessions/*": ["./src/sessions/*"],
-      "#manifests/*": ["./src/manifests/*"],
-      "#cache/*": ["./src/cache/*"],
-      "#similarity/*": ["./src/similarity/*"],
-      "#forum/*": ["./src/forum/*"],
+      "#media/*": ["./src/media/*"],
+      "#discovery/*": ["./src/discovery/*"],
+      "#memory/*": ["./src/memory/*"],
       "#aa/*": ["./src/aa/*"],
-      "#webrtc/*": ["./src/webrtc/*"],
       "#test/*": ["./test/*"]
     }
   },

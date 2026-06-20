@@ -13,14 +13,10 @@ export default defineConfig({
     alias: [
       { find: /^#server\//, replacement: `${sourceDirectory}/server/` },
       { find: /^#descriptor\//, replacement: `${sourceDirectory}/descriptor/` },
-      { find: /^#policy\//, replacement: `${sourceDirectory}/policy/` },
-      { find: /^#sessions\//, replacement: `${sourceDirectory}/sessions/` },
-      { find: /^#manifests\//, replacement: `${sourceDirectory}/manifests/` },
-      { find: /^#cache\//, replacement: `${sourceDirectory}/cache/` },
-      { find: /^#similarity\//, replacement: `${sourceDirectory}/similarity/` },
-      { find: /^#forum\//, replacement: `${sourceDirectory}/forum/` },
+      { find: /^#media\//, replacement: `${sourceDirectory}/media/` },
+      { find: /^#discovery\//, replacement: `${sourceDirectory}/discovery/` },
+      { find: /^#memory\//, replacement: `${sourceDirectory}/memory/` },
       { find: /^#aa\//, replacement: `${sourceDirectory}/aa/` },
-      { find: /^#webrtc\//, replacement: `${sourceDirectory}/webrtc/` },
       { find: /^#test\//, replacement: `${packageDirectory}/test/` }
     ]
   }

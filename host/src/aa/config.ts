@@ -1,6 +1,7 @@
 import type { AaOperationKind, AaSponsorshipMode } from "@livestreak/host";
 import type { Hex } from "viem";
 import type { HostServerConfig } from "../descriptor/config.js";
+import { assertPaymasterSignerMatchesChain } from "./boot-assert.js";
 import { startAlto } from "./alto.js";
 import { createPaymasterSigner, type PaymasterSigner } from "./paymaster-signer.js";
 
@@ -76,6 +77,10 @@ export const buildPaymasterSigners = (aa: AaServerConfig): Map<string, Paymaster
 
 export const bootstrapAaFromConfig = async (aa: AaServerConfig): Promise<void> => {
   for (const chain of aa.chains) {
+    if (chain.paymasterAddress !== undefined && chain.executorPrivateKey !== undefined) {
+      await assertPaymasterSignerMatchesChain(chain);
+    }
+
     if (
       chain.rpcUrl === undefined ||
       chain.entryPoint === undefined ||

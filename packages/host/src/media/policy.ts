@@ -1,5 +1,5 @@
+import { OutputMode } from "@livestreak/schema";
 import { Schema } from "effect";
-import { HostOutputMode } from "./descriptor.js";
 
 // --- exports ---
 
@@ -38,7 +38,7 @@ export type HostPolicyEvaluation = Schema.Schema.Type<typeof HostPolicyEvaluatio
 export const HostPolicyDescriptor = Schema.Struct({
   hostId: Schema.NonEmptyString,
   accountTier: Schema.NonEmptyString,
-  supportedOutputs: Schema.Array(HostOutputMode),
+  supportedOutputs: Schema.Array(OutputMode),
   debug: Schema.Boolean,
   cache: HostCachePolicy,
   live: HostLivePolicy,
@@ -56,7 +56,7 @@ export const HostPolicyBlockReason = Schema.Literal(
   "endpoint_manifests_unavailable",
   "host_cache_unavailable",
   "cache_receipts_unavailable",
-  "live_forwarding_unavailable",
+  "simulcast_unavailable",
   "cache_quota_exceeded",
   "live_duration_out_of_range"
 );
@@ -64,7 +64,7 @@ export const HostPolicyBlockReason = Schema.Literal(
 export type HostPolicyBlockReason = Schema.Schema.Type<typeof HostPolicyBlockReason>;
 
 export const HostPolicyRequest = Schema.Struct({
-  outputMode: Schema.Union(HostOutputMode, Schema.NonEmptyString),
+  outputMode: Schema.Union(OutputMode, Schema.NonEmptyString),
   debug: Schema.Boolean,
   contentId: Schema.NonEmptyString,
   observer: Schema.NonEmptyString,
@@ -106,7 +106,7 @@ export type HostLiveDecision = Schema.Schema.Type<typeof HostLiveDecision>;
 
 export const HostPolicyResult = Schema.Struct({
   descriptor: HostPolicyDescriptor,
-  outputMode: Schema.Union(HostOutputMode, Schema.NonEmptyString),
+  outputMode: Schema.Union(OutputMode, Schema.NonEmptyString),
   cache: HostCacheDecision,
   live: HostLiveDecision,
   blockReasons: Schema.Array(HostPolicyBlockReason),

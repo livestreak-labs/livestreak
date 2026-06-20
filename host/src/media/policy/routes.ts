@@ -11,18 +11,9 @@ import { evaluateHostPolicy, type PolicyEvaluatorDeps } from "./evaluate.js";
 
 export type PolicyRouteDeps = PolicyEvaluatorDeps;
 
-export type PolicyRouteSuccess = {
-  readonly ok: true;
-  readonly result: HostPolicyResult;
-};
-
-export type PolicyRouteFailure = {
-  readonly ok: false;
-  readonly status: number;
-  readonly error: LiveStreakConfigError;
-};
-
-export type PolicyRouteResponse = PolicyRouteSuccess | PolicyRouteFailure;
+export type PolicyRouteResponse =
+  | { readonly ok: true; readonly result: HostPolicyResult }
+  | { readonly ok: false; readonly status: number; readonly error: LiveStreakConfigError };
 
 export const handlePolicyEvaluate = (
   body: unknown,
@@ -50,7 +41,7 @@ export const isPolicyBlocked = (request: HostPolicyRequest, deps: PolicyRouteDep
 
 // --- helpers ---
 
-const policyConfigFailure = (message: string): PolicyRouteFailure => ({
+const policyConfigFailure = (message: string): PolicyRouteResponse => ({
   ok: false,
   status: 400,
   error: new LiveStreakConfigError({

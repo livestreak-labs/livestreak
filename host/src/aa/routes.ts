@@ -1,7 +1,7 @@
 import type { AaCapabilityDescriptor } from "@livestreak/host";
 import type { Hex } from "viem";
-import type { JsonResponse } from "../server/http.js";
-import { jsonSuccess } from "../server/http.js";
+import type { JsonResponse } from "../server/response.js";
+import { jsonSuccess } from "../server/response.js";
 import type { HostServerConfig } from "../descriptor/config.js";
 import { getAltoPort } from "./alto.js";
 import {

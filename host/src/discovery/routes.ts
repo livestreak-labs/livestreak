@@ -1,38 +1,38 @@
 import { LiveStreakConfigError } from "@livestreak/core";
 import {
-  decodeHostSimilarityIndexRequest,
-  decodeHostSimilarityRequest,
+  decodeHostDiscoveryIndexRequest,
+  decodeHostDiscoveryRequest,
   type HostSimilarityIndexRequest,
   type HostSimilarityResult,
   validationErrorMessage
 } from "@livestreak/host";
-import type { SimilarityStore } from "./store.js";
+import type { DiscoveryStore } from "./store.js";
 
 // --- exports ---
 
-export interface SimilarityRouteDeps {
-  readonly store: SimilarityStore;
+export interface DiscoveryRouteDeps {
+  readonly store: DiscoveryStore;
 }
 
-export type SimilarityRouteResponse =
+export type DiscoveryRouteResponse =
   | { readonly ok: true; readonly result: HostSimilarityResult }
   | { readonly ok: false; readonly status: number; readonly error: LiveStreakConfigError };
 
-export type SimilarityIndexRouteResponse =
+export type DiscoveryIndexRouteResponse =
   | { readonly ok: true; readonly result: HostSimilarityIndexRequest }
   | { readonly ok: false; readonly status: number; readonly error: LiveStreakConfigError };
 
 export const handleIndexVault = (
   body: unknown,
-  deps: SimilarityRouteDeps
-): SimilarityIndexRouteResponse => {
+  deps: DiscoveryRouteDeps
+): DiscoveryIndexRouteResponse => {
   if (body === null || typeof body !== "object") {
-    return similarityIndexFailure("Request body must be a JSON object");
+    return discoveryIndexFailure("Request body must be a JSON object");
   }
 
-  const decoded = decodeHostSimilarityIndexRequest(body);
+  const decoded = decodeHostDiscoveryIndexRequest(body);
   if (decoded._tag === "Left") {
-    return similarityIndexFailure(validationErrorMessage(decoded.left));
+    return discoveryIndexFailure(validationErrorMessage(decoded.left));
   }
 
   deps.store.indexVault(decoded.right);
@@ -45,15 +45,15 @@ export const handleIndexVault = (
 
 export const handleFindSimilar = (
   body: unknown,
-  deps: SimilarityRouteDeps
-): SimilarityRouteResponse => {
+  deps: DiscoveryRouteDeps
+): DiscoveryRouteResponse => {
   if (body === null || typeof body !== "object") {
-    return similarityFindFailure("Request body must be a JSON object");
+    return discoveryFindFailure("Request body must be a JSON object");
   }
 
-  const decoded = decodeHostSimilarityRequest(body);
+  const decoded = decodeHostDiscoveryRequest(body);
   if (decoded._tag === "Left") {
-    return similarityFindFailure(validationErrorMessage(decoded.left));
+    return discoveryFindFailure(validationErrorMessage(decoded.left));
   }
 
   return {
@@ -64,7 +64,7 @@ export const handleFindSimilar = (
 
 // --- helpers ---
 
-const similarityFindFailure = (message: string): SimilarityRouteResponse => ({
+const discoveryFindFailure = (message: string): DiscoveryRouteResponse => ({
   ok: false,
   status: 400,
   error: new LiveStreakConfigError({
@@ -73,7 +73,7 @@ const similarityFindFailure = (message: string): SimilarityRouteResponse => ({
   })
 });
 
-const similarityIndexFailure = (message: string): SimilarityIndexRouteResponse => ({
+const discoveryIndexFailure = (message: string): DiscoveryIndexRouteResponse => ({
   ok: false,
   status: 400,
   error: new LiveStreakConfigError({

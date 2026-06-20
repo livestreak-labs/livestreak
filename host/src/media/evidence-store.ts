@@ -48,3 +48,7 @@ export const createCacheStore = (initialQuotaBytes: number): CacheStore => {
     }
   };
 };
+
+export type EvidenceStore = CacheStore;
+
+export const createEvidenceStore = createCacheStore;

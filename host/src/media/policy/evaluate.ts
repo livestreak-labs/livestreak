@@ -1,12 +1,13 @@
 import type {
   HostCacheIntent,
-  HostCapability,
-  HostOutputMode,
+  HostModuleToken,
   HostPolicyBlockReason,
   HostPolicyRequest,
   HostPolicyResult
 } from "@livestreak/host";
-import type { HostServerConfig } from "../descriptor/config.js";
+import type { OutputMode } from "@livestreak/schema";
+import type { HostServerConfig } from "../../descriptor/config.js";
+import { isModuleEnabled } from "../../descriptor/config.js";
 
 // --- exports ---
 
@@ -24,24 +25,27 @@ export const evaluateHostPolicy = (
   deps: PolicyEvaluatorDeps
 ): HostPolicyResult => {
   const { config, state } = deps;
-  const capabilities = new Set<HostCapability>(config.capabilities);
-  const supportedOutputs = new Set<HostOutputMode>(config.supportedOutputs);
+  const mediaEnabled = isModuleEnabled(config, "media");
+  const supportedOutputs = new Set<OutputMode>(config.supportedOutputs);
+  const simulcastAvailable =
+    mediaEnabled &&
+    config.livekitApiKey !== undefined &&
+    config.livekitApiKey.length > 0;
   const intent = requestCacheIntent(request);
   const required = cacheRequired(request, intent);
   const liveRequired = livePolicyRequired(request);
   const expectedDurationSeconds =
     request.expectedDurationSeconds ?? (liveRequired ? config.maxDurationSeconds : 0);
   const expectedCacheBytes = request.expectedCacheBytes ?? 0;
-  const cacheAvailable = capabilities.has("host_cache");
-  const liveAvailable = capabilities.has("webrtc_forwarding");
+  const cacheAvailable = mediaEnabled;
   const blocks: HostPolicyBlockReason[] = [];
   const warnings: string[] = [];
 
-  if (!supportedOutputs.has(request.outputMode as HostOutputMode)) {
+  if (!supportedOutputs.has(request.outputMode as OutputMode)) {
     blocks.push("unsupported_output");
   }
 
-  if (!capabilities.has("endpoint_manifests")) {
+  if (!mediaEnabled) {
     blocks.push("endpoint_manifests_unavailable");
   }
 
@@ -53,8 +57,8 @@ export const evaluateHostPolicy = (
     blocks.push("cache_receipts_unavailable");
   }
 
-  if (request.outputMode === "forwarder" && !liveAvailable) {
-    blocks.push("live_forwarding_unavailable");
+  if (request.outputMode === "simulcast" && !simulcastAvailable) {
+    blocks.push("simulcast_unavailable");
   }
 
   if (required && expectedCacheBytes > state.quotaRemainingBytes) {
@@ -108,7 +112,7 @@ export const evaluateHostPolicy = (
     },
     live: {
       required: liveRequired,
-      available: liveAvailable,
+      available: simulcastAvailable,
       expectedDurationSeconds
     },
     blockReasons: blocks,
@@ -139,7 +143,7 @@ const cacheRequired = (request: HostPolicyRequest, intent: HostCacheIntent): boo
     return true;
   }
 
-  if (request.outputMode === "forwarder") {
+  if (request.outputMode === "simulcast") {
     return true;
   }
 
@@ -150,7 +154,7 @@ const cacheMaySkip = (request: HostPolicyRequest, required: boolean): boolean =>
   !required && (request.outputMode === "file" || (request.outputMode === "local" && request.debug));
 
 const livePolicyRequired = (request: HostPolicyRequest): boolean =>
-  request.outputMode === "forwarder" || (request.outputMode === "local" && !request.debug);
+  request.outputMode === "simulcast" || (request.outputMode === "local" && !request.debug);
 
 const statusFromBlocks = (
   blocks: readonly HostPolicyBlockReason[],

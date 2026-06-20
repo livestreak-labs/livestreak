@@ -1,12 +1,12 @@
+import { OutputMode } from "@livestreak/schema";
 import { Schema } from "effect";
-import { HostOutputMode } from "./descriptor.js";
 import { EndpointDescriptor, EndpointManifest } from "./manifest.js";
 import { HostCacheIntent, HostPolicyResult } from "./policy.js";
 
 // --- exports ---
 
 export const HostCreateSessionRequest = Schema.Struct({
-  outputMode: Schema.Union(HostOutputMode, Schema.NonEmptyString),
+  outputMode: Schema.Union(OutputMode, Schema.NonEmptyString),
   debug: Schema.Boolean,
   contentId: Schema.NonEmptyString,
   observer: Schema.NonEmptyString,
