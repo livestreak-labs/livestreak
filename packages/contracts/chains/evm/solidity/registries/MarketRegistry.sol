@@ -44,7 +44,7 @@ contract MarketRegistry is Ownable {
     struct StreamState {
         StreamStatus status;
         StorageScheme scheme;
-        bytes32 id;
+        string id;
         uint64 updatedAt;
         uint64 endedAt;
     }
@@ -53,8 +53,8 @@ contract MarketRegistry is Ownable {
 
     mapping(bytes32 => StreamState) public streamState;
 
-    event StreamLive(bytes32 indexed marketId, StorageScheme scheme, bytes32 id, uint64 updatedAt);
-    event StreamEnded(bytes32 indexed marketId, StorageScheme scheme, bytes32 id, uint64 endedAt);
+    event StreamLive(bytes32 indexed marketId, StorageScheme scheme, string id, uint64 updatedAt);
+    event StreamEnded(bytes32 indexed marketId, StorageScheme scheme, string id, uint64 endedAt);
 
     constructor(address initialOwner, Protocol protocol_) Ownable(initialOwner) {
         require(address(protocol_) != address(0), "MarketRegistry: zero protocol");
@@ -125,8 +125,8 @@ contract MarketRegistry is Ownable {
     }
 
     /// @notice Creator marks the stream live (first call) or re-points the live manifest.
-    function goLive(bytes32 marketId, StorageScheme scheme, bytes32 id) external onlyMarketCreator(marketId) {
-        require(id != bytes32(0), "MarketRegistry: zero id");
+    function goLive(bytes32 marketId, StorageScheme scheme, string calldata id) external onlyMarketCreator(marketId) {
+        require(bytes(id).length != 0 && bytes(id).length <= 64, "MarketRegistry: bad id length");
         StreamState storage s = streamState[marketId];
         require(s.status != StreamStatus.Ended, "MarketRegistry: stream ended");
         s.status = StreamStatus.Live;
@@ -136,9 +136,9 @@ contract MarketRegistry is Ownable {
         emit StreamLive(marketId, scheme, id, s.updatedAt);
     }
 
-    /// @notice Creator ends the stream (first call freezes endedAt) or revises the VOD pointer until lock.
-    function setEnded(bytes32 marketId, StorageScheme scheme, bytes32 id) external onlyMarketCreator(marketId) {
-        require(id != bytes32(0), "MarketRegistry: zero id");
+    /// @notice Creator ends the stream (first call freezes endedAt) or revises the VOD id until lock.
+    function setEnded(bytes32 marketId, StorageScheme scheme, string calldata id) external onlyMarketCreator(marketId) {
+        require(bytes(id).length != 0 && bytes(id).length <= 64, "MarketRegistry: bad id length");
         StreamState storage s = streamState[marketId];
         require(s.status != StreamStatus.None, "MarketRegistry: not live");
         require(!_isLocked(s), "MarketRegistry: stream locked");

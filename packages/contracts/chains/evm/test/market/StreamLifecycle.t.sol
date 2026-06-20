@@ -22,9 +22,9 @@ contract StreamLifecycleTest is Test {
     address internal stranger = makeAddr("stranger");
 
     bytes32 internal marketId;
-    bytes32 internal liveId = bytes32(uint256(0x11));
-    bytes32 internal vodId = bytes32(uint256(0x22));
-    bytes32 internal vodReviseId = bytes32(uint256(0x33));
+    string internal liveId = "Ci3uNXqA0ent7gRMjWSY7XfzDYl8GWFBtErU2gzZR3M"; // 43-char Walrus blobId
+    string internal vodId = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"; // 59-char IPFS CIDv1
+    string internal vodReviseId = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; // 46-char IPFS CIDv0
 
     MarketRegistry.StorageScheme internal constant SCHEME_LIVE = MarketRegistry.StorageScheme.WalrusTestnet;
 
@@ -47,7 +47,7 @@ contract StreamLifecycleTest is Test {
         (
             MarketRegistry.StreamStatus status,
             MarketRegistry.StorageScheme scheme,
-            bytes32 id,
+            string memory id,
             uint64 updatedAt,
             uint64 endedAt
         ) = marketRegistry.streamState(mid);
@@ -83,14 +83,21 @@ contract StreamLifecycleTest is Test {
         marketRegistry.goLive(bytes32(uint256(999)), SCHEME_LIVE, liveId);
     }
 
-    function test_goLive_zeroIdReverts() public {
+    function test_goLive_emptyIdReverts() public {
         vm.prank(creator);
-        vm.expectRevert("MarketRegistry: zero id");
-        marketRegistry.goLive(marketId, SCHEME_LIVE, bytes32(0));
+        vm.expectRevert("MarketRegistry: bad id length");
+        marketRegistry.goLive(marketId, SCHEME_LIVE, "");
+    }
+
+    function test_goLive_tooLongIdReverts() public {
+        string memory tooLong = new string(65); // 65 bytes > 64 cap
+        vm.prank(creator);
+        vm.expectRevert("MarketRegistry: bad id length");
+        marketRegistry.goLive(marketId, SCHEME_LIVE, tooLong);
     }
 
     function test_goLive_whileLiveRepoints() public {
-        bytes32 repointed = bytes32(uint256(0x44));
+        string memory repointed = "arweave-repoint-txid-0001";
 
         vm.startPrank(creator);
         marketRegistry.goLive(marketId, MarketRegistry.StorageScheme.WalrusTestnet, liveId);
@@ -217,6 +224,6 @@ contract StreamLifecycleTest is Test {
 
         vm.prank(creator);
         vm.expectRevert("MarketRegistry: stream locked");
-        marketRegistry.setEnded(marketId, MarketRegistry.StorageScheme.Ipfs, bytes32(uint256(0x55)));
+        marketRegistry.setEnded(marketId, MarketRegistry.StorageScheme.Ipfs, "late-vod-id");
     }
 }
