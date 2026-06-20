@@ -34,5 +34,10 @@ export interface OptionsReadTransport {
     side: OptionsVaultSide,
     tokenId: TokenId
   ): Promise<bigint>;
+  readUsdcAddress(): Promise<`0x${string}`>;
+  readNftBalance(tokenId: TokenId): Promise<bigint>;
+  readOwnerOf(tokenId: TokenId): Promise<UserAddress>;
+  readApproved(tokenId: TokenId): Promise<UserAddress | undefined>;
+  readIsApprovedForAll(owner: UserAddress, operator: UserAddress): Promise<boolean>;
   readProtocolSummary?(): Promise<OptionsProtocolSummary>;
 }

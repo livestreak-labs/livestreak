@@ -2,6 +2,7 @@
 
 import { LiveStreakConfigError } from "@livestreak/core";
 import {
+  dripsStreamingAbi,
   lvstTokenAbi,
   marketDriverAbi,
   marketRegistryAbi,
@@ -31,6 +32,9 @@ import {
   mapMarket,
   mapNft,
   mapProtocolSummary,
+  mapApprovedAddress,
+  mapStreamsStateBalance,
+  type RawStreamsState,
   mapVault,
   mapVaultIds,
   mapVaultPools,
@@ -46,6 +50,7 @@ import {
 } from "./mapping.js";
 import { sideFromSolidityValue, sideToSolidityValue } from "./sides.js";
 import {
+  validateContractAddress,
   validateMarketIdForContracts,
   validateOptionsContractAddresses,
   validateTokenIdForContracts,
@@ -71,6 +76,7 @@ export type OptionsContractAbis = {
   readonly StewardRegistry: typeof stewardRegistryAbi;
   readonly Treasury: typeof treasuryAbi;
   readonly LvstToken: typeof lvstTokenAbi;
+  readonly DripsStreaming: typeof dripsStreamingAbi;
 };
 
 const DEFAULT_ABIS: OptionsContractAbis = {
@@ -79,14 +85,18 @@ const DEFAULT_ABIS: OptionsContractAbis = {
   MarketDriver: marketDriverAbi,
   StewardRegistry: stewardRegistryAbi,
   Treasury: treasuryAbi,
-  LvstToken: lvstTokenAbi
+  LvstToken: lvstTokenAbi,
+  DripsStreaming: dripsStreamingAbi
 };
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
 
 export type ContractsOptionsReadTransportInput = {
   readonly reader: ContractReader;
   readonly addresses: OptionsContractAddresses;
   readonly abis?: OptionsContractAbis;
   readonly includeProtocolSummary?: boolean;
+  readonly transferOperator?: UserAddress;
 };
 
 export const createContractsOptionsReadTransport = (
@@ -97,12 +107,18 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
   private readonly reader: ContractReader;
   private readonly addresses: OptionsContractAddresses;
   private readonly abis: OptionsContractAbis;
+  private readonly transferOperator?: UserAddress;
+  private usdcAddress?: `0x${string}`;
   readonly readProtocolSummary?: () => Promise<OptionsProtocolSummary>;
 
   constructor(input: ContractsOptionsReadTransportInput) {
     this.reader = input.reader;
     this.addresses = validateOptionsContractAddresses(input.addresses);
     this.abis = input.abis ?? DEFAULT_ABIS;
+    this.transferOperator =
+      input.transferOperator === undefined
+        ? undefined
+        : validateUserAddress(input.transferOperator, "transferOperator");
 
     if (input.includeProtocolSummary === true) {
       this.readProtocolSummary = async () => this.loadProtocolSummary();
@@ -287,7 +303,8 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
         account,
         asMarketId(bytes32ToHex(marketIdRaw)),
         count,
-        lanes
+        lanes,
+        await this.readTransferFlags(id)
       );
     } catch (error) {
       if (error instanceof LiveStreakConfigError) {
@@ -442,6 +459,93 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
     }
   }
 
+  async readUsdcAddress(): Promise<`0x${string}`> {
+    if (this.usdcAddress !== undefined) {
+      return this.usdcAddress;
+    }
+
+    try {
+      const address = await this.call<`0x${string}`>(
+        this.addresses.marketDriver,
+        this.abis.MarketDriver,
+        "USDC",
+        []
+      );
+      this.usdcAddress = validateContractAddress(address, "USDC");
+      return this.usdcAddress;
+    } catch (error) {
+      throw contractsReadFailed("USDC address", error);
+    }
+  }
+
+  async readNftBalance(tokenId: TokenId): Promise<bigint> {
+    const id = validateTokenIdForContracts(tokenId);
+
+    try {
+      const usdc = await this.readUsdcAddress();
+      const state = await this.call<RawStreamsState>(
+        this.addresses.dripsStreaming,
+        this.abis.DripsStreaming,
+        "streamsState",
+        [id, usdc]
+      );
+
+      return mapStreamsStateBalance(state);
+    } catch (error) {
+      throw contractsReadFailed("NFT balance", error);
+    }
+  }
+
+  async readOwnerOf(tokenId: TokenId): Promise<UserAddress> {
+    const id = validateTokenIdForContracts(tokenId);
+
+    try {
+      const owner = await this.call<`0x${string}`>(
+        this.addresses.marketDriver,
+        this.abis.MarketDriver,
+        "ownerOf",
+        [id]
+      );
+
+      return validateUserAddress(owner, "ownerOf");
+    } catch (error) {
+      throw contractsReadFailed("ownerOf", error);
+    }
+  }
+
+  async readApproved(tokenId: TokenId): Promise<UserAddress | undefined> {
+    const id = validateTokenIdForContracts(tokenId);
+
+    try {
+      const approved = await this.call<`0x${string}`>(
+        this.addresses.marketDriver,
+        this.abis.MarketDriver,
+        "getApproved",
+        [id]
+      );
+
+      return mapApprovedAddress(approved);
+    } catch (error) {
+      throw contractsReadFailed("getApproved", error);
+    }
+  }
+
+  async readIsApprovedForAll(owner: UserAddress, operator: UserAddress): Promise<boolean> {
+    const account = validateUserAddress(owner);
+    const approvedOperator = validateUserAddress(operator, "operator");
+
+    try {
+      return await this.call<boolean>(
+        this.addresses.marketDriver,
+        this.abis.MarketDriver,
+        "isApprovedForAll",
+        [account as `0x${string}`, approvedOperator as `0x${string}`]
+      );
+    } catch (error) {
+      throw contractsReadFailed("isApprovedForAll", error);
+    }
+  }
+
   async readLvstAccount(user: UserAddress): Promise<LvstAccount> {
     const account = validateUserAddress(user);
 
@@ -514,6 +618,29 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
     args: readonly unknown[] = []
   ): Promise<T> {
     return (await this.reader.read({ address, abi, functionName, args })) as T;
+  }
+
+  private async readTransferFlags(
+    tokenId: bigint
+  ): Promise<{ readonly approved?: UserAddress; readonly isOperator?: boolean }> {
+    const [approved, ownerOnChain] = await Promise.all([
+      this.readApproved(asTokenId(tokenId)),
+      this.readOwnerOf(asTokenId(tokenId))
+    ]);
+
+    const isOperator =
+      this.transferOperator === undefined
+        ? undefined
+        : await this.readIsApprovedForAll(ownerOnChain, this.transferOperator);
+
+    if (approved === undefined && isOperator === undefined) {
+      return {};
+    }
+
+    return {
+      ...(approved === undefined ? {} : { approved }),
+      ...(isOperator === undefined ? {} : { isOperator })
+    };
   }
 }
 

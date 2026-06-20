@@ -18,7 +18,12 @@ export type ContractsReadEntity =
   | "winning side"
   | "board"
   | "share price"
-  | "pending shares";
+  | "pending shares"
+  | "USDC address"
+  | "NFT balance"
+  | "ownerOf"
+  | "getApproved"
+  | "isApprovedForAll";
 
 export const contractsReadNotFound = (
   entity: ContractsReadEntity,

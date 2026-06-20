@@ -9,4 +9,6 @@ export interface OptionsNft {
   readonly marketId: MarketId;
   readonly laneCount: number;
   readonly lanes: readonly OptionsLane[];
+  readonly approved?: UserAddress;
+  readonly isOperator?: boolean;
 }

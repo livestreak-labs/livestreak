@@ -28,7 +28,8 @@ const CONTRACT_ADDRESSES: OptionsContractAddresses = {
   marketDriver: "0x0000000000000000000000000000000000000015",
   stewardRegistry: "0x0000000000000000000000000000000000000017",
   treasury: "0x0000000000000000000000000000000000000018",
-  lvstToken: "0x0000000000000000000000000000000000000016"
+  lvstToken: "0x0000000000000000000000000000000000000016",
+  dripsStreaming: "0x0000000000000000000000000000000000000019"
 };
 
 const baseInput = (transport: OptionsReadTransport): OptionsRuntimeInput => ({
@@ -428,6 +429,26 @@ const wrapTransport = (
   readPendingShares: async (vaultId, side, tokenId) => {
     onCall();
     return transport.readPendingShares(vaultId, side, tokenId);
+  },
+  readUsdcAddress: async () => {
+    onCall();
+    return transport.readUsdcAddress();
+  },
+  readNftBalance: async (tokenId) => {
+    onCall();
+    return transport.readNftBalance(tokenId);
+  },
+  readOwnerOf: async (tokenId) => {
+    onCall();
+    return transport.readOwnerOf(tokenId);
+  },
+  readApproved: async (tokenId) => {
+    onCall();
+    return transport.readApproved(tokenId);
+  },
+  readIsApprovedForAll: async (owner, operator) => {
+    onCall();
+    return transport.readIsApprovedForAll(owner, operator);
   },
   ...(transport.readProtocolSummary === undefined
     ? {}

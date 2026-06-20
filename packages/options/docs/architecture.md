@@ -145,9 +145,42 @@ NFT-lane writes only (no vault/market creation in this package):
 - Guards: no `Effect.run*` in `src/`, ABI import path, `winningSide` guard
 - Fakes: `test/helpers/fake-transport.ts` implements full `OptionsReadTransport`
 
-## Deferred (R3 — not in this package yet)
+## R3 — aggregation + app-integration (complete)
 
-- Cross-NFT session PnL view
-- Single claim-JSON aggregate
-- Runtime memory / callback facade
-- Transfer-panel read flags (`ownerOf`, `getApproved`, `isApprovedForAll`)
+### Drips + USDC reads
+
+`OptionsContractAddresses` includes `dripsStreaming`. `readUsdcAddress()` caches
+`MarketDriver.USDC()`. `readNftBalance(tokenId)` calls
+`DripsStreaming.streamsState(tokenId, usdc)` and maps tuple index **3** (`balance`,
+`uint128`) as `remainingUSDC`.
+
+### Session PnL
+
+`readSessionPnl(transport, user, investedUSDC?)` → `OptionsSessionPnlView`:
+
+| Field | Fold |
+| --- | --- |
+| `returnedUSDC` | Σ `claimable(tokenId, vault, winningSide)` on resolved vaults |
+| `lossBasisUSDC` | Σ `lossClaimable(tokenId, vault, losingSide)` |
+| `remainingUSDC` | Σ `readNftBalance(tokenId)` across `tokensOfOwner` |
+| `investedUSDC?` | Caller-supplied only — never invented |
+| `netPnlUSDC?` | `returned + remaining − invested` when invested is supplied |
+
+### Claims view
+
+`readClaimsView(transport, user)` → `OptionsClaimsView` spanning all NFTs via
+`tokensOfOwner` → `getAccountVaultIds` + lane enrichment. Reuses R2 claim reads.
+
+### Runtime memory
+
+`OptionsRuntime.set(key, value)` / `get(key)` — in-memory map on the store (reconstructable).
+`onChange(cb)` fires on `set` **and** snapshot refresh; returns unsubscribe. `subscribeSnapshots`
+remains snapshot-only.
+
+### Panel (R3 flags)
+
+- LVST: `canStake`, `canUnstake`, `canClaimDividends` (unchanged logic, explicit tests)
+- Market: `totals.totalPooledUSDC` = Σ `(yesTotal + noTotal)` over market vaults
+- NFT: `owner`, `approved`, `isOperator` from `ownerOf` / `getApproved` / `isApprovedForAll`
+
+**Next step (app package):** wire `/stream` mock hooks to injected viem reader + `createOptionsRuntime`.

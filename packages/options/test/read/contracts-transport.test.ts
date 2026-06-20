@@ -25,7 +25,8 @@ const ADDRESSES: OptionsContractAddresses = {
   marketDriver: "0x0000000000000000000000000000000000000015",
   stewardRegistry: "0x0000000000000000000000000000000000000017",
   treasury: "0x0000000000000000000000000000000000000018",
-  lvstToken: "0x0000000000000000000000000000000000000016"
+  lvstToken: "0x0000000000000000000000000000000000000016",
+  dripsStreaming: "0x0000000000000000000000000000000000000019"
 };
 
 describe("contracts read transport", () => {
@@ -369,6 +370,22 @@ const respond = (request: ContractReadRequest, options: FakeReaderOptions): unkn
       return [TOKEN_ID, 43n];
     }
 
+    if (functionName === "USDC") {
+      return "0x00000000000000000000000000000000000000dd";
+    }
+
+    if (functionName === "ownerOf") {
+      return USER;
+    }
+
+    if (functionName === "getApproved") {
+      return "0x0000000000000000000000000000000000000000";
+    }
+
+    if (functionName === "isApprovedForAll") {
+      return false;
+    }
+
     if (functionName === "marketIdOf") {
       return MARKET_ID;
     }
@@ -384,6 +401,20 @@ const respond = (request: ContractReadRequest, options: FakeReaderOptions): unkn
       }
 
       return { vaultId: VAULT_ID, side: 1, rate: 0n };
+    }
+  }
+
+  if (address === ADDRESSES.dripsStreaming) {
+    if (functionName === "streamsState") {
+      return {
+        streamsHash:
+          "0x0000000000000000000000000000000000000000000000000000000000000001",
+        streamsHistoryHash:
+          "0x0000000000000000000000000000000000000000000000000000000000000002",
+        updateTime: 1,
+        balance: 1_000_000n,
+        maxEnd: 0
+      };
     }
   }
 

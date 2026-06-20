@@ -1,5 +1,11 @@
 export type { OptionsLane } from "./lane.js";
 export type {
+  OptionsClaimEntry,
+  OptionsClaimsView,
+  UserVaultClaimRow
+} from "./claims.js";
+export { projectClaimsView } from "./claims.js";
+export type {
   OptionsBoardState,
   OptionsStreamAccrualView,
   ProjectStreamAccrualInput
@@ -8,6 +14,13 @@ export {
   isAccrualFrozen,
   projectStreamAccrual
 } from "./accrual.js";
+export type {
+  OptionsSessionPnlView,
+  ProjectSessionPnlInput,
+  SessionPnlClaimRow,
+  SessionPnlNftBalance
+} from "./pnl.js";
+export { projectSessionPnl } from "./pnl.js";
 export type { LvstAccount } from "./lvst.js";
 export type { OptionsNft } from "./nft.js";
 export type {

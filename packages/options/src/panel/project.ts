@@ -68,6 +68,7 @@ const projectMarketPanel = (
     vaultIds: [...marketSnapshot.market.vaultIds],
     totals: {
       pooledUSDC: totalPooled.toString(),
+      totalPooledUSDC: totalPooled.toString(),
       activeVaults,
       resolvedVaults
     },
@@ -120,7 +121,10 @@ const projectNftPanel = (entry: OptionsNftSnapshot): OptionsNftPanel => ({
   tokenId: entry.nft.tokenId.toString(),
   marketId: entry.nft.marketId,
   laneCount: entry.nft.laneCount,
-  lanes: entry.nft.lanes.map(projectLanePanel)
+  lanes: entry.nft.lanes.map(projectLanePanel),
+  owner: entry.nft.owner,
+  ...(entry.nft.approved === undefined ? {} : { approved: entry.nft.approved }),
+  ...(entry.nft.isOperator === undefined ? {} : { isOperator: entry.nft.isOperator })
 });
 
 const projectLanePanel = (lane: OptionsNftSnapshot["nft"]["lanes"][number]): OptionsLanePanel => {

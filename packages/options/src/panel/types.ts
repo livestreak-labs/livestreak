@@ -27,6 +27,9 @@ export interface OptionsNftPanel {
   readonly marketId: string;
   readonly laneCount: number;
   readonly lanes: readonly OptionsLanePanel[];
+  readonly owner: string;
+  readonly approved?: string;
+  readonly isOperator?: boolean;
 }
 
 export interface OptionsVaultPanel {
@@ -76,6 +79,7 @@ export interface OptionsMarketPanel {
   readonly vaultIds: readonly string[];
   readonly totals: {
     readonly pooledUSDC: string;
+    readonly totalPooledUSDC: string;
     readonly activeVaults: number;
     readonly resolvedVaults: number;
   };

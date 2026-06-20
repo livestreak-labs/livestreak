@@ -63,5 +63,6 @@ export const validateOptionsContractAddresses = (
   marketDriver: validateContractAddress(addresses.marketDriver, "marketDriver"),
   stewardRegistry: validateContractAddress(addresses.stewardRegistry, "stewardRegistry"),
   treasury: validateContractAddress(addresses.treasury, "treasury"),
-  lvstToken: validateContractAddress(addresses.lvstToken, "lvstToken")
+  lvstToken: validateContractAddress(addresses.lvstToken, "lvstToken"),
+  dripsStreaming: validateContractAddress(addresses.dripsStreaming, "dripsStreaming")
 });

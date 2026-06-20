@@ -7,4 +7,5 @@ export type OptionsContractAddresses = {
   readonly stewardRegistry: `0x${string}`;
   readonly treasury: `0x${string}`;
   readonly lvstToken: `0x${string}`;
+  readonly dripsStreaming: `0x${string}`;
 };

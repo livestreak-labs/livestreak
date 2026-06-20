@@ -4,6 +4,9 @@ export {
   readUserOptionsSnapshot,
   readVaultSnapshot
 } from "./snapshot.js";
+export { readClaimsView } from "./claims.js";
+export { readSessionPnl } from "./pnl.js";
+export { gatherUserVaultClaims } from "./aggregation.js";
 export {
   type ContractReadRequest,
   type ContractReader,

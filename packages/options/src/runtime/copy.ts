@@ -64,6 +64,7 @@ export const copyRuntimeState = (state: OptionsRuntimeState): OptionsRuntimeStat
     : { userSnapshot: copyUserOptionsSnapshot(state.userSnapshot) }),
   markets: state.markets.map(copyMarketSnapshot),
   vaults: state.vaults.map(copyVaultSnapshot),
+  memory: { ...state.memory },
   ...(state.lastError === undefined
     ? {}
     : { lastError: copyRuntimeLastError(state.lastError) })

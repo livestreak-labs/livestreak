@@ -189,14 +189,37 @@ export const mapNft = (
   owner: UserAddress,
   marketId: MarketId,
   laneCount: number,
-  lanes: readonly OptionsLane[]
+  lanes: readonly OptionsLane[],
+  transfer?: { readonly approved?: UserAddress; readonly isOperator?: boolean }
 ): OptionsNft => ({
   tokenId,
   owner,
   marketId,
   laneCount,
-  lanes
+  lanes,
+  ...(transfer?.approved === undefined ? {} : { approved: transfer.approved }),
+  ...(transfer?.isOperator === undefined ? {} : { isOperator: transfer.isOperator })
 });
+
+export type RawStreamsState = {
+  readonly streamsHash: `0x${string}`;
+  readonly streamsHistoryHash: `0x${string}`;
+  readonly updateTime: number;
+  readonly balance: bigint;
+  readonly maxEnd: number;
+};
+
+export const mapStreamsStateBalance = (state: RawStreamsState): bigint => state.balance;
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+export const mapApprovedAddress = (value: `0x${string}`): UserAddress | undefined => {
+  if (value.toLowerCase() === ZERO_ADDRESS) {
+    return undefined;
+  }
+
+  return asUserAddress(value);
+};
 
 export const mapLvstAccount = (
   user: UserAddress,

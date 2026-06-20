@@ -36,6 +36,10 @@ export interface FakeTransportSeed {
   readonly sharePrices?: Readonly<Record<string, bigint>>;
   readonly pendingShares?: Readonly<Record<string, bigint>>;
   readonly accountVaultIds?: Readonly<Record<string, readonly VaultId[]>>;
+  readonly nftBalances?: Readonly<Record<string, bigint>>;
+  readonly usdcAddress?: `0x${string}`;
+  readonly nftApproved?: Readonly<Record<string, UserAddress>>;
+  readonly approvedForAll?: Readonly<Record<string, boolean>>;
 }
 
 export const createFakeOptionsReadTransport = (
@@ -57,6 +61,10 @@ export class FakeTransportInMemory implements OptionsReadTransport {
   private readonly sharePrices = new Map<string, bigint>();
   private readonly pendingShares = new Map<string, bigint>();
   private readonly accountVaultIds = new Map<string, readonly VaultId[]>();
+  private readonly nftBalances = new Map<string, bigint>();
+  private usdcAddress: `0x${string}` = "0x00000000000000000000000000000000000000aa";
+  private readonly nftApproved = new Map<string, UserAddress>();
+  private readonly approvedForAll = new Map<string, boolean>();
   readProtocolSummary?: () => Promise<OptionsProtocolSummary>;
 
   constructor(seed: FakeTransportSeed) {
@@ -119,6 +127,22 @@ export class FakeTransportInMemory implements OptionsReadTransport {
 
     for (const [key, value] of Object.entries(seed.accountVaultIds ?? {})) {
       this.accountVaultIds.set(key, value);
+    }
+
+    if (seed.usdcAddress !== undefined) {
+      this.usdcAddress = seed.usdcAddress;
+    }
+
+    for (const [key, value] of Object.entries(seed.nftBalances ?? {})) {
+      this.nftBalances.set(key, value);
+    }
+
+    for (const [key, value] of Object.entries(seed.nftApproved ?? {})) {
+      this.nftApproved.set(key, value);
+    }
+
+    for (const [key, value] of Object.entries(seed.approvedForAll ?? {})) {
+      this.approvedForAll.set(key, value);
     }
   }
 
@@ -247,6 +271,31 @@ export class FakeTransportInMemory implements OptionsReadTransport {
     return this.pendingShares.get(claimKey(tokenId, vaultId, side)) ?? 0n;
   }
 
+  async readUsdcAddress(): Promise<`0x${string}`> {
+    return this.usdcAddress;
+  }
+
+  async readNftBalance(tokenId: TokenId): Promise<bigint> {
+    return this.nftBalances.get(tokenId.toString()) ?? 0n;
+  }
+
+  async readOwnerOf(tokenId: TokenId): Promise<UserAddress> {
+    const nft = this.nfts.get(tokenId.toString());
+    if (nft === undefined) {
+      throw notFound("nft", String(tokenId));
+    }
+
+    return nft.owner;
+  }
+
+  async readApproved(tokenId: TokenId): Promise<UserAddress | undefined> {
+    return this.nftApproved.get(tokenId.toString());
+  }
+
+  async readIsApprovedForAll(owner: UserAddress, operator: UserAddress): Promise<boolean> {
+    return this.approvedForAll.get(`${owner}:${operator}`) ?? false;
+  }
+
   setMarket(market: OptionsMarket): void {
     this.markets.set(market.marketId, market);
   }
@@ -268,7 +317,9 @@ export class FakeTransportInMemory implements OptionsReadTransport {
   }
 }
 
-export const fixtureMarket = (): OptionsMarket => ({
+export const fixtureMarket = (
+  overrides: Partial<OptionsMarket> = {}
+): OptionsMarket => ({
   marketId: asMarketId("market_01"),
   title: "Regulation hearing",
   creator: asUserAddress("0xcreator"),
@@ -279,7 +330,8 @@ export const fixtureMarket = (): OptionsMarket => ({
   timing: {
     createdAtMs: 1_730_000_000_000,
     closesAtMs: 1_730_001_800_000
-  }
+  },
+  ...overrides
 });
 
 export const fixtureVault = (
@@ -306,7 +358,9 @@ export const fixtureVault = (
   ...overrides
 });
 
-export const fixtureResolvedVault = (): OptionsVault =>
+export const fixtureResolvedVault = (
+  overrides: Partial<OptionsVault> = {}
+): OptionsVault =>
   fixtureVault({
     status: "resolved",
     outcome: "yes",
@@ -318,7 +372,8 @@ export const fixtureResolvedVault = (): OptionsVault =>
       createdAtMs: 1_730_000_000_000,
       expiresAtMs: 1_730_001_800_000,
       resolvedAtMs: 1_730_001_750_000
-    }
+    },
+    ...overrides
   });
 
 export const fixtureShareTotals = (): OptionsVaultShareTotals => ({

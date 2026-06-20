@@ -75,9 +75,15 @@ describe("options public exports", () => {
   });
 
   it("does not export R3 deferred names", () => {
-    expect(publicExport("OptionsSessionPnlView")).toBeUndefined();
-    expect(publicExport("OptionsClaimJsonAggregate")).toBeUndefined();
     expect(publicExport("createOptionsMemoryFacade")).toBeUndefined();
     expect(publicExport("projectTransferPanel")).toBeUndefined();
+  });
+
+  it("exports R3 aggregation and runtime helpers", () => {
+    expect(publicExport("readSessionPnl")).toBeTypeOf("function");
+    expect(publicExport("readClaimsView")).toBeTypeOf("function");
+    expect(publicExport("projectSessionPnl")).toBeTypeOf("function");
+    expect(publicExport("projectClaimsView")).toBeTypeOf("function");
+    expect(publicExport("gatherUserVaultClaims")).toBeTypeOf("function");
   });
 });
