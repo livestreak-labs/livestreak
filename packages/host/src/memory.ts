@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { MemoryTrustModel } from "./descriptor.js";
+import { MemoryNetwork, MemoryTrustModel } from "./descriptor.js";
 
 // --- exports ---
 
@@ -26,4 +26,4 @@ export const MarketMemoryBinding = Schema.Struct({
 
 export type MarketMemoryBinding = Schema.Schema.Type<typeof MarketMemoryBinding>;
 
-export { MemoryTrustModel };
+export { MemoryNetwork, MemoryTrustModel };

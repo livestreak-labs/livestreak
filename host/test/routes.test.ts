@@ -598,11 +598,16 @@ describe("discovery routes", () => {
 describe("memory access route", () => {
   const configuredMemory = () => ({
     ...defaultHostServerConfig(),
-    memoryRelayerUrl: "https://memwal.example",
-    memoryRegistryId: "0xregistry",
+    memoryNetwork: "mainnet" as const,
     memorySuiOwnerPrivateKey: "suiprivkey1qqtest",
     memoryOwnerSeed: null,
-    memorySuiWallet: null
+    resolvedMemoryNetwork: {
+      network: "mainnet" as const,
+      relayerUrl: "https://memwal.example",
+      registryId: "0xregistry",
+      packageId: "0xpackage",
+      suiRpcUrl: "https://fullnode.mainnet.sui.io:443"
+    }
   });
 
   const validDelegateKey = "a".repeat(64);
@@ -638,14 +643,34 @@ describe("memory access route", () => {
     }
   });
 
-  it("returns 503 when memory host credentials are not configured", async () => {
+  it("returns 503 when memory network selector is absent", async () => {
     const host = createTestHost({
       ...defaultHostServerConfig(),
-      memoryRelayerUrl: "https://memwal.example",
-      memoryRegistryId: null,
+      memoryNetwork: null,
       memorySuiOwnerPrivateKey: null,
       memoryOwnerSeed: null,
-      memorySuiWallet: null
+      resolvedMemoryNetwork: null
+    });
+
+    const response = await matchRoute("POST", "/memory/access", host.routes)!.route.handler({
+      params: {},
+      body: { marketId: "mkt_01", suiDelegate: validDelegateKey },
+      deps: host.deps
+    });
+
+    expect(response.ok).toBe(false);
+    if (!response.ok) {
+      expect(response.status).toBe(503);
+    }
+  });
+
+  it("returns 503 when memory is configured but not bootstrapped", async () => {
+    const host = createTestHost({
+      ...defaultHostServerConfig(),
+      memoryNetwork: "mainnet",
+      memorySuiOwnerPrivateKey: "suiprivkey1qqtest",
+      memoryOwnerSeed: null,
+      resolvedMemoryNetwork: null
     });
 
     const response = await matchRoute("POST", "/memory/access", host.routes)!.route.handler({

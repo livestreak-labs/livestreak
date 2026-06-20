@@ -1,6 +1,6 @@
 import { addDelegateKey, createAccount } from "@mysten-incubation/memwal/account";
 import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
-import type { RelayerDeploymentConfig } from "./relayer-config.js";
+import type { ResolvedMemoryNetwork } from "./network-profile.js";
 
 // --- exports ---
 
@@ -9,7 +9,7 @@ export interface MemWalGrantDelegateInput {
   readonly accountId: string;
   readonly delegatePublicKeyHex: string;
   readonly label: string;
-  readonly deployment: RelayerDeploymentConfig;
+  readonly network: ResolvedMemoryNetwork;
 }
 
 export interface MemWalGrantDelegateResult {
@@ -20,24 +20,23 @@ export interface MemWalGrantDelegateResult {
 export interface MemWalAccountOperations {
   readonly createHostAccount: (input: {
     readonly suiPrivateKey: string;
-    readonly deployment: RelayerDeploymentConfig;
-    readonly registryId: string;
+    readonly network: ResolvedMemoryNetwork;
   }) => Promise<{ readonly accountId: string }>;
   readonly grantDelegate: (input: MemWalGrantDelegateInput) => Promise<MemWalGrantDelegateResult>;
 }
 
 export const createMemWalAccountOperations = (): MemWalAccountOperations => ({
-  async createHostAccount({ suiPrivateKey, deployment, registryId }) {
+  async createHostAccount({ suiPrivateKey, network }) {
     const suiClient = new SuiJsonRpcClient({
-      url: deployment.suiRpcUrl,
-      network: deployment.network
+      url: network.suiRpcUrl,
+      network: network.network
     });
     const result = await createAccount({
-      packageId: deployment.packageId,
-      registryId,
+      packageId: network.packageId,
+      registryId: network.registryId,
       suiPrivateKey,
       suiClient,
-      suiNetwork: deployment.network
+      suiNetwork: network.network
     });
 
     if (result.accountId.length === 0) {
@@ -47,19 +46,19 @@ export const createMemWalAccountOperations = (): MemWalAccountOperations => ({
     return { accountId: result.accountId };
   },
 
-  async grantDelegate({ suiPrivateKey, accountId, delegatePublicKeyHex, label, deployment }) {
+  async grantDelegate({ suiPrivateKey, accountId, delegatePublicKeyHex, label, network }) {
     const suiClient = new SuiJsonRpcClient({
-      url: deployment.suiRpcUrl,
-      network: deployment.network
+      url: network.suiRpcUrl,
+      network: network.network
     });
     const result = await addDelegateKey({
-      packageId: deployment.packageId,
+      packageId: network.packageId,
       accountId,
       publicKey: normalizePublicKeyHex(delegatePublicKeyHex),
       label,
       suiPrivateKey,
       suiClient,
-      suiNetwork: deployment.network
+      suiNetwork: network.network
     });
 
     return {

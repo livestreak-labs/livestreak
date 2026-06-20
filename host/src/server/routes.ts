@@ -1,4 +1,5 @@
 export {
+  bootstrapHostServerConfig,
   createHostRouteDeps,
   createHostRoutes,
   dispatchHttpRequest,

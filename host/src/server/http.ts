@@ -1,6 +1,6 @@
 import { LiveStreakConfigError } from "@livestreak/core";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { defaultHostServerConfig } from "../descriptor/config.js";
+import { bootstrapHostServerConfig, defaultHostServerConfig } from "../descriptor/config.js";
 import { createHostRouteDeps, type HostRouteDeps } from "./deps.js";
 import { createHostModules, descriptorRoutes } from "./modules.js";
 import { mountEnabledRoutes } from "./registry.js";
@@ -13,6 +13,7 @@ export type { JsonResponse, JsonSuccess, JsonFailure } from "./response.js";
 export { jsonSuccess, jsonFailure } from "./response.js";
 export type { RouteContext, RouteDefinition, RouteHandler, MatchedRoute } from "./types.js";
 export { createHostRouteDeps, type HostRouteDeps } from "./deps.js";
+export { bootstrapHostServerConfig } from "../descriptor/config.js";
 
 export const matchRoute = (
   method: string,

@@ -5,20 +5,19 @@ import type { HostServerConfig } from "../descriptor/config.js";
 // --- exports ---
 
 export const resolveMemoryOwnerSuiPrivateKey = async (
-  config: HostServerConfig
+  config: Pick<HostServerConfig, "memorySuiOwnerPrivateKey" | "memoryOwnerSeed">,
+  suiRpcUrl: string
 ): Promise<string | null> => {
   if (config.memorySuiOwnerPrivateKey !== null) {
     return config.memorySuiOwnerPrivateKey;
   }
 
-  if (config.memoryOwnerSeed === null || config.memorySuiWallet === null) {
+  if (config.memoryOwnerSeed === null) {
     return null;
   }
 
-  const rpcUrl = config.memorySuiWallet.rpcUrl;
   const manager = createWalletManager("sui", config.memoryOwnerSeed, {
-    rpcUrl: (Array.isArray(rpcUrl) ? [...rpcUrl] : rpcUrl) as string | string[],
-    retries: config.memorySuiWallet.retries
+    rpcUrl: suiRpcUrl
   });
   const account = await manager.getAccount(0);
   const privateKey = account.keyPair.privateKey;

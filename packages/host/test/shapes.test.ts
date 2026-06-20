@@ -18,7 +18,8 @@ describe("host descriptor shape", () => {
       memory: {
         relayerUrl: null,
         namespaceTemplate: "market:{marketId}",
-        trustModel: "plaintext-relayer"
+        trustModel: "plaintext-relayer",
+        network: null
       }
     };
 

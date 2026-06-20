@@ -1,5 +1,17 @@
-import type { HostModuleToken, HostProviderDescriptor, MemoryTrustModel } from "@livestreak/host";
-import type { OutputMode, SuiWalletInitConfig } from "@livestreak/schema";
+import type {
+  HostModuleToken,
+  HostProviderDescriptor,
+  MemoryNetwork,
+  MemoryTrustModel
+} from "@livestreak/host";
+import type { OutputMode } from "@livestreak/schema";
+import {
+  bootstrapMemoryNetwork,
+  memoryNetworkProfiles,
+  parseMemoryNetwork,
+  profileRelayerUrl,
+  type ResolvedMemoryNetwork
+} from "../memory/network-profile.js";
 
 // --- exports ---
 
@@ -18,22 +30,22 @@ export interface HostServerConfig {
   readonly cacheReceipts: "none" | "optional" | "required";
   readonly minDurationSeconds: number;
   readonly maxDurationSeconds: number;
-  readonly memoryRelayerUrl: string | null;
-  readonly memoryRegistryId: string | null;
+  readonly memoryNetwork: MemoryNetwork | null;
+  readonly memoryRelayerUrlOverride: string | null;
+  readonly memoryRegistryIdOverride: string | null;
   readonly memorySuiOwnerPrivateKey: string | null;
   readonly memoryOwnerSeed: string | null;
-  readonly memorySuiWallet: SuiWalletInitConfig | null;
   readonly memoryTrustModel: MemoryTrustModel;
+  readonly resolvedMemoryNetwork: ResolvedMemoryNetwork | null;
   readonly livekitApiKey: string | undefined;
 }
 
-const defaultMemoryRelayerUrl = "https://relayer.memory.walrus.xyz";
-
 export const isMemoryHostConfigured = (config: HostServerConfig): boolean =>
-  config.memoryRelayerUrl !== null &&
-  config.memoryRegistryId !== null &&
-  (config.memorySuiOwnerPrivateKey !== null ||
-    (config.memoryOwnerSeed !== null && config.memorySuiWallet !== null));
+  config.memoryNetwork !== null &&
+  (config.memorySuiOwnerPrivateKey !== null || config.memoryOwnerSeed !== null);
+
+export const isMemoryBootstrapped = (config: HostServerConfig): boolean =>
+  isMemoryHostConfigured(config) && config.resolvedMemoryNetwork !== null;
 
 const allModules: readonly HostModuleToken[] = [
   "aa",
@@ -59,12 +71,15 @@ export const defaultHostServerConfig = (): HostServerConfig => ({
   cacheReceipts: "required",
   minDurationSeconds: 0,
   maxDurationSeconds: 6 * 60 * 60,
-  memoryRelayerUrl: readOptionalEnv("LIVESTREAK_MEMORY_RELAYER_URL") ?? defaultMemoryRelayerUrl,
-  memoryRegistryId: readOptionalEnv("LIVESTREAK_MEMORY_REGISTRY_ID"),
-  memorySuiOwnerPrivateKey: readOptionalEnv("LIVESTREAK_MEMORY_SUI_OWNER_KEY"),
+  memoryNetwork: parseMemoryNetwork(readOptionalEnv("LIVESTREAK_MEMORY_NETWORK")),
+  memoryRelayerUrlOverride: readOptionalEnv("LIVESTREAK_MEMORY_RELAYER_URL_OVERRIDE"),
+  memoryRegistryIdOverride: readOptionalEnv("LIVESTREAK_MEMORY_REGISTRY_ID_OVERRIDE"),
+  memorySuiOwnerPrivateKey:
+    readOptionalEnv("LIVESTREAK_MEMORY_OWNER_KEY") ??
+    readOptionalEnv("LIVESTREAK_MEMORY_SUI_OWNER_KEY"),
   memoryOwnerSeed: readOptionalEnv("LIVESTREAK_MEMORY_OWNER_SEED"),
-  memorySuiWallet: readMemorySuiWallet(),
   memoryTrustModel: "plaintext-relayer",
+  resolvedMemoryNetwork: null,
   livekitApiKey: process.env.LIVEKIT_API_KEY
 });
 
@@ -74,6 +89,8 @@ export const toHostProviderDescriptor = (config: HostServerConfig): HostProvider
     (mode) => mode !== "simulcast" || simulcastAvailable
   );
 
+  const relayerUrl = profileRelayerUrl(config);
+
   return {
     version: "0.1.0",
     hostId: config.hostId,
@@ -82,9 +99,10 @@ export const toHostProviderDescriptor = (config: HostServerConfig): HostProvider
     supportedOutputs: [...advertisedOutputs],
     media: { simulcastAvailable },
     memory: {
-      relayerUrl: config.memoryRelayerUrl,
+      relayerUrl,
       namespaceTemplate: "market:{marketId}",
-      trustModel: config.memoryTrustModel
+      trustModel: config.memoryTrustModel,
+      network: config.memoryNetwork
     },
     termsVersion: config.termsVersion
   };
@@ -95,6 +113,11 @@ export const isModuleEnabled = (
   token: HostModuleToken
 ): boolean => config.enabledModules.includes(token);
 
+export const bootstrapHostServerConfig = async (
+  config: HostServerConfig = defaultHostServerConfig(),
+  fetchImpl: typeof fetch = fetch
+): Promise<HostServerConfig> => bootstrapMemoryNetwork(config, fetchImpl);
+
 // --- helpers ---
 
 const readOptionalEnv = (key: string): string | null => {
@@ -102,20 +125,4 @@ const readOptionalEnv = (key: string): string | null => {
   return value === undefined || value.length === 0 ? null : value;
 };
 
-const readMemorySuiWallet = (): SuiWalletInitConfig | null => {
-  const rpcUrl = readOptionalEnv("LIVESTREAK_MEMORY_SUI_RPC_URL");
-  if (rpcUrl === null) {
-    return null;
-  }
-
-  const retriesRaw = process.env.LIVESTREAK_MEMORY_SUI_RPC_RETRIES;
-  const retries =
-    retriesRaw === undefined || retriesRaw.length === 0
-      ? undefined
-      : Number.parseInt(retriesRaw, 10);
-
-  return {
-    rpcUrl,
-    ...(retries === undefined || Number.isNaN(retries) ? {} : { retries })
-  };
-};
+export const memoryProfileFor = (network: MemoryNetwork) => memoryNetworkProfiles[network];

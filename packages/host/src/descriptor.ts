@@ -24,10 +24,15 @@ export const MemoryTrustModel = Schema.Literal(
 
 export type MemoryTrustModel = Schema.Schema.Type<typeof MemoryTrustModel>;
 
+export const MemoryNetwork = Schema.Literal("mainnet", "testnet");
+
+export type MemoryNetwork = Schema.Schema.Type<typeof MemoryNetwork>;
+
 export const MemoryDescriptorAdvert = Schema.Struct({
   relayerUrl: Schema.Union(Schema.Null, Schema.NonEmptyString),
   namespaceTemplate: Schema.Literal("market:{marketId}"),
-  trustModel: MemoryTrustModel
+  trustModel: MemoryTrustModel,
+  network: Schema.Union(MemoryNetwork, Schema.Null)
 });
 
 export type MemoryDescriptorAdvert = Schema.Schema.Type<typeof MemoryDescriptorAdvert>;
