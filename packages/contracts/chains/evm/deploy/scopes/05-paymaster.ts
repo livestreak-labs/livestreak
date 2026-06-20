@@ -75,7 +75,8 @@ export async function deployPaymaster(
     status: "completed",
     deployedAt: new Date().toISOString(),
     contracts: {
-      verifyingPaymaster: paymaster
+      verifyingPaymaster: paymaster,
+      verifyingSigner
     }
   };
 }

@@ -15,6 +15,10 @@
       "types": "./dist/chains/evm/index.d.ts",
       "default": "./dist/chains/evm/index.js"
     },
+    "./evm/abis": {
+      "types": "./dist/chains/evm/abis-entry.d.ts",
+      "default": "./dist/chains/evm/abis-entry.js"
+    },
     "./package": {
       "default": "./package.json"
     }

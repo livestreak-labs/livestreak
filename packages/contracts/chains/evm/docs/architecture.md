@@ -152,6 +152,8 @@ solidity/
 
 ### MarketDriver (per-market NFT, `tokenId == Drips account`)
 
+`ERC721Enumerable` with `tokensOfOwner(address)` for holder enumeration (including transferred-in NFTs). Browser ABI-only consumers should use `@livestreak/contracts/evm/abis` (no `node:fs`).
+
 ≤ `MAX_LANES` (10) lanes across distinct vaults; **one side per vault**. Ops: `mint`, `fund`, `stop`, `stopAll`, **`setLanes`** (declarative reconcile — hedge is a side flip inside `setLanes`), `withdraw` (single + mass, optional `to` redirect for owner), `claimLossLvst`. No `switchSide`, `replaceLane`, `withdrawAll`, or both sides on one vault.
 
 ### VaultDriver (receiver-side)
