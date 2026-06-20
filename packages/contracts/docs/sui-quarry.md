@@ -14,7 +14,10 @@ Target: semantic parity with `chains/evm/solidity/` per `docs/architecture.md` +
 | `driver_transfer_utils.move` | `SharedDriverUtils.sol` | **KEEP** (trim) | `sources/drivers/driver_transfer_utils.move` — no splits/yield/give |
 | `movemate i128` | native `int128` | **KEEP** | Quarried to `sources/i128.move` (`livestreak::i128`) |
 | `movemate i256` | native `int256` | **KEEP** | Quarried to `sources/i256.move` (`livestreak::i256`) |
-| `nft_driver.move` | `MarketDriver.sol` | **ADAPT** | Position = owned object; ≤10 lanes; native holder enum via object ownership |
+| `nft_driver.move` | `MarketDriver.sol` | **ADAPT** | `sources/drivers/market_driver.move` — `MarketPositionNFT` owned object; ≤10 lanes; native holder enum |
+| (new) | `VaultDriver.sol` | **ADAPT** | `sources/drivers/vault_driver.move` — seed accounts, harvest, `createVault` |
+| (new) | `Vault.sol` (hooks) | **ADAPT** | `sources/vault/vault.move` — driver-facing hooks; Board math in Stage 3 |
+| (new) | `MarketRegistry.sol` (index) | **ADAPT** | `sources/registries/market_registry.move` — `marketExists` / `addVault` |
 | `splits.move` | (unused in EVM) | **DROP** | Removed from EVM drivers; no product use |
 | `address_driver.move` | `AddressDriver` (removed) | **DROP** | EVM removed; NFT driver replaces |
 | `yield_manager.move` | (none) | **DROP** | No EVM analog in LiveStreak protocol |
@@ -34,8 +37,8 @@ Target: semantic parity with `chains/evm/solidity/` per `docs/architecture.md` +
 | Stage | Status |
 | --- | --- |
 | 0 — Scaffold + math libs | **done** (`7ac6480`) |
-| 1 — Streaming substrate | **done** (commit pending) |
-| 2 — Drivers | pending |
+| 1 — Streaming substrate | **done** (`437323c`) |
+| 2 — Drivers | **done** (commit pending) |
 | 3 — Product contracts | pending |
 | 4 — Reads + kit | pending |
 | 5 — Parity verification | pending |

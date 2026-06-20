@@ -54,9 +54,9 @@ USDC / LVST       -> Coin<USDC> / Coin<LVST>
 - [x] driver utils — `driver_utils` + `driver_transfer_utils` → `SharedDriverUtils` parity
 
 ### Stage 2 — Drivers
-- [ ] NFT driver (`nft_driver` → `MarketDriver`): position = owned object; ≤10 lanes, one-side-per-vault, `setLanes` hedge; `mint` / `fund` / `stop` / `stopAll` / `withdraw` / `claimLossLvst`
-- [ ] `VaultDriver`: permissionless bonded seed `createVault`, `harvest`, seed withdraw
-- [ ] holder enumeration via native object ownership (no `Enumerable` analog needed)
+- [x] NFT driver (`nft_driver` → `MarketDriver`): position = owned object; ≤10 lanes, one-side-per-vault, `setLanes` hedge; `mint` / `fund` / `stop` / `stopAll` / `withdraw` / `claimLossLvst`
+- [x] `VaultDriver`: permissionless bonded seed `createVault`, `harvest`, seed withdraw
+- [x] holder enumeration via native object ownership (no `Enumerable` analog needed)
 
 ### Stage 3 — Product contracts (parity with Solidity)
 - [ ] `Protocol` — wiring object holding module refs / shared state

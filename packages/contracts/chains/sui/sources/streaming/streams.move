@@ -1485,3 +1485,7 @@ public fun get_cycle_secs<T>(registry: &StreamsRegistry<T>): u64 {
 public fun get_min_amt_per_sec<T>(registry: &StreamsRegistry<T>): u256 {
     registry.min_amt_per_sec
 }
+
+public fun amt_per_sec_multiplier(): u256 {
+    AMT_PER_SEC_MULTIPLIER
+}
