@@ -27,6 +27,26 @@ contract MarketRegistry is Ownable {
     event MarketRegistered(bytes32 indexed marketId, address indexed creator, bytes32 indexed streamId, string title);
     event VaultIndexed(bytes32 indexed marketId, bytes32 indexed vaultId);
 
+    enum StreamStatus {
+        None,
+        Live,
+        Ended
+    }
+
+    struct StreamState {
+        StreamStatus status;
+        bytes32 pointer;
+        uint64 updatedAt;
+        uint64 endedAt;
+    }
+
+    uint64 public constant STREAM_LOCK_GRACE = 1 days;
+
+    mapping(bytes32 => StreamState) public streamState;
+
+    event StreamLive(bytes32 indexed marketId, bytes32 pointer, uint64 updatedAt);
+    event StreamEnded(bytes32 indexed marketId, bytes32 pointer, uint64 endedAt);
+
     constructor(address initialOwner, Protocol protocol_) Ownable(initialOwner) {
         require(address(protocol_) != address(0), "MarketRegistry: zero protocol");
         protocol = protocol_;
@@ -87,5 +107,45 @@ contract MarketRegistry is Ownable {
     function getVaultIds(bytes32 marketId) external view returns (bytes32[] memory) {
         require(markets[marketId].exists, "MarketRegistry: unknown market");
         return _vaultIdsByMarket[marketId];
+    }
+
+    modifier onlyMarketCreator(bytes32 marketId) {
+        require(markets[marketId].exists, "MarketRegistry: unknown market");
+        require(markets[marketId].creator == msg.sender, "MarketRegistry: not creator");
+        _;
+    }
+
+    /// @notice Creator marks the stream live (first call) or re-points the live manifest.
+    function goLive(bytes32 marketId, bytes32 pointer) external onlyMarketCreator(marketId) {
+        require(pointer != bytes32(0), "MarketRegistry: zero pointer");
+        StreamState storage s = streamState[marketId];
+        require(s.status != StreamStatus.Ended, "MarketRegistry: stream ended");
+        s.status = StreamStatus.Live;
+        s.pointer = pointer;
+        s.updatedAt = uint64(block.timestamp);
+        emit StreamLive(marketId, pointer, s.updatedAt);
+    }
+
+    /// @notice Creator ends the stream (first call freezes endedAt) or revises the VOD pointer until lock.
+    function setEnded(bytes32 marketId, bytes32 vodPointer) external onlyMarketCreator(marketId) {
+        require(vodPointer != bytes32(0), "MarketRegistry: zero pointer");
+        StreamState storage s = streamState[marketId];
+        require(s.status != StreamStatus.None, "MarketRegistry: not live");
+        require(!_isLocked(s), "MarketRegistry: stream locked");
+        if (s.status != StreamStatus.Ended) {
+            s.status = StreamStatus.Ended;
+            s.endedAt = uint64(block.timestamp);
+        }
+        s.pointer = vodPointer;
+        s.updatedAt = uint64(block.timestamp);
+        emit StreamEnded(marketId, vodPointer, s.endedAt);
+    }
+
+    function isLocked(bytes32 marketId) external view returns (bool) {
+        return _isLocked(streamState[marketId]);
+    }
+
+    function _isLocked(StreamState storage s) private view returns (bool) {
+        return s.status == StreamStatus.Ended && block.timestamp > uint256(s.endedAt) + STREAM_LOCK_GRACE;
     }
 }

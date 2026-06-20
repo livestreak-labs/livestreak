@@ -1991,6 +1991,13 @@ export const marketRegistryAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'STREAM_LOCK_GRACE',
+    outputs: [{ name: '', internalType: 'uint64', type: 'uint64' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'marketId', internalType: 'bytes32', type: 'bytes32' },
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
@@ -2035,6 +2042,23 @@ export const marketRegistryAbi = [
     inputs: [{ name: 'marketId', internalType: 'bytes32', type: 'bytes32' }],
     name: 'getVaultIds',
     outputs: [{ name: '', internalType: 'bytes32[]', type: 'bytes32[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'marketId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'pointer', internalType: 'bytes32', type: 'bytes32' },
+    ],
+    name: 'goLive',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'marketId', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'isLocked',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'view',
   },
   {
@@ -2105,6 +2129,28 @@ export const marketRegistryAbi = [
   },
   {
     type: 'function',
+    inputs: [
+      { name: 'marketId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'vodPointer', internalType: 'bytes32', type: 'bytes32' },
+    ],
+    name: 'setEnded',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'streamState',
+    outputs: [
+      { name: 'status', internalType: 'enum MarketRegistry.StreamStatus', type: 'uint8' },
+      { name: 'pointer', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'updatedAt', internalType: 'uint64', type: 'uint64' },
+      { name: 'endedAt', internalType: 'uint64', type: 'uint64' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
     name: 'transferOwnership',
     outputs: [],
@@ -2136,6 +2182,26 @@ export const marketRegistryAbi = [
       { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
     ],
     name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'marketId', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      { name: 'pointer', internalType: 'bytes32', type: 'bytes32', indexed: false },
+      { name: 'endedAt', internalType: 'uint64', type: 'uint64', indexed: false },
+    ],
+    name: 'StreamEnded',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'marketId', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      { name: 'pointer', internalType: 'bytes32', type: 'bytes32', indexed: false },
+      { name: 'updatedAt', internalType: 'uint64', type: 'uint64', indexed: false },
+    ],
+    name: 'StreamLive',
   },
   {
     type: 'event',
