@@ -1,15 +1,14 @@
-import type { HostModuleToken } from "@livestreak/host";
-import { createAaRouteDeps, createAaRouteDepsAsync, type CreateAaRouteDepsOptions } from "../../services/aa/routes.js";
-import { defaultHostServerConfig, type HostServerConfig } from "../../config/host.js";
-import { createDiscoveryStore } from "../../services/discovery.js";
-import { createEvidenceStore } from "../../services/media/evidence.js";
-import { createManifestStore } from "../../services/media/manifest.js";
-import { createSessionStore } from "../../services/media/session.js";
-import { createContentStore } from "../../services/walrus/content/content.js";
-import { createMemoryBindingStore } from "../../services/walrus/memory/binding.js";
-import { createMemWalAccountOperations } from "../../services/walrus/memory/memwal-ops.js";
-import { resolveMemoryOwnerSuiPrivateKey } from "../../infrastructure/wallet/wallet.js";
-import type { ResolvedWalrus } from "../../infrastructure/walrus/network.js";
+import { defaultHostServerConfig, type HostServerConfig } from "../config/host.js";
+import { createAaRouteDeps, type AaRouteDeps, type CreateAaRouteDepsOptions } from "./aa-deps.js";
+import { createDiscoveryStore } from "../services/discovery.js";
+import { createEvidenceStore } from "../services/media/evidence.js";
+import { createManifestStore } from "../services/media/manifest.js";
+import { createSessionStore } from "../services/media/session.js";
+import { createContentStore } from "../services/walrus/content/content.js";
+import { createMemoryBindingStore } from "../services/walrus/memory/binding.js";
+import { createMemWalAccountOperations } from "../services/walrus/memory/memwal-ops.js";
+import { resolveMemoryOwnerKey } from "../infrastructure/wallet/index.js";
+import type { ResolvedWalrus } from "../infrastructure/walrus/network.js";
 
 // --- exports ---
 
@@ -18,7 +17,7 @@ export interface HostRouteDeps {
   readonly media: MediaRouteDeps;
   readonly discovery: DiscoveryRouteDeps;
   readonly walrus: WalrusRouteDeps;
-  readonly aa: ReturnType<typeof createAaRouteDeps>;
+  readonly aa: AaRouteDeps;
 }
 
 export interface MediaRouteDeps {
@@ -72,29 +71,6 @@ export const createHostRouteDeps = (
   };
 };
 
-export const createHostRouteDepsAsync = async (
-  config: HostServerConfig = defaultHostServerConfig(),
-  options: CreateHostRouteDepsOptions = {}
-): Promise<HostRouteDeps> => {
-  const resolved = options.walrusResolved ?? config.resolvedWalrus;
-  const ops = options.memoryOps ?? createMemWalAccountOperations();
-  const walrus = buildWalrusDeps(config, resolved, ops);
-
-  return {
-    config,
-    media: {
-      sessions: createSessionStore(),
-      manifests: createManifestStore(),
-      evidence: createEvidenceStore(config.cacheQuotaBytes)
-    },
-    discovery: {
-      store: createDiscoveryStore()
-    },
-    walrus,
-    aa: await createAaRouteDepsAsync(config, options)
-  };
-};
-
 // --- helpers ---
 
 const buildWalrusDeps = (
@@ -131,14 +107,7 @@ const buildWalrusDeps = (
             })
           : createMemoryBindingStore({
               resolved: active,
-              resolveOwnerKey: async () => {
-                const key = await resolveMemoryOwnerSuiPrivateKey(config, active.sui.rpcUrl);
-                if (key === null) {
-                  throw new Error("memory_owner_not_configured");
-                }
-
-                return key;
-              },
+              resolveOwnerKey: async () => resolveMemoryOwnerKey(config, active.sui.rpcUrl),
               ops
             })
     },
