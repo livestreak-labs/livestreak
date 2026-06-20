@@ -3637,7 +3637,7 @@ export const vaultDriverAbi = [
     type: 'function',
     inputs: [{ name: 'vaultId', internalType: 'bytes32', type: 'bytes32' }],
     name: 'stopSeed',
-    outputs: [],
+    outputs: [{ name: 'refunded', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'nonpayable',
   },
   {
