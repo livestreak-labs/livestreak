@@ -1,7 +1,7 @@
 import { Router } from "express";
 import type { AaRouteDeps } from "../aa-deps.js";
 import { createAaController } from "../controllers/aa.js";
-import { asyncHandler } from "../helpers.js";
+import { asyncHandler } from "../respond.js";
 
 // --- exports ---
 

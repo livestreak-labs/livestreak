@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import type { HostRouteDeps } from "../deps.js";
-import { asyncHandler, sendRouteResult } from "../helpers.js";
+import { asyncHandler, sendRouteResult } from "../respond.js";
 import { handleFindSimilar, handleIndexVault } from "../../services/discovery-routes.js";
 
 // --- exports ---
