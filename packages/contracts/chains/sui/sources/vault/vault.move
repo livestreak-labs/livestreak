@@ -303,6 +303,21 @@ public fun caught_up<T>(
     board_caught_up(registry, vault_id, side, clock)
 }
 
+/// Count of un-drained depletion boundaries on (vault_id, side) — for pre-advance planning before fund.
+public fun pending_boundaries<T>(registry: &VaultRegistry<T>, vault_id: &vector<u8>, side: u8): u64 {
+    let key = BoardKey { vault_id: *vault_id, side };
+    if (!table::contains(&registry.boundaries, key)) {
+        return 0
+    };
+    let len = vector::length(table::borrow(&registry.boundaries, key));
+    let head = if (table::contains(&registry.boundary_heads, key)) {
+        *table::borrow(&registry.boundary_heads, key)
+    } else {
+        0
+    };
+    len - head
+}
+
 public fun status_resolved(): u8 {
     STATUS_RESOLVED
 }

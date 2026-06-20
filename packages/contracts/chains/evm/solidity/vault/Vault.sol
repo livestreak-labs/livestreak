@@ -380,6 +380,12 @@ contract Vault {
         return _boardCaughtUp(vaultId, side);
     }
 
+    /// @notice Count of un-drained depletion boundaries on (vaultId, side). Lets a caller plan how many
+    /// bounded `advance` calls precede a `fund` when the board is behind. `_boundaryHead <= length` always.
+    function pendingBoundaries(bytes32 vaultId, Side side) external view returns (uint256) {
+        return _boundaries[vaultId][side].length - _boundaryHead[vaultId][side];
+    }
+
     function getAccountVaultIds(uint256 account) external view returns (bytes32[] memory) {
         return _accountVaults[account];
     }

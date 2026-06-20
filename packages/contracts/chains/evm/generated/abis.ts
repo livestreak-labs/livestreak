@@ -3327,6 +3327,16 @@ export const vaultAbi = [
     inputs: [
       { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
       { name: 'side', internalType: 'enum Side', type: 'uint8' },
+    ],
+    name: 'pendingBoundaries',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'vaultId', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'side', internalType: 'enum Side', type: 'uint8' },
       { name: 'account', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'pendingShares',
