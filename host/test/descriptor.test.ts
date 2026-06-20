@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { handleDescriptor } from "#descriptor/routes.js";
-import { defaultHostServerConfig } from "../src/descriptor/config.js";
-import { walrusNetworkProfiles } from "../src/walrus/network.js";
+import { handleDescriptor } from "#services/descriptor.js";
+import { defaultHostServerConfig } from "#config/host.js";
+import { walrusNetworkProfiles } from "#infrastructure/walrus/network.js";
 
 describe("host descriptor", () => {
   it("advertises module tokens and walrus capabilities without internal ids", () => {

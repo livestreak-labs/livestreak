@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { createContentStore } from "#walrus/content/content-store.js";
-import type { WalrusClient } from "#walrus/content/walrus-client.js";
-import type { ResolvedWalrus } from "#walrus/network.js";
+import { createContentStore } from "#services/walrus/content/content.js";
+import type { WalrusClient } from "#infrastructure/walrus/blob-client.js";
+import type { ResolvedWalrus } from "#infrastructure/walrus/network.js";
 
 const testResolved = (): ResolvedWalrus => ({
   network: "testnet",

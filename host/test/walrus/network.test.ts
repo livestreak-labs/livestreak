@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import type { HostServerConfig } from "#descriptor/config.js";
+import type { HostServerConfig } from "#config/host.js";
 import {
   WalrusNetworkMismatchError,
   resolveWalrus,
   walrusNetworkProfiles
-} from "#walrus/network.js";
+} from "#infrastructure/walrus/network.js";
 
 const baseConfig = (): HostServerConfig => ({
   hostId: "host_dev",
@@ -25,6 +25,7 @@ const baseConfig = (): HostServerConfig => ({
   walrusRegistryIdOverride: null,
   memorySuiOwnerPrivateKey: "suiprivkey1qqtest",
   memoryOwnerSeed: null,
+  walletSeed: null,
   memoryTrustModel: "plaintext-relayer",
   walrusContentEphemeralEpochs: 1,
   walrusContentLockedEpochs: 5,

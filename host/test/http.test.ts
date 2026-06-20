@@ -2,9 +2,9 @@ import { EventEmitter } from "node:events";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { describe, expect, it } from "vitest";
-import { createHostRouteDeps, createHostRoutes } from "#server/routes.js";
-import { dispatchHttpRequest } from "#server/http.js";
-import { defaultHostServerConfig } from "../src/descriptor/config.js";
+import { createHostRouteDeps, createHostRoutes } from "#api/server.js";
+import { dispatchHttpRequest } from "#api/server.js";
+import { defaultHostServerConfig } from "#config/host.js";
 
 // --- helpers ---
 

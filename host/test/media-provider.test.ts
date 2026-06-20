@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createLiveKitMediaProvider } from "#media/provider/livekit.js";
+import { createLiveKitMediaProvider } from "#infrastructure/livekit.js";
 
 describe("media provider", () => {
   it("returns 503 when LiveKit API key is absent", async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createWalrusClient } from "#walrus/content/walrus-client.js";
-import { walrusNetworkProfiles } from "#walrus/network.js";
+import { createWalrusClient } from "#infrastructure/walrus/blob-client.js";
+import { walrusNetworkProfiles } from "#infrastructure/walrus/network.js";
 
 const liveEnabled = process.env.WALRUS_LIVE === "1";
 

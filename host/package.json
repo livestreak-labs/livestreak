@@ -8,7 +8,9 @@
     "build": "tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src test",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "dev": "tsx src/main.ts",
+    "start": "node dist/main.js"
   },
   "dependencies": {
     "@livestreak/core": "file:../packages/core",
@@ -24,6 +26,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
+    "tsx": "^4.19.0",
     "typescript": "6.0.3",
     "vitest": "^4.1.8"
   }

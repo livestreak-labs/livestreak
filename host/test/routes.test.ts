@@ -1,18 +1,18 @@
 import type { EndpointDescriptor } from "@livestreak/host";
 import { describe, expect, it, vi } from "vitest";
-import { createHostRouteDeps, createHostRoutes } from "#server/routes.js";
-import { matchRoute } from "#server/http.js";
-import { handleMemoryAccess } from "#walrus/memory/routes.js";
-import { handlePolicyEvaluate } from "#media/policy/routes.js";
+import { createHostRouteDeps, createHostRoutes } from "#api/server.js";
+import { matchRoute } from "#api/server.js";
+import { handleMemoryAccess } from "#services/walrus/memory/routes.js";
+import { handlePolicyEvaluate } from "#services/media/policy-routes.js";
 import {
   handleCacheReceipt,
   handleCreateSession,
   handleGetManifest
-} from "#media/routes.js";
-import { createEvidenceStore } from "#media/evidence-store.js";
-import { createManifestStore } from "#media/manifest.js";
-import { createSessionStore } from "#media/session-store.js";
-import { defaultHostServerConfig } from "../src/descriptor/config.js";
+} from "#services/media/routes.js";
+import { createEvidenceStore } from "#services/media/evidence.js";
+import { createManifestStore } from "#services/media/manifest.js";
+import { createSessionStore } from "#services/media/session.js";
+import { defaultHostServerConfig } from "#config/host.js";
 
 const validIndexVaultBody = {
   vaultId: "vlt_01",

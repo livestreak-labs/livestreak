@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readExecutorAddress } from "#aa/boot-assert.js";
+import { readExecutorAddress } from "#config/aa/boot-assert.js";
 
 describe("aa boot assert", () => {
   it("derives executor address from private key", () => {

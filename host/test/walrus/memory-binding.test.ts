@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryBindingStore } from "#walrus/memory/binding-store.js";
-import type { MemWalAccountOperations } from "#walrus/memory/memwal-ops.js";
-import type { ResolvedWalrus } from "#walrus/network.js";
+import { createMemoryBindingStore } from "#services/walrus/memory/binding.js";
+import type { MemWalAccountOperations } from "#services/walrus/memory/memwal-ops.js";
+import type { ResolvedWalrus } from "#infrastructure/walrus/network.js";
 
 const testResolved = (): ResolvedWalrus => ({
   network: "mainnet",

@@ -5,7 +5,7 @@ import {
   addDelegateKey,
   generateDelegateKey
 } from "@mysten-incubation/memwal/account";
-import { fetchRelayerConfig, walrusNetworkProfiles } from "#walrus/network.js";
+import { fetchRelayerConfig, walrusNetworkProfiles } from "#infrastructure/walrus/network.js";
 
 const liveEnabled = process.env.MEMWAL_LIVE === "1";
 const ownerKey =
