@@ -1,31 +1,13 @@
-import type { BookmakerPanelView, BookmakerWatchRef } from "../model/panel.js";
-import type { BookmakerDecision } from "../model/decision.js";
-import type { BookmakerMarketContext } from "../model/market-context.js";
-import type { SimilarityResult } from "../model/similarity.js";
-import type { Detection } from "../model/detection.js";
-import type { VaultDraft } from "../model/vault-draft.js";
-import type { BookmakerWatchSource } from "../model/watch-source.js";
-import type { BookmakerWritePlan } from "../model/write-plan.js";
+import type { BookmakerPanelView, BookmakerWatchRef } from "../../model/panel.js";
+import type { BookmakerPanelSnapshot } from "./types.js";
 
 // --- exports ---
 
-export interface BookmakerPanelSnapshot {
-  readonly runtimeId: string;
-  readonly marketContext: BookmakerMarketContext;
-  readonly watchSource?: BookmakerWatchSource;
-  readonly latestDetection?: Detection;
-  readonly currentDraft?: VaultDraft;
-  readonly similarityResult?: SimilarityResult;
-  readonly lastDecision?: BookmakerDecision;
-  readonly pendingWritePlan?: BookmakerWritePlan;
-  readonly completedWritePlans?: readonly BookmakerWritePlan[];
-  readonly lastError?: string;
-  readonly updatedAtMs?: number;
-}
+export type { BookmakerPanelSnapshot } from "./types.js";
 
 export const projectBookmakerPanel = (snapshot: BookmakerPanelSnapshot): BookmakerPanelView => {
   const watchRefs = projectWatchRefs(snapshot.watchSource);
-  const writeIntents = snapshot.pendingWritePlan?.intents ?? [];
+  const writeIntents = snapshot.pendingWriteIntents ?? [];
 
   return {
     runtimeId: snapshot.runtimeId,
@@ -43,9 +25,8 @@ export const projectBookmakerPanel = (snapshot: BookmakerPanelSnapshot): Bookmak
     ...(snapshot.lastDecision?.action === "skip"
       ? { skipReason: snapshot.lastDecision.reason }
       : {}),
-    ...(snapshot.pendingWritePlan === undefined ? {} : { pendingWritePlan: snapshot.pendingWritePlan }),
     writeIntents,
-    completedWritePlans: snapshot.completedWritePlans ?? [],
+    completedVaultCreations: snapshot.completedVaultCreations ?? [],
     ...(snapshot.lastError === undefined ? {} : { lastError: snapshot.lastError }),
     updatedAtMs: snapshot.updatedAtMs ?? 0
   };
@@ -53,7 +34,9 @@ export const projectBookmakerPanel = (snapshot: BookmakerPanelSnapshot): Bookmak
 
 // --- helpers ---
 
-const projectWatchRefs = (watchSource: BookmakerWatchSource | undefined): readonly BookmakerWatchRef[] => {
+const projectWatchRefs = (
+  watchSource: BookmakerPanelSnapshot["watchSource"]
+): readonly BookmakerWatchRef[] => {
   if (watchSource === undefined) {
     return [];
   }
