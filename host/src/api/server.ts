@@ -13,8 +13,6 @@ import { createDescriptorRouter } from "./routes/descriptor.js";
 import { createDiscoveryRouter } from "./routes/discovery.js";
 import { createMediaRouter } from "./routes/media.js";
 import { createMemoryRouter } from "./routes/memory.js";
-import { createRuntimeRouter } from "./routes/runtime.js";
-import { createTenancyRouter } from "./routes/tenancy.js";
 
 // --- exports ---
 
@@ -44,14 +42,6 @@ export const createApp = (deps: HostRouteDeps): Express => {
 
   if (isModuleEnabled(deps.config, "discovery")) {
     app.use(createDiscoveryRouter(deps));
-  }
-
-  if (isModuleEnabled(deps.config, "runtime")) {
-    app.use(createRuntimeRouter());
-  }
-
-  if (isModuleEnabled(deps.config, "tenancy")) {
-    app.use(createTenancyRouter());
   }
 
   app.use(notFoundHandler);
