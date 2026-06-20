@@ -31,7 +31,6 @@ public fun seg_math(pool: u256, side_rate: u256, dt: u256): (u256, u256) {
 #[test_only]
 public fun base_price(): u256 { BASE_PRICE }
 
-#[test_only]
 public fun wad(): u256 { WAD }
 
 #[test_only]

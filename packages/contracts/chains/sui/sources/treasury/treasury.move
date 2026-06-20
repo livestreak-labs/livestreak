@@ -12,8 +12,8 @@ use sui::table::{Self, Table};
 const ACC_SCALE: u256 = 1_000_000_000_000_000_000;
 const USDC_ONE: u256 = 1_000_000;
 const SKIM_BPS_DEFAULT: u256 = 200;
-const MINT_START: u256 = 100_000_000_000_000_000_000;
-const MINT_FLOOR: u256 = 1_000_000_000_000_000_000;
+const MINT_START: u256 = 100_000_000_000;
+const MINT_FLOOR: u256 = 1_000_000_000;
 const MINT_KNEE: u256 = 10_000_000_000;
 
 const E_ALREADY_CLAIMED: u64 = 1;
@@ -108,6 +108,50 @@ public fun mint_rate<T>(registry: &TreasuryRegistry<T>): u256 {
             / (registry.mint_knee + registry.total_skimmed)
 }
 
+public fun mint_start<T>(registry: &TreasuryRegistry<T>): u256 {
+    registry.mint_start
+}
+
+public fun mint_floor<T>(registry: &TreasuryRegistry<T>): u256 {
+    registry.mint_floor
+}
+
+public fun lvst_staked<T>(registry: &TreasuryRegistry<T>, user: address): u128 {
+    if (table::contains(&registry.stake_of, user)) {
+        *table::borrow(&registry.stake_of, user)
+    } else {
+        0
+    }
+}
+
+public fun pending_dividends<T>(registry: &TreasuryRegistry<T>, user: address): u128 {
+    let accrued = if (table::contains(&registry.accrued_dividends, user)) {
+        *table::borrow(&registry.accrued_dividends, user)
+    } else {
+        0
+    };
+    let stake = if (table::contains(&registry.stake_of, user)) {
+        *table::borrow(&registry.stake_of, user)
+    } else {
+        0
+    };
+    let debt = if (table::contains(&registry.reward_debt, user)) {
+        *table::borrow(&registry.reward_debt, user)
+    } else {
+        0
+    };
+    let unsettled = (stake as u256) * registry.acc_usdc_per_stake / ACC_SCALE;
+    if (unsettled > debt) {
+        accrued + ((unsettled - debt) as u128)
+    } else {
+        accrued
+    }
+}
+
+public fun treasury_usdc_balance<T>(registry: &TreasuryRegistry<T>): u128 {
+    balance::value(&registry.usdc) as u128
+}
+
 public(package) fun notify_skim<T>(registry: &mut TreasuryRegistry<T>, amount: u256) {
     registry.total_skimmed = registry.total_skimmed + amount;
     let dist = amount + (registry.undistributed as u256);
@@ -141,7 +185,46 @@ public(package) fun mint_loss_lvst<T>(
     assert!(lost_usdc > 0, E_NOTHING_LOST);
     table::add(&mut registry.loss_claimed, key, true);
     let minted = (lost_usdc * mint_rate(registry)) / USDC_ONE;
-    lvst::mint(lvst_cap, (minted as u64), to, ctx);
+    lvst::mint(lvst_cap, minted as u128, to, ctx);
+    event::emit(LossLvstClaimed {
+        user: to,
+        vault_id,
+        side,
+        lost_usdc,
+        minted,
+    });
+    minted
+}
+
+#[test_only]
+public fun set_mint_params_for_test<T>(
+    registry: &mut TreasuryRegistry<T>,
+    start: u256,
+    floor: u256,
+    knee: u256,
+) {
+    registry.mint_start = start;
+    registry.mint_floor = floor;
+    registry.mint_knee = knee;
+}
+
+#[test_only]
+public fun mint_loss_lvst_for_test<T>(
+    registry: &mut TreasuryRegistry<T>,
+    account: u256,
+    to: address,
+    vault_id: vector<u8>,
+    side: u8,
+    lost_usdc: u256,
+    ctx: &mut TxContext,
+): u256 {
+    side::assert_valid(side);
+    let key = LossClaimKey { account, vault_id, side };
+    assert!(!table::contains(&registry.loss_claimed, key), E_ALREADY_CLAIMED);
+    assert!(lost_usdc > 0, E_NOTHING_LOST);
+    table::add(&mut registry.loss_claimed, key, true);
+    let minted = (lost_usdc * mint_rate(registry)) / USDC_ONE;
+    lvst::mint_for_test(minted as u128, to, ctx);
     event::emit(LossLvstClaimed {
         user: to,
         vault_id,

@@ -29,8 +29,32 @@ fun init(otw: LVST, ctx: &mut TxContext) {
     transfer::share_object(wrapper);
 }
 
-public fun mint(cap: &mut LvstTreasuryCap, amount: u64, recipient: address, ctx: &mut TxContext) {
-    coin::mint_and_transfer(&mut cap.cap, amount, recipient, ctx);
+public fun mint(cap: &mut LvstTreasuryCap, amount: u128, recipient: address, ctx: &mut TxContext) {
+    let mut remaining = amount;
+    while (remaining > 0) {
+        let chunk = if (remaining > (std::u64::max_value!() as u128)) {
+            std::u64::max_value!()
+        } else {
+            (remaining as u64)
+        };
+        coin::mint_and_transfer(&mut cap.cap, chunk, recipient, ctx);
+        remaining = remaining - (chunk as u128);
+    };
+}
+
+#[test_only]
+public fun mint_for_test(amount: u128, recipient: address, ctx: &mut TxContext) {
+    let mut remaining = amount;
+    while (remaining > 0) {
+        let chunk = if (remaining > (std::u64::max_value!() as u128)) {
+            std::u64::max_value!()
+        } else {
+            (remaining as u64)
+        };
+        let payment = coin::mint_for_testing<LVST>(chunk, ctx);
+        transfer::public_transfer(payment, recipient);
+        remaining = remaining - (chunk as u128);
+    };
 }
 
 public fun pull_from(_cap: &mut LvstTreasuryCap, _from: address, _amount: u64, _ctx: &mut TxContext) {
