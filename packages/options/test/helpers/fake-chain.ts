@@ -1,4 +1,5 @@
 import { LiveStreakConfigError } from "@livestreak/core";
+import { marketDriverAbi, treasuryAbi } from "@livestreak/contracts/evm/abis";
 
 import {
   asMarketId,
@@ -19,9 +20,10 @@ import {
   type UserAddress,
   type VaultId
 } from "../../src/model/index.js";
-import type { OptionsContractAddresses } from "../../src/chains/addresses.js";
-import type { ChainReadRequest, ChainWriteRequest, OptionsChain, OptionsChainConfig } from "../../src/chains/types.js";
-import type { OptionsReadTransport } from "../../src/read/transport.js";
+import type { OptionsContractAddresses } from "../../src/chains/evm/addresses.js";
+import { validateOptionsContractAddresses } from "../../src/chains/evm/addresses.js";
+import type { OptionsChain, OptionsChainConfig, OptionsReader, OptionsWriter, TxId } from "../../src/chains/types.js";
+import { asTxId } from "../../src/chains/types.js";
 
 export const DEFAULT_FAKE_ADDRESSES: OptionsContractAddresses = {
   marketRegistry: "0x0000000000000000000000000000000000000011",
@@ -35,13 +37,13 @@ export const DEFAULT_FAKE_ADDRESSES: OptionsContractAddresses = {
 
 export const createFakeOptionsReader = (
   seed: FakeTransportSeed = {}
-): OptionsReadTransport => new FakeTransportInMemory(seed);
+): OptionsReader => new FakeReaderInMemory(seed);
 
 export const createFakeOptionsChain = (
   seed: FakeTransportSeed = {}
 ): { readonly chain: OptionsChain; readonly addresses: OptionsContractAddresses } => ({
   chain: {
-    reader: createFakeChainReader(seed),
+    reader: createFakeOptionsReader(seed),
     writer: createFakeChainWriter()
   },
   addresses: DEFAULT_FAKE_ADDRESSES
@@ -71,9 +73,6 @@ export const createFakeChainConfig = (
   ...(seed.protocol === undefined ? {} : { includeProtocolSummary: true })
 });
 
-/** @deprecated use createFakeOptionsReader */
-export const createFakeOptionsReadTransport = createFakeOptionsReader;
-
 export interface FakeTransportSeed {
   readonly markets?: readonly OptionsMarket[];
   readonly vaults?: readonly OptionsVault[];
@@ -97,7 +96,7 @@ export interface FakeTransportSeed {
   readonly streamStates?: Readonly<Record<string, OptionsStreamState>>;
 }
 
-export class FakeTransportInMemory implements OptionsReadTransport {
+export class FakeReaderInMemory implements OptionsReader {
   private readonly markets = new Map<string, OptionsMarket>();
   private readonly vaults = new Map<string, OptionsVault>();
   private readonly shareTotals = new Map<string, OptionsVaultShareTotals>();
@@ -382,6 +381,9 @@ export class FakeTransportInMemory implements OptionsReadTransport {
   }
 }
 
+/** @deprecated use FakeReaderInMemory */
+export const FakeTransportInMemory = FakeReaderInMemory;
+
 export const fixtureMarket = (
   overrides: Partial<OptionsMarket> = {}
 ): OptionsMarket => ({
@@ -535,6 +537,49 @@ export const fixtureSeedWithoutProtocol = (
   lvstAccounts: [fixtureLvstAccount(user)]
 });
 
+export type RecordedWrite = {
+  readonly action: string;
+  readonly args: unknown;
+};
+
+export type FakeChainWriter = OptionsWriter & {
+  readonly requests: readonly RecordedWrite[];
+  readonly clear: () => void;
+};
+
+export const createFakeChainWriter = (): FakeChainWriter => {
+  const requests: RecordedWrite[] = [];
+
+  const record = (action: string, args: unknown): Promise<TxId> => {
+    requests.push({ action, args });
+    return Promise.resolve(asTxId("0xfake_user_op_hash"));
+  };
+
+  return {
+    get requests() {
+      return requests;
+    },
+    clear() {
+      requests.length = 0;
+    },
+    fund: (input) => record("fund", input),
+    setLanes: (input) => record("setLanes", input),
+    stopFunding: (input) => record("stopFunding", input),
+    stopAllFunding: (input) => record("stopAllFunding", input),
+    withdraw: (input) => record("withdraw", input),
+    withdrawMany: (input) => record("withdrawMany", input),
+    claimLossLvst: (input) => record("claimLossLvst", input),
+    stakeLvst: (input) => record("stakeLvst", input),
+    unstakeLvst: (input) => record("unstakeLvst", input),
+    claimDividends: () => record("claimDividends", {}),
+    transferNft: (input) => record("transferNft", input),
+    approveNft: (input) => record("approveNft", input),
+    setApprovalForAll: (input) => record("setApprovalForAll", input)
+  };
+};
+
+export { validateOptionsContractAddresses };
+
 const notFound = (entity: string, id: string): LiveStreakConfigError =>
   new LiveStreakConfigError({
     message: `${entity} not found`,
@@ -545,42 +590,3 @@ const claimKey = (tokenId: TokenId, vaultId: VaultId, side: OptionsVaultSide): s
   `${tokenId.toString()}:${vaultId}:${side}`;
 
 const boardKey = (vaultId: VaultId, side: OptionsVaultSide): string => `${vaultId}:${side}`;
-
-export type FakeChainWriter = OptionsChain["writer"] & {
-  readonly requests: readonly ChainWriteRequest[];
-  readonly clear: () => void;
-};
-
-export const createFakeChainWriter = (): FakeChainWriter => {
-  const requests: ChainWriteRequest[] = [];
-
-  return {
-    get requests() {
-      return requests;
-    },
-    clear() {
-      requests.length = 0;
-    },
-    write(request: ChainWriteRequest): Promise<string> {
-      requests.push(request);
-      return Promise.resolve("0xfake_user_op_hash");
-    }
-  };
-};
-
-const createFakeChainReader = (seed: FakeTransportSeed): OptionsChain["reader"] => {
-  const transport = new FakeTransportInMemory(seed);
-
-  return {
-    read: async (request: ChainReadRequest) => {
-      if (request.functionName === "marketExists") {
-        const marketId = String(request.args?.[0] ?? "");
-        return transport.readMarket(asMarketId(marketId)).then(() => true).catch(() => false);
-      }
-
-      throw new LiveStreakConfigError({
-        message: `Fake chain reader does not implement ${request.functionName}; use createFakeOptionsReader for high-level reads`
-      });
-    }
-  };
-};

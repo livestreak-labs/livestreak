@@ -4,7 +4,7 @@ import { LiveStreakConfigError } from "@livestreak/core";
 
 import { asUserAddress } from "../model/ids.js";
 import type { OptionsChainConfig } from "./types.js";
-import { validateOptionsContractAddresses } from "../read/decode/validation.js";
+import { validateOptionsContractAddresses } from "./evm/addresses.js";
 
 export const validateOptionsChainConfig = (input: unknown): OptionsChainConfig => {
   if (!isPlainObject(input)) {

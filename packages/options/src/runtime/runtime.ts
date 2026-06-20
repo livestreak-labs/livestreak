@@ -4,11 +4,10 @@ import { LiveStreakConfigError } from "@livestreak/core";
 
 import type { MarketId, UserAddress, VaultId } from "../model/ids.js";
 import type { OptionsUserOptionsSnapshot } from "../model/snapshot.js";
-import { createOptionsChain } from "../chains/index.js";
-import { projectOptionsPanel } from "../panel/project.js";
-import type { OptionsPanel } from "../panel/types.js";
-import { createOptionsReader } from "../read/reader.js";
-import type { OptionsReadTransport } from "../read/transport.js";
+import { createOptionsChain, type OptionsChain } from "../chains/index.js";
+import { projectOptionsPanel } from "../bridge/panel/project.js";
+import type { OptionsPanel } from "../bridge/panel/types.js";
+import { assembleBoard, type OptionsBoard } from "./board.js";
 import type { OptionsRuntimeConfig, OptionsRuntimeInput } from "./config.js";
 import { validateOptionsRuntimeConfig } from "./config.js";
 import {
@@ -17,6 +16,7 @@ import {
   refreshVaultSnapshot,
   toRuntimeLastError
 } from "./refresh.js";
+import { createBoardSubscriptionRegistry } from "./subscriptions.js";
 import {
   createOptionsRuntimeStore,
   type OptionsRuntimeState,
@@ -25,16 +25,20 @@ import {
 
 export interface OptionsRuntime {
   readonly config: OptionsRuntimeConfig;
+  readonly chain: OptionsChain;
   readSnapshot: () => OptionsRuntimeState;
   readPanel: () => OptionsPanel;
+  readBoard: () => OptionsBoard;
   refresh: () => Promise<OptionsRuntimeState>;
   refreshMarket: (marketId: MarketId) => Promise<OptionsRuntimeState>;
   refreshVault: (vaultId: VaultId) => Promise<OptionsRuntimeState>;
   refreshUser: (user: UserAddress, marketId?: MarketId) => Promise<OptionsRuntimeState>;
   subscribeSnapshots: (listener: (state: OptionsRuntimeState) => void) => () => void;
+  subscribeBoard: (listener: (board: OptionsBoard) => void) => () => void;
   onChange: (listener: (state: OptionsRuntimeState) => void) => () => void;
   set: (key: string, value: unknown) => OptionsRuntimeState;
   get: <T>(key: string) => T | undefined;
+  watchMemory: (key: string, listener: (value: unknown) => void) => () => void;
   startPolling: () => { readonly stop: () => void };
 }
 
@@ -43,30 +47,19 @@ export const createOptionsRuntime = (input: OptionsRuntimeInput): OptionsRuntime
 
 class OptionsRuntimeFacade implements OptionsRuntime {
   readonly config: OptionsRuntimeConfig;
+  readonly chain: OptionsChain;
   private readonly store: OptionsRuntimeStore;
+  private readonly boardSubscriptions = createBoardSubscriptionRegistry();
   private readonly listeners = new Set<(state: OptionsRuntimeState) => void>();
   private readonly changeListeners = new Set<(state: OptionsRuntimeState) => void>();
+  private readonly memoryWatchers = new Map<string, Set<(value: unknown) => void>>();
   private pollingTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor(input: OptionsRuntimeInput) {
     this.config = validateOptionsRuntimeConfig(input.config);
     this.store = createOptionsRuntimeStore(this.config.runtimeId);
-    const chainConfig = input.chainConfig;
-    this.transport =
-      input.transport ??
-      createOptionsReader({
-        chain: createOptionsChain(chainConfig),
-        addresses: chainConfig.addresses,
-        ...(chainConfig.includeProtocolSummary === true
-          ? { includeProtocolSummary: true }
-          : {}),
-        ...(chainConfig.transferOperator === undefined
-          ? {}
-          : { transferOperator: chainConfig.transferOperator })
-      });
+    this.chain = input.chain ?? createOptionsChain(input.chainConfig);
   }
-
-  private readonly transport: OptionsReadTransport;
 
   readSnapshot(): OptionsRuntimeState {
     return this.store.readState();
@@ -75,6 +68,12 @@ class OptionsRuntimeFacade implements OptionsRuntime {
   readPanel(): OptionsPanel {
     const snapshot = this.requireUserSnapshot();
     return projectOptionsPanel(snapshot);
+  }
+
+  readBoard(): OptionsBoard {
+    const state = this.store.readState();
+    const snapshot = this.requireUserSnapshot();
+    return assembleBoard(state.revision, snapshot, projectOptionsPanel(snapshot));
   }
 
   async refresh(): Promise<OptionsRuntimeState> {
@@ -101,7 +100,7 @@ class OptionsRuntimeFacade implements OptionsRuntime {
 
   async refreshMarket(marketId: MarketId): Promise<OptionsRuntimeState> {
     try {
-      const snapshot = await refreshMarketSnapshot(this.transport, marketId);
+      const snapshot = await refreshMarketSnapshot(this.chain.reader, marketId);
       this.store.setMarketSnapshot(snapshot);
       return this.publish();
     } catch (error) {
@@ -111,7 +110,7 @@ class OptionsRuntimeFacade implements OptionsRuntime {
 
   async refreshVault(vaultId: VaultId): Promise<OptionsRuntimeState> {
     try {
-      const snapshot = await refreshVaultSnapshot(this.transport, vaultId);
+      const snapshot = await refreshVaultSnapshot(this.chain.reader, vaultId);
       this.store.setVaultSnapshot(snapshot);
       return this.publish();
     } catch (error) {
@@ -121,7 +120,7 @@ class OptionsRuntimeFacade implements OptionsRuntime {
 
   async refreshUser(user: UserAddress, marketId?: MarketId): Promise<OptionsRuntimeState> {
     try {
-      const snapshot = await refreshUserSnapshot(this.transport, user, marketId);
+      const snapshot = await refreshUserSnapshot(this.chain.reader, user, marketId);
       this.store.setUserSnapshot(snapshot);
       return this.publish();
     } catch (error) {
@@ -136,6 +135,10 @@ class OptionsRuntimeFacade implements OptionsRuntime {
     };
   }
 
+  subscribeBoard(listener: (board: OptionsBoard) => void): () => void {
+    return this.boardSubscriptions.subscribe(listener);
+  }
+
   onChange(listener: (state: OptionsRuntimeState) => void): () => void {
     this.changeListeners.add(listener);
     return () => {
@@ -145,11 +148,35 @@ class OptionsRuntimeFacade implements OptionsRuntime {
 
   set(key: string, value: unknown): OptionsRuntimeState {
     this.store.setMemory(key, value);
+    this.notifyMemoryWatchers(key, value);
     return this.publish();
   }
 
   get<T>(key: string): T | undefined {
     return this.store.getMemory<T>(key);
+  }
+
+  watchMemory(key: string, listener: (value: unknown) => void): () => void {
+    const watchers = this.memoryWatchers.get(key) ?? new Set();
+    watchers.add(listener);
+    this.memoryWatchers.set(key, watchers);
+
+    const current = this.get(key);
+    if (current !== undefined) {
+      listener(current);
+    }
+
+    return () => {
+      const set = this.memoryWatchers.get(key);
+      if (set === undefined) {
+        return;
+      }
+
+      set.delete(listener);
+      if (set.size === 0) {
+        this.memoryWatchers.delete(key);
+      }
+    };
   }
 
   startPolling(): { readonly stop: () => void } {
@@ -204,6 +231,7 @@ class OptionsRuntimeFacade implements OptionsRuntime {
 
   private publish(): OptionsRuntimeState {
     const state = this.store.readState();
+
     for (const listener of this.listeners) {
       listener(state);
     }
@@ -212,7 +240,24 @@ class OptionsRuntimeFacade implements OptionsRuntime {
       listener(state);
     }
 
+    if (state.userSnapshot !== undefined) {
+      this.boardSubscriptions.notify(
+        assembleBoard(state.revision, state.userSnapshot, projectOptionsPanel(state.userSnapshot))
+      );
+    }
+
     return state;
+  }
+
+  private notifyMemoryWatchers(key: string, value: unknown): void {
+    const watchers = this.memoryWatchers.get(key);
+    if (watchers === undefined) {
+      return;
+    }
+
+    for (const listener of watchers) {
+      listener(value);
+    }
   }
 
   private fail(error: unknown): never {

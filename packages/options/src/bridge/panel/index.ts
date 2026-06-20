@@ -1,4 +1,8 @@
+// --- exports ---
+
+export { projectOptionsPanel, projectOptionsControls } from "./project.js";
 export type {
+  OptionsControlsView,
   OptionsLanePanel,
   OptionsLvstPanel,
   OptionsMarketPanel,
@@ -8,4 +12,3 @@ export type {
   OptionsUserPanel,
   OptionsVaultPanel
 } from "./types.js";
-export { projectOptionsPanel } from "./project.js";

@@ -6,7 +6,7 @@ import type {
   OptionsVaultSide,
   OptionsVaultStatus,
   OptionsVaultType
-} from "../model/index.js";
+} from "../../model/index.js";
 
 export interface OptionsLanePanel {
   readonly vaultId: string;
@@ -122,4 +122,17 @@ export interface OptionsPanel {
   readonly lvst: OptionsLvstPanel;
   readonly protocol?: OptionsProtocolPanel;
   readonly user: OptionsUserPanel;
+}
+
+export interface OptionsControlsView {
+  readonly account: string;
+  readonly actions: {
+    readonly canFund: boolean;
+    readonly canWithdraw: boolean;
+    readonly canClaimLoss: boolean;
+    readonly canStakeLvst: boolean;
+    readonly canUnstakeLvst: boolean;
+    readonly canClaimDividends: boolean;
+    readonly canTransferNft: boolean;
+  };
 }

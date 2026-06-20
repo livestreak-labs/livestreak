@@ -15,53 +15,35 @@ describe("options public exports", () => {
     expect(publicExport("segMath")).toBeTypeOf("function");
     expect(publicExport("asMarketId")).toBeTypeOf("function");
     expect(publicExport("asTokenId")).toBeTypeOf("function");
+    expect(publicExport("asTxId")).toBeTypeOf("function");
   });
 
-  it("exports chain factory and read helpers", () => {
+  it("exports chain factory, bridge, and flow reads", () => {
     expect(publicExport("createOptionsChain")).toBeTypeOf("function");
+    expect(publicExport("createOptionsBridge")).toBeTypeOf("function");
     expect(publicExport("validateOptionsChainConfig")).toBeTypeOf("function");
     expect(publicExport("readMarketSnapshot")).toBeTypeOf("function");
     expect(publicExport("readVaultSnapshot")).toBeTypeOf("function");
     expect(publicExport("readUserOptionsSnapshot")).toBeTypeOf("function");
-    expect(publicExport("createOptionsReader")).toBeTypeOf("function");
     expect(publicExport("readStreamState")).toBeTypeOf("function");
     expect(publicExport("createOptionsRuntime")).toBeTypeOf("function");
     expect(publicExport("validateOptionsRuntimeConfig")).toBeTypeOf("function");
   });
 
-  it("exports panel projection", () => {
+  it("exports panel projection under bridge", () => {
     expect(publicExport("projectOptionsPanel")).toBeTypeOf("function");
+    expect(publicExport("projectOptionsControls")).toBeTypeOf("function");
   });
 
-  it("exports NFT-lane write helpers", () => {
-    expect(publicExport("fundStream")).toBeTypeOf("function");
-    expect(publicExport("setLanes")).toBeTypeOf("function");
-    expect(publicExport("stopFunding")).toBeTypeOf("function");
-    expect(publicExport("stopAllFunding")).toBeTypeOf("function");
-    expect(publicExport("withdraw")).toBeTypeOf("function");
-    expect(publicExport("withdrawMany")).toBeTypeOf("function");
-    expect(publicExport("claimLossLvst")).toBeTypeOf("function");
-    expect(publicExport("stakeLvst")).toBeTypeOf("function");
-    expect(publicExport("unstakeLvst")).toBeTypeOf("function");
-    expect(publicExport("claimDividends")).toBeTypeOf("function");
-    expect(publicExport("transferNft")).toBeTypeOf("function");
-    expect(publicExport("approveNft")).toBeTypeOf("function");
-    expect(publicExport("setApprovalForAll")).toBeTypeOf("function");
-  });
-
-  it("does not export retired R1 write names", () => {
-    expect(publicExport("setFundingRate")).toBeUndefined();
-    expect(publicExport("stopFundingStream")).toBeUndefined();
-    expect(publicExport("claimLossFlow")).toBeUndefined();
-    expect(publicExport("stakeFlow")).toBeUndefined();
-    expect(publicExport("unstakeFlow")).toBeUndefined();
-  });
-
-  it("does not export blocked write functions", () => {
-    expect(publicExport("claimVault")).toBeUndefined();
-    expect(publicExport("releaseVault")).toBeUndefined();
-    expect(publicExport("claimFlowDividends")).toBeUndefined();
-    expect(publicExport("claimAndStakeLossFlow")).toBeUndefined();
+  it("does not export retired reader or standalone write helpers", () => {
+    expect(publicExport("createOptionsReader")).toBeUndefined();
+    expect(publicExport("OptionsReadTransport")).toBeUndefined();
+    expect(publicExport("fundStream")).toBeUndefined();
+    expect(publicExport("setLanes")).toBeUndefined();
+    expect(publicExport("withdraw")).toBeUndefined();
+    expect(publicExport("claimLossLvst")).toBeUndefined();
+    expect(publicExport("stakeLvst")).toBeUndefined();
+    expect(publicExport("transferNft")).toBeUndefined();
   });
 
   it("does not export fake test helpers or internal stores", () => {
@@ -76,12 +58,7 @@ describe("options public exports", () => {
     expect(publicExport("registerMarket")).toBeUndefined();
   });
 
-  it("does not export R3 deferred names", () => {
-    expect(publicExport("createOptionsMemoryFacade")).toBeUndefined();
-    expect(publicExport("projectTransferPanel")).toBeUndefined();
-  });
-
-  it("exports R3 aggregation and runtime helpers", () => {
+  it("exports R3 aggregation helpers", () => {
     expect(publicExport("readSessionPnl")).toBeTypeOf("function");
     expect(publicExport("readClaimsView")).toBeTypeOf("function");
     expect(publicExport("projectSessionPnl")).toBeTypeOf("function");
@@ -89,17 +66,10 @@ describe("options public exports", () => {
     expect(publicExport("gatherUserVaultClaims")).toBeTypeOf("function");
   });
 
-  it("does not export stripped R4/R5 media or retired contract ports", () => {
+  it("does not export stripped media or retired contract ports", () => {
     expect(publicExport("getStreamMedia")).toBeUndefined();
-    expect(publicExport("resolveStreamMedia")).toBeUndefined();
-    expect(publicExport("DEFAULT_MEDIA_RESOLVERS")).toBeUndefined();
-    expect(publicExport("walrusAggregatorResolver")).toBeUndefined();
-    expect(publicExport("OptionsStreamMedia")).toBeUndefined();
-    expect(publicExport("createContractsOptionsReadTransport")).toBeUndefined();
-    expect(publicExport("createContractsOptionsWriteTransport")).toBeUndefined();
     expect(publicExport("ContractReader")).toBeUndefined();
     expect(publicExport("ContractWriter")).toBeUndefined();
-    expect(publicExport("SCHEME_GATEWAY")).toBeUndefined();
-    expect(publicExport("GatewayOverrides")).toBeUndefined();
+    expect(publicExport("createContractsOptionsReadTransport")).toBeUndefined();
   });
 });

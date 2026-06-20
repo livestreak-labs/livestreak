@@ -6,9 +6,10 @@ import type {
   OptionsNftSnapshot,
   OptionsUserOptionsSnapshot,
   OptionsVaultSnapshot
-} from "../model/index.js";
-import { totalVaultPool } from "../model/index.js";
+} from "../../model/index.js";
+import { totalVaultPool } from "../../model/index.js";
 import type {
+  OptionsControlsView,
   OptionsLanePanel,
   OptionsLvstPanel,
   OptionsMarketPanel,
@@ -30,6 +31,31 @@ export const projectOptionsPanel = (snapshot: OptionsUserOptionsSnapshot): Optio
     ...(snapshot.marketId === undefined ? {} : { marketId: snapshot.marketId })
   }
 });
+
+export const projectOptionsControls = (panel: OptionsPanel): OptionsControlsView => {
+  const hasClaimableWin = panel.nfts.some((nft) =>
+    nft.lanes.some((lane) => lane.canClaimWin === true)
+  );
+  const hasClaimableLoss = panel.nfts.some((nft) =>
+    nft.lanes.some((lane) => lane.canClaimLoss === true)
+  );
+  const hasActiveLanes = panel.nfts.some((nft) =>
+    nft.lanes.some((lane) => lane.rate !== "0" && !lane.depleted)
+  );
+
+  return {
+    account: panel.account,
+    actions: {
+      canFund: panel.nfts.length > 0,
+      canWithdraw: hasActiveLanes,
+      canClaimLoss: hasClaimableLoss,
+      canStakeLvst: panel.lvst.actions.canStake,
+      canUnstakeLvst: panel.lvst.actions.canUnstake,
+      canClaimDividends: panel.lvst.actions.canClaimDividends,
+      canTransferNft: panel.nfts.length > 0 && hasClaimableWin === false
+    }
+  };
+};
 
 // --- helpers ---
 

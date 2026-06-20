@@ -1,9 +1,10 @@
 import { LiveStreakConfigError } from "@livestreak/core";
 import { describe, expect, it } from "vitest";
 
-import { createOptionsChain } from "../src/chains/index.js";
-import { createSuiOptionsChain } from "../src/chains/sui.js";
-import { DEFAULT_FAKE_ADDRESSES } from "./helpers/fake-chain.js";
+import { asTokenId } from "../src/model/ids.js";
+import { createOptionsChain, asTxId } from "../src/chains/index.js";
+import { createSuiOptionsChain } from "../src/chains/sui/index.js";
+import { createFakeChainWriter, DEFAULT_FAKE_ADDRESSES } from "./helpers/fake-chain.js";
 
 const evmChainConfig = {
   walletInit: {
@@ -27,29 +28,47 @@ const evmChainConfig = {
 };
 
 describe("createOptionsChain", () => {
-  it("dispatches evm walletInit to an evm chain with reader and writer", () => {
+  it("dispatches evm walletInit to an evm chain with reader and writer operations", () => {
     const chain = createOptionsChain(evmChainConfig);
 
     expect(chain.reader).toBeTypeOf("object");
     expect(chain.writer).toBeTypeOf("object");
-    expect(chain.reader.read).toBeTypeOf("function");
-    expect(chain.writer.write).toBeTypeOf("function");
+    expect(chain.reader.readMarket).toBeTypeOf("function");
+    expect(chain.writer.fund).toBeTypeOf("function");
   });
 
-  it("dispatches sui walletInit to a stub that throws LiveStreakConfigError", () => {
-    expect(() =>
-      createOptionsChain({
-        walletInit: {
-          chain: "sui",
-          seedSource: "raw",
-          config: { rpcUrl: "https://fullnode.testnet.sui.io:443" }
-        },
-        seed: "test-seed",
-        addresses: DEFAULT_FAKE_ADDRESSES
-      })
-    ).toThrow(LiveStreakConfigError);
+  it("returns TxId from fake writer operations", async () => {
+    const writer = createFakeChainWriter();
 
-    expect(() => createSuiOptionsChain()).toThrow(LiveStreakConfigError);
+    const txId = await writer.fund({
+      tokenId: asTokenId(1n),
+      vaultId:
+        "0x00000000000000000000000000000000000000000000000000000000000000aa" as never,
+      side: "yes",
+      rate: 1n,
+      deposit: 1n
+    });
+
+    expect(txId).toBe(asTxId("0xfake_user_op_hash"));
+  });
+
+  it("dispatches sui walletInit to a stub chain whose operations throw", async () => {
+    const chain = createOptionsChain({
+      walletInit: {
+        chain: "sui",
+        seedSource: "raw",
+        config: { rpcUrl: "https://fullnode.testnet.sui.io:443" }
+      },
+      seed: "test-seed",
+      addresses: DEFAULT_FAKE_ADDRESSES
+    });
+
+    await expect(chain.reader.readMarket("0x01" as never)).rejects.toBeInstanceOf(
+      LiveStreakConfigError
+    );
+
+    const suiChain = createSuiOptionsChain();
+    await expect(suiChain.writer.fund({} as never)).rejects.toBeInstanceOf(LiveStreakConfigError);
   });
 
   it("rejects unknown wallet chains", () => {

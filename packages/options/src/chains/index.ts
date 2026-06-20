@@ -4,13 +4,33 @@ import { LiveStreakConfigError } from "@livestreak/core";
 import type { WalletInit } from "@livestreak/schema";
 
 import { validateOptionsChainConfig } from "./config.js";
-import { createEvmOptionsChain } from "./evm.js";
-import { createSuiOptionsChain } from "./sui.js";
+import { createEvmOptionsChain } from "./evm/index.js";
+import { createSuiOptionsChain } from "./sui/index.js";
 import type { OptionsChain, OptionsChainConfig } from "./types.js";
 
-export type { OptionsContractAddresses } from "./addresses.js";
+export type { OptionsContractAddresses } from "./evm/addresses.js";
 export { validateOptionsChainConfig } from "./config.js";
-export type { OptionsChain, OptionsChainConfig, OptionsChainReader, OptionsChainWriter } from "./types.js";
+export type {
+  ApproveNftInput,
+  ClaimLossLvstInput,
+  FundStreamInput,
+  LaneWriteInput,
+  OptionsChain,
+  OptionsChainConfig,
+  OptionsReader,
+  OptionsWriter,
+  SetApprovalForAllInput,
+  SetLanesInput,
+  StakeLvstInput,
+  StopAllFundingInput,
+  StopFundingInput,
+  TransferNftInput,
+  TxId,
+  UnstakeLvstInput,
+  WithdrawInput,
+  WithdrawManyInput
+} from "./types.js";
+export { asTxId } from "./types.js";
 
 export const createOptionsChain = (config: OptionsChainConfig): OptionsChain => {
   const validated = validateOptionsChainConfig(config);

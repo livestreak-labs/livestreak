@@ -3,15 +3,16 @@
 import { LiveStreakConfigError } from "@livestreak/core";
 
 import type { UserAddress } from "../model/ids.js";
-import type { UserVaultClaimRow } from "../model/claims.js";
-import type { OptionsReadTransport } from "./transport.js";
+import type { OptionsClaimsView, UserVaultClaimRow } from "../model/claims.js";
+import { projectClaimsView } from "../model/claims.js";
+import type { OptionsReader } from "../chains/types.js";
 
 export const gatherUserVaultClaims = async (
-  transport: OptionsReadTransport,
+  reader: OptionsReader,
   user: UserAddress
 ): Promise<readonly UserVaultClaimRow[]> => {
   const tokenIds = await readOrThrow(
-    () => transport.listOwnerTokens(user),
+    () => reader.listOwnerTokens(user),
     "owner tokens",
     user
   );
@@ -20,13 +21,13 @@ export const gatherUserVaultClaims = async (
 
   for (const tokenId of tokenIds) {
     const nft = await readOrThrow(
-      () => transport.readNft(tokenId, user),
+      () => reader.readNft(tokenId, user),
       "nft",
       String(tokenId)
     );
 
     const vaultIds = await readOrThrow(
-      () => transport.readAccountVaultIds(tokenId),
+      () => reader.readAccountVaultIds(tokenId),
       "account vault ids",
       String(tokenId)
     );
@@ -43,15 +44,15 @@ export const gatherUserVaultClaims = async (
       }
 
       const vault = await readOrThrow(
-        () => transport.readVault(vaultId),
+        () => reader.readVault(vaultId),
         "vault",
         vaultId
       );
-      const winningSide = await transport.readWinningSide(vaultId);
-      const claimable = lane.claimable ?? (await transport.readClaimable(tokenId, vaultId, lane.side));
+      const winningSide = await reader.readWinningSide(vaultId);
+      const claimable = lane.claimable ?? (await reader.readClaimable(tokenId, vaultId, lane.side));
       const lossClaimable =
         lane.lossClaimable ??
-        (await transport.readLossClaimable(tokenId, vaultId, lane.side));
+        (await reader.readLossClaimable(tokenId, vaultId, lane.side));
       const won = winningSide === undefined ? undefined : lane.side === winningSide;
 
       rows.push({
@@ -69,6 +70,14 @@ export const gatherUserVaultClaims = async (
   }
 
   return rows;
+};
+
+export const readClaimsView = async (
+  reader: OptionsReader,
+  user: UserAddress
+): Promise<OptionsClaimsView> => {
+  const rows = await gatherUserVaultClaims(reader, user);
+  return projectClaimsView(user, rows);
 };
 
 // --- helpers ---

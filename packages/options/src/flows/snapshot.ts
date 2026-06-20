@@ -12,35 +12,33 @@ import type {
   UserAddress,
   VaultId
 } from "../model/index.js";
-import type { OptionsReadTransport } from "./transport.js";
+import type { OptionsReader } from "../chains/types.js";
 
 export const readMarketSnapshot = async (
-  transport: OptionsReadTransport,
+  reader: OptionsReader,
   marketId: MarketId
 ): Promise<OptionsMarketSnapshot> => {
-  const market = await readOrThrow(() => transport.readMarket(marketId), "market", marketId);
+  const market = await readOrThrow(() => reader.readMarket(marketId), "market", marketId);
   const vaultIds = await readOrThrow(
-    () => transport.listMarketVaults(marketId),
+    () => reader.listMarketVaults(marketId),
     "market vault index",
     marketId
   );
 
   const vaults = await Promise.all(
-    vaultIds.map((vaultId) =>
-      readOrThrow(() => transport.readVault(vaultId), "vault", vaultId)
-    )
+    vaultIds.map((vaultId) => readOrThrow(() => reader.readVault(vaultId), "vault", vaultId))
   );
 
   return { market, vaults };
 };
 
 export const readVaultSnapshot = async (
-  transport: OptionsReadTransport,
+  reader: OptionsReader,
   vaultId: VaultId
 ): Promise<OptionsVaultSnapshot> => {
-  const vault = await readOrThrow(() => transport.readVault(vaultId), "vault", vaultId);
+  const vault = await readOrThrow(() => reader.readVault(vaultId), "vault", vaultId);
   const shareTotals = await readOrThrow(
-    () => transport.readVaultShareTotals(vaultId),
+    () => reader.readVaultShareTotals(vaultId),
     "vault share totals",
     vaultId
   );
@@ -54,47 +52,25 @@ export const readVaultSnapshot = async (
       active: vault.steward.disputeId !== undefined,
       disputeId: vault.steward.disputeId
     },
-    ...(await enrichResolvedVaultFields(transport, vaultId, vault))
-  };
-};
-
-const enrichResolvedVaultFields = async (
-  transport: OptionsReadTransport,
-  vaultId: VaultId,
-  vault: OptionsVault
-): Promise<Pick<OptionsVaultSnapshot, "winningSide" | "pot" | "collected">> => {
-  if (vault.status !== "resolved") {
-    return {};
-  }
-
-  const [winningSide, pot, collected] = await Promise.all([
-    transport.readWinningSide(vaultId),
-    transport.readPot(vaultId),
-    transport.readCollected(vaultId)
-  ]);
-
-  return {
-    ...(winningSide === undefined ? {} : { winningSide }),
-    pot,
-    collected
+    ...(await enrichResolvedVaultFields(reader, vaultId, vault))
   };
 };
 
 export const readUserOptionsSnapshot = async (
-  transport: OptionsReadTransport,
+  reader: OptionsReader,
   user: UserAddress,
   marketId?: MarketId
 ): Promise<OptionsUserOptionsSnapshot> => {
   const lvstAccount = await readOrThrow(
-    () => transport.readLvstAccount(user),
+    () => reader.readLvstAccount(user),
     "LVST account",
     user
   );
 
   const protocol =
-    transport.readProtocolSummary === undefined
+    reader.readProtocolSummary === undefined
       ? undefined
-      : await readOrThrow(() => transport.readProtocolSummary!(), "protocol summary", user);
+      : await readOrThrow(() => reader.readProtocolSummary!(), "protocol summary", user);
 
   if (marketId === undefined) {
     return {
@@ -107,16 +83,16 @@ export const readUserOptionsSnapshot = async (
     };
   }
 
-  const marketSnapshot = await readMarketSnapshot(transport, marketId);
+  const marketSnapshot = await readMarketSnapshot(reader, marketId);
   const tokenIds = await readOrThrow(
-    () => transport.listOwnerTokens(user),
+    () => reader.listOwnerTokens(user),
     "owner tokens",
     user
   );
 
   const nfts: OptionsNftSnapshot[] = [];
   for (const tokenId of tokenIds) {
-    const nft = await readOrThrow(() => transport.readNft(tokenId, user), "nft", String(tokenId));
+    const nft = await readOrThrow(() => reader.readNft(tokenId, user), "nft", String(tokenId));
     if (nft.marketId === marketId) {
       nfts.push({ nft });
     }
@@ -130,7 +106,7 @@ export const readUserOptionsSnapshot = async (
   }
 
   const vaults = await Promise.all(
-    [...vaultIdSet].map((vaultId) => readVaultSnapshot(transport, vaultId))
+    [...vaultIdSet].map((vaultId) => readVaultSnapshot(reader, vaultId))
   );
 
   return {
@@ -145,6 +121,28 @@ export const readUserOptionsSnapshot = async (
 };
 
 // --- helpers ---
+
+const enrichResolvedVaultFields = async (
+  reader: OptionsReader,
+  vaultId: VaultId,
+  vault: OptionsVault
+): Promise<Pick<OptionsVaultSnapshot, "winningSide" | "pot" | "collected">> => {
+  if (vault.status !== "resolved") {
+    return {};
+  }
+
+  const [winningSide, pot, collected] = await Promise.all([
+    reader.readWinningSide(vaultId),
+    reader.readPot(vaultId),
+    reader.readCollected(vaultId)
+  ]);
+
+  return {
+    ...(winningSide === undefined ? {} : { winningSide }),
+    pot,
+    collected
+  };
+};
 
 const readOrThrow = async <T>(
   read: () => Promise<T>,

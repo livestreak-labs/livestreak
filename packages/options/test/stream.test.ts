@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { asMarketId } from "../src/model/ids.js";
 import type { OptionsStreamState } from "../src/model/stream.js";
-import { readStreamState } from "../src/read/stream.js";
+import { readStreamState } from "../src/flows/stream.js";
 import { createFakeOptionsReader } from "./helpers/fake-chain.js";
 
 const marketId = asMarketId("market_01");

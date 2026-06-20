@@ -3,10 +3,27 @@
 import { LiveStreakConfigError } from "@livestreak/core";
 
 import type { MarketId, TokenId, UserAddress, VaultId } from "../../model/ids.js";
-import type { OptionsContractAddresses } from "../../chains/addresses.js";
+import type { OptionsVaultSide } from "../../model/vault.js";
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/;
+
+export type ContractSide = "yes" | "no";
+
+export const sideToSolidityValue = (side: ContractSide): 0 | 1 =>
+  side === "yes" ? 0 : 1;
+
+export const sideFromSolidityValue = (value: number): ContractSide => {
+  if (value === 0) {
+    return "yes";
+  }
+
+  if (value === 1) {
+    return "no";
+  }
+
+  throw new Error(`Invalid Side enum value: ${value}`);
+};
 
 export const validateContractAddress = (
   value: string,
@@ -55,14 +72,4 @@ export const validateTokenIdForContracts = (tokenId: TokenId): bigint => {
   return tokenId;
 };
 
-export const validateOptionsContractAddresses = (
-  addresses: OptionsContractAddresses
-): OptionsContractAddresses => ({
-  marketRegistry: validateContractAddress(addresses.marketRegistry, "marketRegistry"),
-  vault: validateContractAddress(addresses.vault, "vault"),
-  marketDriver: validateContractAddress(addresses.marketDriver, "marketDriver"),
-  stewardRegistry: validateContractAddress(addresses.stewardRegistry, "stewardRegistry"),
-  treasury: validateContractAddress(addresses.treasury, "treasury"),
-  lvstToken: validateContractAddress(addresses.lvstToken, "lvstToken"),
-  dripsStreaming: validateContractAddress(addresses.dripsStreaming, "dripsStreaming")
-});
+export const coerceVaultSide = (side: OptionsVaultSide): ContractSide => side;

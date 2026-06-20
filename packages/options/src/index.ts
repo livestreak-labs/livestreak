@@ -57,20 +57,18 @@ export {
   validateOptionsVaultSide,
   WAD
 } from "./model/index.js";
-export type { OptionsReadTransport } from "./read/index.js";
 export {
-  contractsReadFailed,
-  contractsReadNotFound,
-  createOptionsReader,
-  gatherUserVaultClaims,
-  readClaimsView,
   readMarketSnapshot,
+  readVaultSnapshot,
+  readUserOptionsSnapshot,
+  readClaimsView,
   readSessionPnl,
   readStreamState,
-  readUserOptionsSnapshot,
-  readVaultSnapshot,
+  gatherUserVaultClaims,
+  contractsReadFailed,
+  contractsReadNotFound,
   type ContractsReadEntity
-} from "./read/index.js";
+} from "./flows/index.js";
 export type {
   OptionsLanePanel,
   OptionsLvstPanel,
@@ -79,53 +77,55 @@ export type {
   OptionsPanel,
   OptionsProtocolPanel,
   OptionsUserPanel,
-  OptionsVaultPanel
-} from "./panel/index.js";
-export { projectOptionsPanel } from "./panel/index.js";
+  OptionsVaultPanel,
+  OptionsControlsView
+} from "./bridge/panel/index.js";
+export { projectOptionsPanel, projectOptionsControls } from "./bridge/panel/index.js";
+export type {
+  BridgeCaller,
+  CallActionEnvelope,
+  CapabilityGrant,
+  CapabilityScope,
+  CreateOptionsBridgeInput,
+  OptionsBridge
+} from "./bridge/index.js";
+export {
+  createOptionsBridge,
+  bridgeActionScope,
+  bridgeBoardReadScope,
+  bridgeBoardSubscribeScope,
+  bridgeControlsReadScope,
+  authorizeBridgeCaller,
+  requireAnyScope
+} from "./bridge/index.js";
 export type {
   OptionsRuntime,
   OptionsRuntimeConfig,
   OptionsRuntimeInput,
   OptionsRuntimeLastError,
-  OptionsRuntimeState
+  OptionsRuntimeState,
+  OptionsBoard
 } from "./runtime/index.js";
 export { createOptionsRuntime, validateOptionsRuntimeConfig } from "./runtime/index.js";
 export type {
-  ApproveNftInput,
-  ClaimLossLvstInput,
-  FundStreamInput,
-  LaneWriteInput,
-  OptionsWriteDeps,
-  SetApprovalForAllInput,
-  SetLanesInput,
-  StakeLvstInput,
-  StopAllFundingInput,
-  StopFundingInput,
-  TransferNftInput,
-  UnstakeLvstInput,
-  WithdrawInput,
-  WithdrawManyInput
-} from "./write/index.js";
-export {
-  approveNft,
-  claimDividends,
-  claimLossLvst,
-  fundStream,
-  setApprovalForAll,
-  setLanes,
-  stakeLvst,
-  stopAllFunding,
-  stopFunding,
-  transferNft,
-  unstakeLvst,
-  withdraw,
-  withdrawMany
-} from "./write/index.js";
-export type {
   OptionsChain,
   OptionsChainConfig,
-  OptionsChainReader,
-  OptionsChainWriter,
-  OptionsContractAddresses
+  OptionsReader,
+  OptionsWriter,
+  OptionsContractAddresses,
+  TxId,
+  FundStreamInput,
+  SetLanesInput,
+  StopFundingInput,
+  StopAllFundingInput,
+  WithdrawInput,
+  WithdrawManyInput,
+  ClaimLossLvstInput,
+  StakeLvstInput,
+  UnstakeLvstInput,
+  TransferNftInput,
+  ApproveNftInput,
+  SetApprovalForAllInput,
+  LaneWriteInput
 } from "./chains/index.js";
-export { createOptionsChain, validateOptionsChainConfig } from "./chains/index.js";
+export { createOptionsChain, validateOptionsChainConfig, asTxId } from "./chains/index.js";

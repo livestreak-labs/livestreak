@@ -11,7 +11,7 @@ import {
   readMarketSnapshot,
   readUserOptionsSnapshot,
   readVaultSnapshot
-} from "../src/read/snapshot.js";
+} from "../src/flows/snapshot.js";
 import {
   createFakeOptionsReader,
   fixtureMarket,

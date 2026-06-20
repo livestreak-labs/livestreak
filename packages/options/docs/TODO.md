@@ -6,7 +6,7 @@ no `Effect.run*`. **Wallet-direct** (R6): options imports `@livestreak/wallet` a
 observe/market/chains); view reads via a viem public client. ABIs from `@livestreak/contracts/evm/abis`.
 `walletInit` + seed injected at runtime (seed never baked).
 
-## ✅ Shipped & verified — R1–R3 + R6 (R4/R5 media superseded by R6). `check`/`build` green, 17 files / 129 tests.
+## ✅ Shipped & verified — R1–R3 + R6 + R7. `check`/`build` green, 47 src files / 127 tests.
 
 - **R1 — NFT-lane core** (committed `8d120aa`). Model keyed `tokenId → lanes` (one side per vault;
   multi-NFT via `tokensOfOwner`). Reads: `getVault` + `getVaultPools`, `getPosition`, steward
@@ -29,12 +29,9 @@ observe/market/chains); view reads via a viem public client. ABIs from `@livestr
 
 ## ▢ Open
 
-- [ ] **Doc refresh** — `docs/architecture.md` still describes injected `ContractReader`/`ContractWriter`
-  + `fake-transport`; rewrite to wallet-direct + `chains/` (code landed in R6; the doc lags).
-- [ ] (optional) `read/reader.ts` consolidates all low-level read families into one large file — split
-  into per-family files (`market`/`vault`/`position`/…) if it keeps growing.
+- [x] **R7 — operation-boundary chains + bridge externality** — shipped.
 
-After this: app integration (below, not options) + phase-2 `Live` playback.
+After R7: app integration (below, not options) + phase-2 `Live` playback.
 
 ## Next (not options)
 

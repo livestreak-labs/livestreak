@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { asMarketId } from "../src/model/index.js";
-import { projectOptionsPanel } from "../src/panel/project.js";
-import { readUserOptionsSnapshot } from "../src/read/snapshot.js";
+import { projectOptionsPanel } from "../src/bridge/panel/project.js";
+import { readUserOptionsSnapshot } from "../src/flows/snapshot.js";
 import {
   createFakeOptionsReader,
   fixtureNft,

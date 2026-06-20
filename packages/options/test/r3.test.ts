@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { asMarketId, asTokenId, asUserAddress, asVaultId } from "../src/model/ids.js";
-import { mapStreamsStateBalance } from "../src/read/decode/mapping.js";
-import { readClaimsView } from "../src/read/claims.js";
-import { readSessionPnl } from "../src/read/pnl.js";
-import { projectOptionsPanel } from "../src/panel/project.js";
-import { readUserOptionsSnapshot } from "../src/read/snapshot.js";
+import { mapStreamsStateBalance } from "../src/chains/evm/decode.js";
+import { readClaimsView } from "../src/flows/claims.js";
+import { readSessionPnl } from "../src/flows/pnl.js";
+import { projectOptionsPanel } from "../src/bridge/panel/project.js";
+import { readUserOptionsSnapshot } from "../src/flows/snapshot.js";
 import { createOptionsRuntime } from "../src/runtime/index.js";
 import {
   createFakeChainConfig,
+  createFakeChainWriter,
   createFakeOptionsReader,
   fixtureLvstAccount,
   fixtureMarket,
@@ -198,7 +199,7 @@ describe("runtime memory API", () => {
         defaultMarketId: asMarketId("market_01")
       },
       chainConfig: createFakeChainConfig(),
-      transport
+      chain: { reader: transport, writer: createFakeChainWriter() }
     });
 
     const revisions: number[] = [];
