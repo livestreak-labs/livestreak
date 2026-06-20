@@ -12,7 +12,8 @@ import { validateObserveRunMarketOptions } from "#market/validate.js";
 import {
   createFakeMarketRegistrar,
   defaultFakeRegisterResult,
-  paymasterFailure
+  paymasterFailure,
+  receiptFailure
 } from "#test/helpers/fake-market-registrar.js";
 import { minimalEvmMarketRegistrationConfig } from "#test/helpers/market-config.js";
 
@@ -56,6 +57,35 @@ describe("market registration lifecycle", () => {
     );
 
     expect(registerCalls).toBe(1);
+  });
+
+  it("records receipt revert without affecting board run cell", async () => {
+    const exit = await Effect.runPromiseExit(
+      Effect.gen(function* () {
+        const bus = yield* createControlBus({
+          runId: "run_receipt",
+          board: createInitialBoard({ runId: "run_receipt", nowMs: 1 }),
+          catalog: buildControlCatalog(),
+          surfaces: []
+        });
+
+        const registration = minimalEvmMarketRegistrationConfig("run_receipt");
+        yield* runMarketRegistrationLifecycle({
+          runId: "run_receipt",
+          bus,
+          registration,
+          registrar: createFakeMarketRegistrar({ failWith: receiptFailure() })
+        });
+
+        return yield* bus.readBoard();
+      })
+    );
+
+    expect(Exit.isSuccess(exit)).toBe(true);
+    if (Exit.isSuccess(exit)) {
+      expect(exit.value.cells["market"]?.status[0]).toBe("failed");
+      expect(exit.value.cells["market"]?.readonly).toMatchObject({ phase: "receipt" });
+    }
   });
 
   it("records paymaster-side failure without affecting board run cell", async () => {

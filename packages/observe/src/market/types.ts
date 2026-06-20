@@ -6,7 +6,6 @@ export type MarketFailurePhase =
   | "validation"
   | "send"
   | "receipt"
-  | "verify"
   | "paymaster"
   | "unsupported";
 
@@ -64,22 +63,9 @@ export interface MarketRegisterInput {
 
 export interface MarketRegisterResult {
   readonly userOpHash: string;
-  readonly sender: EvmAddress;
-  readonly decoded: DecodedMarketRegistered;
-}
-
-export interface DecodedMarketRegistered {
   readonly marketId: StreamId;
   readonly streamId: StreamId;
   readonly title: string;
-}
-
-export interface VerifiedMarketRegistration {
-  readonly marketId: StreamId;
-  readonly streamId: StreamId;
-  readonly title: string;
-  readonly userOpHash: string;
-  readonly sender: EvmAddress;
 }
 
 export interface MarketRegistrar {
