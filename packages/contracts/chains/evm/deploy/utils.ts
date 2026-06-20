@@ -1,6 +1,6 @@
 import { createPublicClient, createWalletClient, http, encodeAbiParameters, keccak256, toHex, parseEther, type Address, type Hex, type PublicClient, type WalletClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from "fs";
 import { join, resolve } from "path";
 
 export const DETERMINISTIC_DEPLOYER = "0x4e59b44847b379578588920cA78FbF26c0B4956C" as Address;
@@ -172,4 +172,21 @@ export function writeState(name: string, state: DeployState): void {
   const filePath = join(OUTPUT_DIR, `${name}.json`);
   writeFileSync(filePath, `${JSON.stringify(state, null, 2)}\n`);
   console.log(`  State saved -> ${filePath}`);
+}
+
+/** Copy a fresh deploy output into the committed `deployments/` snapshot for the typed kit. */
+export function promoteDeployment(name: string): void {
+  const source = join(OUTPUT_DIR, `${name}.json`);
+  if (!existsSync(source)) {
+    throw new Error(`Cannot promote: missing deploy output at ${source}`);
+  }
+
+  const destDir = join(CONTRACTS_ROOT, "deployments");
+  if (!existsSync(destDir)) {
+    mkdirSync(destDir, { recursive: true });
+  }
+
+  const dest = join(destDir, `${name}.json`);
+  copyFileSync(source, dest);
+  console.log(`  Promoted deployment -> ${dest}`);
 }

@@ -14,10 +14,9 @@ Use these terms in code and docs:
 | `Vault` | One binary YES/NO prediction pool inside a market. |
 | `Side` | `yes` or `no`. Separate position storage and funding stream per side. |
 | `Funding stream` | Continuous drip rate per `user + vault + side`. Rate `0` = stopped. Not a one-shot deposit. |
-| `Position` | Shares and deposited USDC for one side. User may hold YES and NO simultaneously. |
+| `Position` | Shares and deposited USDC for one `(vault, side, account)`. **One active side per vault per NFT** — hedge by `setLanes` flip; prior-side shares survive on the Board. |
 | `Resolution` | Winning side recorded on vault. Challenge/dispute window before finalize. |
-| `Claim` | Pull USDC winnings after resolution. |
-| `Release` | Pull remaining releasable value (naming kept distinct from claim in SDK layers). |
+| `Claim` / `Withdraw` | Pull USDC winnings + overage after resolution via `MarketDriver.withdraw(tokenId, vaultId, to)` (single or mass). |
 | `Loss claim` | LVST minted/accounted because user lost USDC in a resolved vault. |
 | `Hot state` | Steward-triggered adverse period on a vault. Contracts store state; steward owns decision workflow. |
 | `Contract read surface` | Typed view/pure reads exposed by Solidity; consumers call via wagmi ABIs + injected transport |
@@ -40,30 +39,24 @@ Do not use these as contract architecture terms:
 
 ```text
 contracts owns:
-  MarketRegistry
-  vault creation primitives (bookmaker-gated)
-  market -> vault index
-  vault YES/NO pools
-  position reads per side
-  funding stream / rate state
-  resolution and claims
-  LVST loss claims
-  LVST staking / dividends
-  steward-visible hot / dispute state
+  Protocol (set-once address book)
+  MarketRegistry + permissionless VaultDriver.createVault (bonded seed)
+  MarketDriver NFT (≤10 lanes, one side per vault, setLanes hedge)
+  Vault YES/NO Boards + bonding curve + harvest-on-cycle settlement
+  StewardRegistry (default + per-market steward, resolveVault)
+  Treasury / LvstToken (skim, loss-mint, stake, dividends)
+  DripsStreaming rail (no squeeze in drivers)
 
 options consumes:
   reads markets / vaults / positions / LVST
-  calls funding / claim / stake functions
-  does not create markets or vaults
-
-bookmaker owns:
-  vault creation workflows (createVault under existing marketId)
+  calls fund / setLanes / withdraw / claimLossLvst / stake
+  does not register markets or create vaults (observe / bookmaker edges do)
 
 observe / observer edge owns:
-  market registration workflow (registerMarket when stream starts)
+  market registration (registerMarket when stream starts)
 
-steward owns:
-  hot / dispute / governance workflows (calls contract steward paths)
+anyone may:
+  VaultDriver.createVault under an existing market (bonded directional seed)
 ```
 
 Contracts are the **authority** for on-chain state. TypeScript packages decode and project; they do not invent parallel state.
@@ -141,7 +134,35 @@ Streaming primitive (src/streaming/)
 
 The mined streaming Solidity (`Streams.sol`, `Managed.sol`, `Caller.sol`, `DripsStreaming.sol`, drivers) and `VerifyingPaymaster`/`LiveStreakPaymaster` are **GPL-3.0-only**, inherited from the Drips quarry. LiveStreak is open-sourced (GPL-compatible), so the earlier "reimplement behavior instead of copying" requirement is **resolved by accepting GPL** for these files (see `docs/TODO.md`). Streaming sources carry GPL-3.0 headers and live under `src/streaming/` + `src/aa/`, kept separate from the prediction-market product contracts.
 
-## Target Solidity Layout
+## Current module map (shipped)
+
+```text
+solidity/
+  Protocol.sol              set-once address book
+  registries/MarketRegistry
+  steward/StewardRegistry   default + per-market steward; resolveVault
+  vault/{Vault, BondingBoard, Side}
+  streaming/{DripsStreaming, Streams, Managed, Caller, IDrips}
+  streaming/drivers/{SharedDriverUtils, MarketDriver, VaultDriver}
+  treasury/{Treasury, LvstToken}
+  aa/{LiveStreakPaymaster, AAImports}
+```
+
+**Removed:** `AddressDriver`, `BookmakerRegistry`, `VaultFactory`, `squeezeStreams` in drivers (primitive remains in `Streams.sol` unused).
+
+### MarketDriver (per-market NFT, `tokenId == Drips account`)
+
+≤ `MAX_LANES` (10) lanes across distinct vaults; **one side per vault**. Ops: `mint`, `fund`, `stop`, `stopAll`, **`setLanes`** (declarative reconcile — hedge is a side flip inside `setLanes`), `withdraw` (single + mass, optional `to` redirect for owner), `claimLossLvst`. No `switchSide`, `replaceLane`, `withdrawAll`, or both sides on one vault.
+
+### VaultDriver (receiver-side)
+
+Permissionless `createVault(marketId, question, seedSide, rate, deposit)`; `bootstrapStreaming`; `harvest`; seed `withdraw` / `stopSeed`.
+
+### Vault (pure accounting)
+
+Driver-gated `onFund` / `onStop`; **flow guard** (`Vault.advance` when board behind); `collect` harvest-on-cycle (short `CYCLE_SECS`); unified `withdraw` = winnings + overage. Settlement: **no squeeze** in drivers.
+
+## Target Solidity Layout (historical — see module map above)
 
 v0 contract set:
 
@@ -182,7 +203,7 @@ Design rule: market id is stable; vault ids are children. No global flat `vaultI
 
 **v0 locked law:** `marketId = keccak256(abi.encode(observer, streamId))` via `computeMarketId`. Same `(observer, streamId)` may register once; different observers with the same `streamId` get distinct markets. `streamId` must be non-zero. `creator` is always `msg.sender`. Enumeration via `marketCount` / `marketIdAt` is retained for indexing; ids are not sequential counters.
 
-**v0 bookmaker gate:** `BookmakerRegistry` owner authorizes addresses; `VaultFactory.createVault` requires `isAuthorized(msg.sender)`. Full `AgentRegistry` metadata is a later slice.
+**v0 vault creation:** permissionless `VaultDriver.createVault(marketId, question, seedSide, rate, deposit)` under an existing market. Bonded directional seed is mandatory. No `BookmakerRegistry` / `VaultFactory`.
 
 ### Vault model
 

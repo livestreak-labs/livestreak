@@ -33,6 +33,8 @@
     "build": "cd chains/evm && forge build && FOUNDRY_PROFILE=aa forge build && wagmi generate && cd ../.. && tsc -p tsconfig.build.json && mkdir -p dist/chains/evm/deployments && for f in chains/evm/deployments/*.json; do [ -f \"$f\" ] && cp \"$f\" dist/chains/evm/deployments/; done",
     "check": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint kit chains && cd chains/evm && forge fmt --check solidity test",
+    "deploy": "tsx chains/evm/deploy/main.ts",
+    "e2e": "tsx chains/evm/deploy/e2e.ts",
     "test": "cd chains/evm && forge test"
   },
   "dependencies": {

@@ -4,6 +4,7 @@ import { defaultChains } from "./chains.js";
 import {
   createClients,
   ensureNickFactory,
+  promoteDeployment,
   readState,
   writeState,
   type DeployState,
@@ -49,11 +50,8 @@ Options:
   process.exit(0);
 }
 
-const deployerKey = process.env.DEPLOYER_PRIVATE_KEY as Hex | undefined;
-if (!deployerKey) {
-  console.error("Error: DEPLOYER_PRIVATE_KEY env var is required");
-  process.exit(1);
-}
+const deployerKey = (process.env.DEPLOYER_PRIVATE_KEY ??
+  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80") as Hex;
 
 async function deployToChain(chainName: string, rpc: string) {
   console.log(`\n========== Deploying to ${chainName} ==========`);
@@ -125,6 +123,15 @@ async function deployToChain(chainName: string, rpc: string) {
       for (const [name, addr] of Object.entries(result.contracts)) {
         console.log(`      ${name}: ${addr}`);
       }
+    }
+  }
+
+  const allCompleted = SCOPES.every(({ key }) => state.scopes[key]?.status === "completed");
+  if (allCompleted) {
+    try {
+      promoteDeployment(chainName);
+    } catch (error) {
+      console.warn(`  Warning: could not promote deployment snapshot: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
