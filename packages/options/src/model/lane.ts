@@ -8,7 +8,11 @@ export interface OptionsLane {
   readonly vaultId: VaultId;
   readonly side: OptionsVaultSide;
   readonly rate: bigint;
+  readonly gPaid: bigint;
   readonly sharesAccrued: bigint;
   readonly maxEndMs?: number;
   readonly depleted: boolean;
+  readonly claimable?: bigint;
+  readonly lossClaimable?: bigint;
+  readonly won?: boolean;
 }

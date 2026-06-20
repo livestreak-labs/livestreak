@@ -1,6 +1,7 @@
 export type {
   LvstAccount,
   MarketId,
+  OptionsBoardState,
   OptionsLane,
   OptionsMarket,
   OptionsMarketSnapshot,
@@ -9,6 +10,7 @@ export type {
   OptionsNft,
   OptionsNftSnapshot,
   OptionsProtocolSummary,
+  OptionsStreamAccrualView,
   OptionsUserOptionsSnapshot,
   OptionsVault,
   OptionsVaultOutcome,
@@ -20,6 +22,7 @@ export type {
   OptionsVaultStewardState,
   OptionsVaultTiming,
   OptionsVaultType,
+  ProjectStreamAccrualInput,
   TokenAddress,
   TokenId,
   UserAddress,
@@ -33,13 +36,18 @@ export {
   asVaultId,
   BASE_PRICE,
   CURVE_K,
+  isAccrualFrozen,
   isOptionsVaultSide,
   OPTIONS_VAULT_SIDES,
   priceOf,
+  projectShares,
+  projectStreamAccrual,
+  segMath,
   SHARE_SCALE,
   sharesPerUsdc,
   totalVaultPool,
-  validateOptionsVaultSide
+  validateOptionsVaultSide,
+  WAD
 } from "./model/index.js";
 export type { OptionsReadTransport } from "./read/index.js";
 export {

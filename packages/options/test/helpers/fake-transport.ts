@@ -7,11 +7,13 @@ import {
   asVaultId,
   type LvstAccount,
   type MarketId,
+  type OptionsBoardState,
   type OptionsMarket,
   type OptionsNft,
   type OptionsProtocolSummary,
   type OptionsVault,
   type OptionsVaultShareTotals,
+  type OptionsVaultSide,
   type TokenId,
   type UserAddress,
   type VaultId
@@ -25,6 +27,15 @@ export interface FakeTransportSeed {
   readonly nfts?: readonly OptionsNft[];
   readonly lvstAccounts?: readonly LvstAccount[];
   readonly protocol?: OptionsProtocolSummary;
+  readonly claimable?: Readonly<Record<string, bigint>>;
+  readonly lossClaimable?: Readonly<Record<string, bigint>>;
+  readonly winningSide?: Readonly<Record<string, OptionsVaultSide>>;
+  readonly pot?: Readonly<Record<string, bigint>>;
+  readonly collected?: Readonly<Record<string, boolean>>;
+  readonly boards?: Readonly<Record<string, OptionsBoardState>>;
+  readonly sharePrices?: Readonly<Record<string, bigint>>;
+  readonly pendingShares?: Readonly<Record<string, bigint>>;
+  readonly accountVaultIds?: Readonly<Record<string, readonly VaultId[]>>;
 }
 
 export const createFakeOptionsReadTransport = (
@@ -37,6 +48,15 @@ export class FakeTransportInMemory implements OptionsReadTransport {
   private readonly shareTotals = new Map<string, OptionsVaultShareTotals>();
   private readonly nfts = new Map<string, OptionsNft>();
   private readonly lvstAccounts = new Map<string, LvstAccount>();
+  private readonly claimable = new Map<string, bigint>();
+  private readonly lossClaimable = new Map<string, bigint>();
+  private readonly winningSide = new Map<string, OptionsVaultSide>();
+  private readonly pot = new Map<string, bigint>();
+  private readonly collected = new Map<string, boolean>();
+  private readonly boards = new Map<string, OptionsBoardState>();
+  private readonly sharePrices = new Map<string, bigint>();
+  private readonly pendingShares = new Map<string, bigint>();
+  private readonly accountVaultIds = new Map<string, readonly VaultId[]>();
   readProtocolSummary?: () => Promise<OptionsProtocolSummary>;
 
   constructor(seed: FakeTransportSeed) {
@@ -63,6 +83,42 @@ export class FakeTransportInMemory implements OptionsReadTransport {
     if (seed.protocol !== undefined) {
       const summary = seed.protocol;
       this.readProtocolSummary = async () => summary;
+    }
+
+    for (const [key, value] of Object.entries(seed.claimable ?? {})) {
+      this.claimable.set(key, value);
+    }
+
+    for (const [key, value] of Object.entries(seed.lossClaimable ?? {})) {
+      this.lossClaimable.set(key, value);
+    }
+
+    for (const [key, value] of Object.entries(seed.winningSide ?? {})) {
+      this.winningSide.set(key, value);
+    }
+
+    for (const [key, value] of Object.entries(seed.pot ?? {})) {
+      this.pot.set(key, value);
+    }
+
+    for (const [key, value] of Object.entries(seed.collected ?? {})) {
+      this.collected.set(key, value);
+    }
+
+    for (const [key, value] of Object.entries(seed.boards ?? {})) {
+      this.boards.set(key, value);
+    }
+
+    for (const [key, value] of Object.entries(seed.sharePrices ?? {})) {
+      this.sharePrices.set(key, value);
+    }
+
+    for (const [key, value] of Object.entries(seed.pendingShares ?? {})) {
+      this.pendingShares.set(key, value);
+    }
+
+    for (const [key, value] of Object.entries(seed.accountVaultIds ?? {})) {
+      this.accountVaultIds.set(key, value);
     }
   }
 
@@ -130,6 +186,65 @@ export class FakeTransportInMemory implements OptionsReadTransport {
     }
 
     return account;
+  }
+
+  async readClaimable(
+    tokenId: TokenId,
+    vaultId: VaultId,
+    side: OptionsVaultSide
+  ): Promise<bigint> {
+    return this.claimable.get(claimKey(tokenId, vaultId, side)) ?? 0n;
+  }
+
+  async readLossClaimable(
+    tokenId: TokenId,
+    vaultId: VaultId,
+    side: OptionsVaultSide
+  ): Promise<bigint> {
+    return this.lossClaimable.get(claimKey(tokenId, vaultId, side)) ?? 0n;
+  }
+
+  async readPot(vaultId: VaultId): Promise<bigint> {
+    return this.pot.get(vaultId) ?? 0n;
+  }
+
+  async readCollected(vaultId: VaultId): Promise<boolean> {
+    return this.collected.get(vaultId) ?? false;
+  }
+
+  async readAccountVaultIds(tokenId: TokenId): Promise<readonly VaultId[]> {
+    return this.accountVaultIds.get(tokenId.toString()) ?? [];
+  }
+
+  async readWinningSide(vaultId: VaultId): Promise<OptionsVaultSide | undefined> {
+    const vault = await this.readVault(vaultId);
+
+    if (vault.status !== "resolved") {
+      return undefined;
+    }
+
+    return this.winningSide.get(vaultId);
+  }
+
+  async readBoard(vaultId: VaultId, side: OptionsVaultSide): Promise<OptionsBoardState> {
+    const board = this.boards.get(boardKey(vaultId, side));
+    if (board === undefined) {
+      throw notFound("board", boardKey(vaultId, side));
+    }
+
+    return board;
+  }
+
+  async readSharePrice(vaultId: VaultId, side: OptionsVaultSide): Promise<bigint> {
+    return this.sharePrices.get(boardKey(vaultId, side)) ?? 0n;
+  }
+
+  async readPendingShares(
+    vaultId: VaultId,
+    side: OptionsVaultSide,
+    tokenId: TokenId
+  ): Promise<bigint> {
+    return this.pendingShares.get(claimKey(tokenId, vaultId, side)) ?? 0n;
   }
 
   setMarket(market: OptionsMarket): void {
@@ -230,6 +345,7 @@ export const fixtureNft = (
         vaultId: asVaultId("vault_01"),
         side: "yes",
         rate: 800_000n,
+        gPaid: 0n,
         sharesAccrued: 34_000_000n,
         depleted: false
       },
@@ -238,6 +354,7 @@ export const fixtureNft = (
         vaultId: asVaultId("vault_01"),
         side: "no",
         rate: 0n,
+        gPaid: 0n,
         sharesAccrued: 6_000_000n,
         depleted: false
       }
@@ -257,6 +374,7 @@ export const fixtureOtherMarketNft = (user: UserAddress = fixtureUser()): Option
         vaultId: asVaultId("vault_02"),
         side: "yes",
         rate: 100_000n,
+        gPaid: 0n,
         sharesAccrued: 1_000_000n,
         depleted: false
       }
@@ -302,3 +420,8 @@ const notFound = (entity: string, id: string): LiveStreakConfigError =>
     message: `${entity} not found`,
     metadata: { details: id }
   });
+
+const claimKey = (tokenId: TokenId, vaultId: VaultId, side: OptionsVaultSide): string =>
+  `${tokenId.toString()}:${vaultId}:${side}`;
+
+const boardKey = (vaultId: VaultId, side: OptionsVaultSide): string => `${vaultId}:${side}`;

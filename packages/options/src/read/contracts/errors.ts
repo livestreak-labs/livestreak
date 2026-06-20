@@ -9,7 +9,16 @@ export type ContractsReadEntity =
   | "owner tokens"
   | "nft"
   | "LVST account"
-  | "protocol summary";
+  | "protocol summary"
+  | "claimable"
+  | "loss claimable"
+  | "pot"
+  | "collected"
+  | "account vault ids"
+  | "winning side"
+  | "board"
+  | "share price"
+  | "pending shares";
 
 export const contractsReadNotFound = (
   entity: ContractsReadEntity,

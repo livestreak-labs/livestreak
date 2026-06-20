@@ -123,14 +123,26 @@ const projectNftPanel = (entry: OptionsNftSnapshot): OptionsNftPanel => ({
   lanes: entry.nft.lanes.map(projectLanePanel)
 });
 
-const projectLanePanel = (lane: OptionsNftSnapshot["nft"]["lanes"][number]): OptionsLanePanel => ({
-  vaultId: lane.vaultId,
-  side: lane.side,
-  rate: lane.rate.toString(),
-  sharesAccrued: lane.sharesAccrued.toString(),
-  depleted: lane.depleted,
-  ...(lane.maxEndMs === undefined ? {} : { maxEndMs: lane.maxEndMs })
-});
+const projectLanePanel = (lane: OptionsNftSnapshot["nft"]["lanes"][number]): OptionsLanePanel => {
+  const claimable = lane.claimable ?? 0n;
+  const lossClaimable = lane.lossClaimable ?? 0n;
+
+  return {
+    vaultId: lane.vaultId,
+    side: lane.side,
+    rate: lane.rate.toString(),
+    sharesAccrued: lane.sharesAccrued.toString(),
+    depleted: lane.depleted,
+    ...(lane.maxEndMs === undefined ? {} : { maxEndMs: lane.maxEndMs }),
+    ...(lane.claimable === undefined ? {} : { claimableUSDC: claimable.toString() }),
+    ...(lane.lossClaimable === undefined
+      ? {}
+      : { lossClaimableLVST: lossClaimable.toString() }),
+    ...(lane.won === undefined ? {} : { won: lane.won }),
+    ...(lane.claimable === undefined ? {} : { canClaimWin: claimable > 0n }),
+    ...(lane.lossClaimable === undefined ? {} : { canClaimLoss: lossClaimable > 0n })
+  };
+};
 
 const projectLvstPanel = (account: LvstAccount): OptionsLvstPanel => {
   const unstaked =

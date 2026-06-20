@@ -7,6 +7,7 @@ import type {
   OptionsMarketSnapshot,
   OptionsNftSnapshot,
   OptionsUserOptionsSnapshot,
+  OptionsVault,
   OptionsVaultSnapshot,
   UserAddress,
   VaultId
@@ -52,7 +53,30 @@ export const readVaultSnapshot = async (
     dispute: {
       active: vault.steward.disputeId !== undefined,
       disputeId: vault.steward.disputeId
-    }
+    },
+    ...(await enrichResolvedVaultFields(transport, vaultId, vault))
+  };
+};
+
+const enrichResolvedVaultFields = async (
+  transport: OptionsReadTransport,
+  vaultId: VaultId,
+  vault: OptionsVault
+): Promise<Pick<OptionsVaultSnapshot, "winningSide" | "pot" | "collected">> => {
+  if (vault.status !== "resolved") {
+    return {};
+  }
+
+  const [winningSide, pot, collected] = await Promise.all([
+    transport.readWinningSide(vaultId),
+    transport.readPot(vaultId),
+    transport.readCollected(vaultId)
+  ]);
+
+  return {
+    ...(winningSide === undefined ? {} : { winningSide }),
+    pot,
+    collected
   };
 };
 

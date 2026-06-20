@@ -13,16 +13,19 @@ import {
 import { asMarketId, asTokenId, asVaultId } from "../../model/ids.js";
 import type { LvstAccount } from "../../model/lvst.js";
 import type { MarketId, TokenId, UserAddress, VaultId } from "../../model/ids.js";
+import type { OptionsBoardState } from "../../model/accrual.js";
 import type { OptionsMarket } from "../../model/market.js";
 import type { OptionsNft } from "../../model/nft.js";
 import type { OptionsProtocolSummary } from "../../model/snapshot.js";
 import type { OptionsVault } from "../../model/vault.js";
-import type { OptionsVaultShareTotals } from "../../model/vault.js";
+import type { OptionsVaultShareTotals, OptionsVaultSide } from "../../model/vault.js";
 import type { OptionsReadTransport } from "../transport.js";
 import type { OptionsContractAddresses } from "./addresses.js";
 import { contractsReadFailed, contractsReadNotFound } from "./errors.js";
 import {
   bytes32ToHex,
+  enrichLane,
+  mapBoard,
   mapLane,
   mapLvstAccount,
   mapMarket,
@@ -32,6 +35,7 @@ import {
   mapVaultIds,
   mapVaultPools,
   mapVaultShareTotals,
+  type RawBoard,
   type RawDisputeState,
   type RawHotState,
   type RawLane,
@@ -40,7 +44,7 @@ import {
   type RawVaultData,
   type RawVaultPools
 } from "./mapping.js";
-import { sideToSolidityValue } from "./sides.js";
+import { sideFromSolidityValue, sideToSolidityValue } from "./sides.js";
 import {
   validateMarketIdForContracts,
   validateOptionsContractAddresses,
@@ -245,6 +249,7 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
 
       const count = Number(laneCount);
       const lanes = [];
+      const winningSideByVault = new Map<string, OptionsVaultSide | undefined>();
 
       for (let index = 0; index < count; index += 1) {
         const lane = await this.call<RawLane>(
@@ -255,6 +260,7 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
         );
 
         const vaultBytes = lane.vaultId;
+        const vaultId = asVaultId(bytes32ToHex(vaultBytes));
         const position = await this.call<RawPosition>(
           this.addresses.vault,
           this.abis.Vault,
@@ -262,7 +268,18 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
           [vaultBytes, lane.side, id]
         );
 
-        lanes.push(mapLane(asTokenId(id), lane, position));
+        const mapped = mapLane(asTokenId(id), lane, position);
+        let winningSide = winningSideByVault.get(vaultId);
+
+        if (!winningSideByVault.has(vaultId)) {
+          winningSide = await this.readWinningSide(vaultId);
+          winningSideByVault.set(vaultId, winningSide);
+        }
+
+        const claimable = await this.readClaimable(asTokenId(id), vaultId, mapped.side);
+        const lossClaimable = await this.readLossClaimable(asTokenId(id), vaultId, mapped.side);
+
+        lanes.push(enrichLane(mapped, claimable, lossClaimable, winningSide));
       }
 
       return mapNft(
@@ -278,6 +295,150 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
       }
 
       throw contractsReadFailed("nft", error);
+    }
+  }
+
+  async readClaimable(
+    tokenId: TokenId,
+    vaultId: VaultId,
+    side: OptionsVaultSide
+  ): Promise<bigint> {
+    const id = validateTokenIdForContracts(tokenId);
+    const vaultBytes = validateVaultIdForContracts(vaultId);
+
+    try {
+      return await this.call<bigint>(this.addresses.vault, this.abis.Vault, "claimable", [
+        id,
+        vaultBytes,
+        sideToSolidityValue(side)
+      ]);
+    } catch (error) {
+      throw contractsReadFailed("claimable", error);
+    }
+  }
+
+  async readLossClaimable(
+    tokenId: TokenId,
+    vaultId: VaultId,
+    side: OptionsVaultSide
+  ): Promise<bigint> {
+    const id = validateTokenIdForContracts(tokenId);
+    const vaultBytes = validateVaultIdForContracts(vaultId);
+
+    try {
+      return await this.call<bigint>(this.addresses.vault, this.abis.Vault, "lossClaimable", [
+        id,
+        vaultBytes,
+        sideToSolidityValue(side)
+      ]);
+    } catch (error) {
+      throw contractsReadFailed("loss claimable", error);
+    }
+  }
+
+  async readPot(vaultId: VaultId): Promise<bigint> {
+    const vaultBytes = validateVaultIdForContracts(vaultId);
+
+    try {
+      return await this.call<bigint>(this.addresses.vault, this.abis.Vault, "pot", [vaultBytes]);
+    } catch (error) {
+      throw contractsReadFailed("pot", error);
+    }
+  }
+
+  async readCollected(vaultId: VaultId): Promise<boolean> {
+    const vaultBytes = validateVaultIdForContracts(vaultId);
+
+    try {
+      return await this.call<boolean>(this.addresses.vault, this.abis.Vault, "collected", [
+        vaultBytes
+      ]);
+    } catch (error) {
+      throw contractsReadFailed("collected", error);
+    }
+  }
+
+  async readAccountVaultIds(tokenId: TokenId): Promise<readonly VaultId[]> {
+    const id = validateTokenIdForContracts(tokenId);
+
+    try {
+      const vaultIds = await this.call<readonly `0x${string}`[]>(
+        this.addresses.vault,
+        this.abis.Vault,
+        "getAccountVaultIds",
+        [id]
+      );
+
+      return mapVaultIds(vaultIds);
+    } catch (error) {
+      throw contractsReadFailed("account vault ids", error);
+    }
+  }
+
+  async readWinningSide(vaultId: VaultId): Promise<OptionsVaultSide | undefined> {
+    const vault = await this.readVault(vaultId);
+
+    if (vault.status !== "resolved") {
+      return undefined;
+    }
+
+    const vaultBytes = validateVaultIdForContracts(vaultId);
+
+    try {
+      const side = await this.call<number>(this.addresses.vault, this.abis.Vault, "winningSide", [
+        vaultBytes
+      ]);
+
+      return sideFromSolidityValue(side);
+    } catch (error) {
+      throw contractsReadFailed("winning side", error);
+    }
+  }
+
+  async readBoard(vaultId: VaultId, side: OptionsVaultSide): Promise<OptionsBoardState> {
+    const vaultBytes = validateVaultIdForContracts(vaultId);
+
+    try {
+      const board = await this.call<RawBoard>(this.addresses.vault, this.abis.Vault, "getBoard", [
+        vaultBytes,
+        sideToSolidityValue(side)
+      ]);
+
+      return mapBoard(board);
+    } catch (error) {
+      throw contractsReadFailed("board", error);
+    }
+  }
+
+  async readSharePrice(vaultId: VaultId, side: OptionsVaultSide): Promise<bigint> {
+    const vaultBytes = validateVaultIdForContracts(vaultId);
+
+    try {
+      return await this.call<bigint>(this.addresses.vault, this.abis.Vault, "getSharePrice", [
+        vaultBytes,
+        sideToSolidityValue(side)
+      ]);
+    } catch (error) {
+      throw contractsReadFailed("share price", error);
+    }
+  }
+
+  async readPendingShares(
+    vaultId: VaultId,
+    side: OptionsVaultSide,
+    tokenId: TokenId
+  ): Promise<bigint> {
+    const vaultBytes = validateVaultIdForContracts(vaultId);
+    const id = validateTokenIdForContracts(tokenId);
+
+    try {
+      return await this.call<bigint>(this.addresses.vault, this.abis.Vault, "pendingShares", [
+        vaultBytes,
+        sideToSolidityValue(side),
+        id
+      ]);
+    } catch (error) {
+      throw contractsReadFailed("pending shares", error);
     }
   }
 

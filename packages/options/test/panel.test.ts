@@ -116,6 +116,7 @@ describe("projectOptionsPanel", () => {
           vaultId: fixtureNft(user).lanes[0]!.vaultId,
           side: "yes",
           rate: 0n,
+          gPaid: 0n,
           sharesAccrued: 0n,
           depleted: true
         }

@@ -8,6 +8,7 @@ import type {
   OptionsVault,
   OptionsVaultPools,
   OptionsVaultShareTotals,
+  OptionsVaultSide,
   OptionsVaultStewardState
 } from "./vault.js";
 
@@ -27,6 +28,9 @@ export interface OptionsVaultSnapshot {
   readonly shareTotals: OptionsVaultShareTotals;
   readonly hot: OptionsVaultStewardState;
   readonly dispute: Pick<OptionsVaultStewardState, "disputeId"> & { readonly active: boolean };
+  readonly winningSide?: OptionsVaultSide;
+  readonly pot?: bigint;
+  readonly collected?: boolean;
 }
 
 export interface OptionsNftSnapshot {

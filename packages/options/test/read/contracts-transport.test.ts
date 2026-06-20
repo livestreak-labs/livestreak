@@ -329,6 +329,39 @@ const respond = (request: ContractReadRequest, options: FakeReaderOptions): unkn
         depleted: false
       };
     }
+
+    if (functionName === "claimable" || functionName === "lossClaimable") {
+      return 0n;
+    }
+
+    if (functionName === "getBoard") {
+      return {
+        pool: 1_000_000n,
+        sideRate: 100_000n,
+        g: 0n,
+        lastAdvance: 1_700_000_000
+      };
+    }
+
+    if (functionName === "getSharePrice") {
+      return 100_000n;
+    }
+
+    if (functionName === "pendingShares") {
+      return 100n;
+    }
+
+    if (functionName === "pot" || functionName === "collected") {
+      return functionName === "pot" ? 0n : false;
+    }
+
+    if (functionName === "getAccountVaultIds") {
+      return [VAULT_ID];
+    }
+
+    if (functionName === "winningSide") {
+      return 0;
+    }
   }
 
   if (address === ADDRESSES.marketDriver) {

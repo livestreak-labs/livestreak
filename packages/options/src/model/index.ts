@@ -1,4 +1,13 @@
 export type { OptionsLane } from "./lane.js";
+export type {
+  OptionsBoardState,
+  OptionsStreamAccrualView,
+  ProjectStreamAccrualInput
+} from "./accrual.js";
+export {
+  isAccrualFrozen,
+  projectStreamAccrual
+} from "./accrual.js";
 export type { LvstAccount } from "./lvst.js";
 export type { OptionsNft } from "./nft.js";
 export type {
@@ -15,7 +24,16 @@ export {
   asUserAddress,
   asVaultId
 } from "./ids.js";
-export { BASE_PRICE, CURVE_K, SHARE_SCALE, priceOf, sharesPerUsdc } from "./curve.js";
+export {
+  BASE_PRICE,
+  CURVE_K,
+  priceOf,
+  projectShares,
+  segMath,
+  SHARE_SCALE,
+  sharesPerUsdc,
+  WAD
+} from "./curve.js";
 export type {
   OptionsMarket,
   OptionsMarketStatus,

@@ -78,12 +78,14 @@ view, read **Drips `streamsState` / `balanceAt`** for it (covers the #4 PnL basi
 
 ## 1. Foundational realignment (the R1 slice)
 
-> **R1 ✅ LANDED & verified** — `check`/`build` green; 12 files / 103 tests pass (re-run independently).
-> Done = the checked items below. **Still open → R2:** the architecture.md rewrite, `getBoard`/
-> `getSharePrice` reads, claim previews (`claimable`/`lossClaimable`/`winningSide`/`pendingShares`/
-> `pot`), and the §3–§5 views.
+> **R1 + R2 ✅ LANDED & verified** — `check`/`build` green; 14 files / 113 tests pass (re-run independently).
+> R1 = the NFT-lane core. R2 = claim previews (`claimable`/`lossClaimable`/`winningSide` [guarded]/
+> `pot`), the board/share-price reads, the live ln() ticker (`OptionsStreamAccrualView`), and the
+> architecture.md rewrite. **Still open → R3:** session PnL view, exhaustive claim-JSON aggregate,
+> runtime memory/callback facade, transfer-panel read flags (`ownerOf`/`getApproved`/`isApprovedForAll`),
+> stake grey-out flag, market total-pool aggregation.
 
-- [ ] Rewrite `docs/architecture.md` to the NFT-lane model: `tokenId → lanes`, one-side-per-vault,
+- [x] Rewrite `docs/architecture.md` to the NFT-lane model: `tokenId → lanes`, one-side-per-vault,
       multi-NFT, and each contract's role (MarketRegistry / VaultDriver / MarketDriver / Vault /
       StewardRegistry / Treasury / LvstToken). Delete the "hold both sides" hedging language.
 - [x] `model/`: add `TokenId` brand to `ids.ts`; replace `position.ts` with `lane.ts`
@@ -108,7 +110,7 @@ view, read **Drips `streamsState` / `balanceAt`** for it (covers the #4 PnL basi
 - [x] **Vault detail** = `Vault.getVault(vaultId)` `{id,marketId,question,creator,status,outcome,
       resolvedAt,exists}` **+** `Vault.getVaultPools(vaultId)` `[yesTotal,noTotal,yesShareTotal,
       noShareTotal]`. Pools moved OFF `getVault` → must call `getVaultPools`.
-- [ ] **Per-side board** = `Vault.getBoard(vaultId, side)` `[pool, sideRate, g, lastAdvance]` for live
+- [x] **Per-side board** = `Vault.getBoard(vaultId, side)` `[pool, sideRate, g, lastAdvance]` for live
       odds + the bonding-curve state behind share price.
 - [x] **Steward overlay** = `StewardRegistry.vaultHotState` / `disputeState`. ✅ shapes already match
       options' `RawHotState`/`RawDisputeState` — keep.
@@ -119,14 +121,14 @@ view, read **Drips `streamsState` / `balanceAt`** for it (covers the #4 PnL basi
       takes `streamId`; identity = `computeMarketId(observer, streamId)`.)
 - [x] **Lane / position** = `Vault.getPosition(vaultId, side, tokenId)`, `pendingShares(vaultId, side,
       tokenId)`, `MarketDriver.tokensOfOwner` / `laneCount` / `laneAt`, `Vault.getAccountVaultIds(tokenId)`.
-- [ ] **Claim previews** = `Vault.claimable(tokenId, vaultId, side)` (winner; 0 pre-resolution),
+- [x] **Claim previews** = `Vault.claimable(tokenId, vaultId, side)` (winner; 0 pre-resolution),
       `lossClaimable(tokenId, vaultId, side)` (loser basis), `winningSide(vaultId)`, `pot(vaultId)`.
 
 ---
 
 ## 3. User-steered scope (concrete TODOs)
 
-- [ ] **#1 Real-time stream worth (ln curve).** `OptionsStreamAccrualView`: `pendingShares` +
+- [x] **#1 Real-time stream worth (ln curve).** `OptionsStreamAccrualView`: `pendingShares` +
       `getSharePrice`/`getBoard`; tick client-side each second. *(Unblocked — see B5.)*
 - [ ] **#2 Walk `/stream` + exhaustive claim JSON.** Page is mock today (`StreamLayout` →
       `useVaults`/`useFlow`/`mockPositions`). Produce a view that knows **all the vaults a user is
@@ -154,7 +156,7 @@ view, read **Drips `streamsState` / `balanceAt`** for it (covers the #4 PnL basi
 
 ## 4. UI surfaces to back (oracle: `VaultCard`, `BalanceBar`, `useFlow`)
 
-- [ ] **Claim win/loss buttons (green/red).** `VaultCard` `WinState`(payout) / `LossState`
+- [x] **Claim win/loss buttons (green/red).** `VaultCard` `WinState`(payout) / `LossState`
       (`flowReceived` + Stake) → `withdraw` (win) + `claimLossLvst` (loss). `payout` from `claimable`;
       `flowReceived` = `lossClaimable × mintRate`.
 - [ ] **Stake button (grey-out state).** `BalanceBar`/`useFlow` want `{ balance, staked,
@@ -163,7 +165,7 @@ view, read **Drips `streamsState` / `balanceAt`** for it (covers the #4 PnL basi
       `lvstToken.balanceOf`. `canStake = unstaked > 0`; `canClaimDividends = pendingDividends > 0`.
       (`useFlow` still points at `contracts.flowToken`/`FLOW_TOKEN_ABI` — app edge also needs the
       LVST/Treasury repoint; raise to app via inbox.)
-- [ ] **Cost of newer shares per streamed funds.** Expose `sharePriceNow` / `sharesPerUsdcNow` from
+- [x] **Cost of newer shares per streamed funds.** Expose `sharePriceNow` / `sharesPerUsdcNow` from
       `getSharePrice`/`getBoard`. *(Available — `getSharePrice` returns `price(pool)` directly; see B5.)*
 - [ ] **NFT transfer panel.** "Each market = a stream; the NFT is per-market" → list the user's NFTs
       with transfer/approve actions (see #7). *(Unblocked — list via `tokensOfOwner`.)*
@@ -172,7 +174,7 @@ view, read **Drips `streamsState` / `balanceAt`** for it (covers the #4 PnL basi
 
 ## 5. Live ticker (was Slice 6) — now groundable
 
-- [ ] `OptionsStreamAccrualView`: `pendingShares` now, `$ value now`, `shares/sec` (falls as pool
+- [x] `OptionsStreamAccrualView`: `pendingShares` now, `$ value now`, `shares/sec` (falls as pool
       grows). Client tick mirrors the contract curve between reads. Read-only, reconstructable.
       *(Unblocked — see B5; `$ value` = `pendingShares × pot_est / sideShareTotal`.)*
 

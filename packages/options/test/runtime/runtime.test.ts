@@ -393,6 +393,42 @@ const wrapTransport = (
     onCall();
     return transport.readLvstAccount(user);
   },
+  readClaimable: async (tokenId, vaultId, side) => {
+    onCall();
+    return transport.readClaimable(tokenId, vaultId, side);
+  },
+  readLossClaimable: async (tokenId, vaultId, side) => {
+    onCall();
+    return transport.readLossClaimable(tokenId, vaultId, side);
+  },
+  readPot: async (vaultId) => {
+    onCall();
+    return transport.readPot(vaultId);
+  },
+  readCollected: async (vaultId) => {
+    onCall();
+    return transport.readCollected(vaultId);
+  },
+  readAccountVaultIds: async (tokenId) => {
+    onCall();
+    return transport.readAccountVaultIds(tokenId);
+  },
+  readWinningSide: async (vaultId) => {
+    onCall();
+    return transport.readWinningSide(vaultId);
+  },
+  readBoard: async (vaultId, side) => {
+    onCall();
+    return transport.readBoard(vaultId, side);
+  },
+  readSharePrice: async (vaultId, side) => {
+    onCall();
+    return transport.readSharePrice(vaultId, side);
+  },
+  readPendingShares: async (vaultId, side, tokenId) => {
+    onCall();
+    return transport.readPendingShares(vaultId, side, tokenId);
+  },
   ...(transport.readProtocolSummary === undefined
     ? {}
     : {

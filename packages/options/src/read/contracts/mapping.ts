@@ -152,9 +152,36 @@ export const mapLane = (
   vaultId: asVaultId(bytes32ToHex(lane.vaultId)),
   side: sideFromSolidityValue(lane.side),
   rate: lane.rate,
+  gPaid: position.gPaid,
   sharesAccrued: position.sharesAccrued,
   maxEndMs: position.maxEnd > 0 ? position.maxEnd * 1000 : undefined,
   depleted: position.depleted
+});
+
+export const enrichLane = (
+  lane: OptionsLane,
+  claimable: bigint,
+  lossClaimable: bigint,
+  winningSide?: OptionsVaultSide
+): OptionsLane => ({
+  ...lane,
+  claimable,
+  lossClaimable,
+  ...(winningSide === undefined ? {} : { won: lane.side === winningSide })
+});
+
+export type RawBoard = {
+  readonly pool: bigint;
+  readonly sideRate: bigint;
+  readonly g: bigint;
+  readonly lastAdvance: number;
+};
+
+export const mapBoard = (data: RawBoard) => ({
+  pool: data.pool,
+  sideRate: data.sideRate,
+  g: data.g,
+  lastAdvanceMs: data.lastAdvance * 1000
 });
 
 export const mapNft = (

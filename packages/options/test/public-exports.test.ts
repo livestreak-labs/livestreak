@@ -10,6 +10,9 @@ describe("options public exports", () => {
     expect(publicExport("totalVaultPool")).toBeTypeOf("function");
     expect(publicExport("priceOf")).toBeTypeOf("function");
     expect(publicExport("sharesPerUsdc")).toBeTypeOf("function");
+    expect(publicExport("projectShares")).toBeTypeOf("function");
+    expect(publicExport("projectStreamAccrual")).toBeTypeOf("function");
+    expect(publicExport("segMath")).toBeTypeOf("function");
     expect(publicExport("asMarketId")).toBeTypeOf("function");
     expect(publicExport("asTokenId")).toBeTypeOf("function");
   });
@@ -69,5 +72,12 @@ describe("options public exports", () => {
     expect(publicExport("createVault")).toBeUndefined();
     expect(publicExport("createMarket")).toBeUndefined();
     expect(publicExport("registerMarket")).toBeUndefined();
+  });
+
+  it("does not export R3 deferred names", () => {
+    expect(publicExport("OptionsSessionPnlView")).toBeUndefined();
+    expect(publicExport("OptionsClaimJsonAggregate")).toBeUndefined();
+    expect(publicExport("createOptionsMemoryFacade")).toBeUndefined();
+    expect(publicExport("projectTransferPanel")).toBeUndefined();
   });
 });

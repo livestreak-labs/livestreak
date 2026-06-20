@@ -15,6 +15,11 @@ export interface OptionsLanePanel {
   readonly sharesAccrued: string;
   readonly depleted: boolean;
   readonly maxEndMs?: number;
+  readonly claimableUSDC?: string;
+  readonly lossClaimableLVST?: string;
+  readonly won?: boolean;
+  readonly canClaimWin?: boolean;
+  readonly canClaimLoss?: boolean;
 }
 
 export interface OptionsNftPanel {
