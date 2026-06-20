@@ -3,7 +3,7 @@
 import type { TokenId, UserAddress } from "../model/ids.js";
 import type { OptionsContractAddresses } from "../chains/addresses.js";
 import type { OptionsChainWriter } from "../chains/types.js";
-import type { OptionsContractAbis } from "../read/reader.js";
+import type { OptionsContractAbis } from "../read/context.js";
 import { validateTokenIdForContracts, validateUserAddress } from "../read/decode/validation.js";
 
 export type TransferNftInput = {

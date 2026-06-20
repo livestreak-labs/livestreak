@@ -4,7 +4,7 @@ import { LiveStreakConfigError } from "@livestreak/core";
 
 import type { OptionsContractAddresses } from "../chains/addresses.js";
 import type { OptionsChainWriter } from "../chains/types.js";
-import type { OptionsContractAbis } from "../read/reader.js";
+import type { OptionsContractAbis } from "../read/context.js";
 
 export type StakeLvstInput = {
   readonly amount: bigint;

@@ -6,7 +6,7 @@ import { validateOptionsVaultSide } from "../model/vault.js";
 import { sideToSolidityValue } from "../read/decode/sides.js";
 import type { OptionsContractAddresses } from "../chains/addresses.js";
 import { validateUserAddress } from "../read/decode/validation.js";
-import type { OptionsContractAbis } from "../read/reader.js";
+import type { OptionsContractAbis } from "../read/context.js";
 import {
   validateTokenIdForContracts,
   validateVaultIdForContracts
