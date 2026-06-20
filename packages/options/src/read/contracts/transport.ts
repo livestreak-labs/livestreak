@@ -3,42 +3,48 @@
 import { LiveStreakConfigError } from "@livestreak/core";
 import {
   lvstTokenAbi,
+  marketDriverAbi,
   marketRegistryAbi,
   stewardRegistryAbi,
-  vaultAbi,
-  vaultFundingAbi
-} from "@livestreak/contracts";
+  treasuryAbi,
+  vaultAbi
+} from "@livestreak/contracts/evm/abis";
 
-import { asMarketId, asVaultId } from "../../model/ids.js";
+import { asMarketId, asTokenId, asVaultId } from "../../model/ids.js";
 import type { LvstAccount } from "../../model/lvst.js";
-import type { OptionsFundingStream } from "../../model/funding.js";
-import type { MarketId, UserAddress, VaultId } from "../../model/ids.js";
+import type { MarketId, TokenId, UserAddress, VaultId } from "../../model/ids.js";
 import type { OptionsMarket } from "../../model/market.js";
+import type { OptionsNft } from "../../model/nft.js";
 import type { OptionsProtocolSummary } from "../../model/snapshot.js";
-import type { OptionsUserVaultPosition } from "../../model/position.js";
-import type { OptionsVault, OptionsVaultSide } from "../../model/vault.js";
+import type { OptionsVault } from "../../model/vault.js";
+import type { OptionsVaultShareTotals } from "../../model/vault.js";
 import type { OptionsReadTransport } from "../transport.js";
-import type { LivestreakContractAddresses } from "./addresses.js";
+import type { OptionsContractAddresses } from "./addresses.js";
 import { contractsReadFailed, contractsReadNotFound } from "./errors.js";
 import {
   bytes32ToHex,
+  mapLane,
   mapLvstAccount,
-  mapFundingStream,
   mapMarket,
+  mapNft,
   mapProtocolSummary,
-  mapUserVaultPosition,
   mapVault,
   mapVaultIds,
+  mapVaultPools,
+  mapVaultShareTotals,
   type RawDisputeState,
   type RawHotState,
+  type RawLane,
   type RawMarketData,
-  type RawSidePosition,
-  type RawVaultData
+  type RawPosition,
+  type RawVaultData,
+  type RawVaultPools
 } from "./mapping.js";
 import { sideToSolidityValue } from "./sides.js";
 import {
-  validateLivestreakContractAddresses,
   validateMarketIdForContracts,
+  validateOptionsContractAddresses,
+  validateTokenIdForContracts,
   validateUserAddress,
   validateVaultIdForContracts
 } from "./validation.js";
@@ -54,26 +60,28 @@ export type ContractReader = {
   readonly read: (request: ContractReadRequest) => Promise<unknown>;
 };
 
-export type LivestreakContractAbis = {
+export type OptionsContractAbis = {
   readonly MarketRegistry: typeof marketRegistryAbi;
   readonly Vault: typeof vaultAbi;
-  readonly VaultFunding: typeof vaultFundingAbi;
-  readonly LvstToken: typeof lvstTokenAbi;
+  readonly MarketDriver: typeof marketDriverAbi;
   readonly StewardRegistry: typeof stewardRegistryAbi;
+  readonly Treasury: typeof treasuryAbi;
+  readonly LvstToken: typeof lvstTokenAbi;
 };
 
-const DEFAULT_ABIS: LivestreakContractAbis = {
+const DEFAULT_ABIS: OptionsContractAbis = {
   MarketRegistry: marketRegistryAbi,
   Vault: vaultAbi,
-  VaultFunding: vaultFundingAbi,
-  LvstToken: lvstTokenAbi,
-  StewardRegistry: stewardRegistryAbi
+  MarketDriver: marketDriverAbi,
+  StewardRegistry: stewardRegistryAbi,
+  Treasury: treasuryAbi,
+  LvstToken: lvstTokenAbi
 };
 
 export type ContractsOptionsReadTransportInput = {
   readonly reader: ContractReader;
-  readonly addresses: LivestreakContractAddresses;
-  readonly abis?: LivestreakContractAbis;
+  readonly addresses: OptionsContractAddresses;
+  readonly abis?: OptionsContractAbis;
   readonly includeProtocolSummary?: boolean;
 };
 
@@ -83,13 +91,13 @@ export const createContractsOptionsReadTransport = (
 
 class ContractsOptionsReadTransport implements OptionsReadTransport {
   private readonly reader: ContractReader;
-  private readonly addresses: LivestreakContractAddresses;
-  private readonly abis: LivestreakContractAbis;
+  private readonly addresses: OptionsContractAddresses;
+  private readonly abis: OptionsContractAbis;
   readonly readProtocolSummary?: () => Promise<OptionsProtocolSummary>;
 
   constructor(input: ContractsOptionsReadTransportInput) {
     this.reader = input.reader;
-    this.addresses = validateLivestreakContractAddresses(input.addresses);
+    this.addresses = validateOptionsContractAddresses(input.addresses);
     this.abis = input.abis ?? DEFAULT_ABIS;
 
     if (input.includeProtocolSummary === true) {
@@ -156,6 +164,13 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
         throw contractsReadNotFound("vault", vaultId);
       }
 
+      const pools = await this.call<RawVaultPools>(
+        this.addresses.vault,
+        this.abis.Vault,
+        "getVaultPools",
+        [vaultBytes]
+      );
+
       const hot = await this.call<RawHotState>(
         this.addresses.stewardRegistry,
         this.abis.StewardRegistry,
@@ -170,7 +185,7 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
         [vaultBytes]
       );
 
-      return mapVault(data, hot, dispute);
+      return mapVault(data, pools, hot, dispute);
     } catch (error) {
       if (error instanceof LiveStreakConfigError) {
         throw error;
@@ -180,62 +195,89 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
     }
   }
 
-  async readUserVaultPosition(
-    user: UserAddress,
-    vaultId: VaultId
-  ): Promise<OptionsUserVaultPosition> {
-    const account = validateUserAddress(user);
+  async readVaultShareTotals(vaultId: VaultId): Promise<OptionsVaultShareTotals> {
+    const poolsRaw = await this.readVaultPools(vaultId);
+    return mapVaultShareTotals(poolsRaw);
+  }
+
+  private async readVaultPools(vaultId: VaultId): Promise<RawVaultPools> {
     const vaultBytes = validateVaultIdForContracts(vaultId);
+    return this.call<RawVaultPools>(this.addresses.vault, this.abis.Vault, "getVaultPools", [
+      vaultBytes
+    ]);
+  }
+
+  async listOwnerTokens(owner: UserAddress): Promise<readonly TokenId[]> {
+    const account = validateUserAddress(owner);
 
     try {
-      await this.readVault(vaultId);
+      const tokenIds = await this.call<readonly bigint[]>(
+        this.addresses.marketDriver,
+        this.abis.MarketDriver,
+        "tokensOfOwner",
+        [account as `0x${string}`]
+      );
 
-      const yes = await this.readRawPosition(account as `0x${string}`, vaultBytes, "yes");
-      const no = await this.readRawPosition(account as `0x${string}`, vaultBytes, "no");
-
-      return mapUserVaultPosition(account, asVaultId(vaultId), yes, no);
+      return tokenIds.map((id) => asTokenId(id));
     } catch (error) {
-      if (error instanceof LiveStreakConfigError) {
-        throw error;
-      }
-
-      throw contractsReadFailed("user position", error);
+      throw contractsReadFailed("owner tokens", error);
     }
   }
 
-  async readFundingStream(
-    user: UserAddress,
-    vaultId: VaultId,
-    side: OptionsVaultSide
-  ): Promise<OptionsFundingStream> {
-    const account = validateUserAddress(user);
-    const vaultBytes = validateVaultIdForContracts(vaultId);
-    const sideValue = sideToSolidityValue(side);
+  async readNft(tokenId: TokenId, owner: UserAddress): Promise<OptionsNft> {
+    const id = validateTokenIdForContracts(tokenId);
+    const account = validateUserAddress(owner);
 
     try {
-      await this.readVault(vaultId);
-
-      const rate = await this.call<bigint>(
-        this.addresses.vaultFunding,
-        this.abis.VaultFunding,
-        "fundingRate",
-        [account as `0x${string}`, vaultBytes, sideValue]
+      const marketIdRaw = await this.call<`0x${string}`>(
+        this.addresses.marketDriver,
+        this.abis.MarketDriver,
+        "marketIdOf",
+        [id]
       );
 
-      const active = await this.call<boolean>(
-        this.addresses.vaultFunding,
-        this.abis.VaultFunding,
-        "fundingActive",
-        [account as `0x${string}`, vaultBytes, sideValue]
+      const laneCount = await this.call<bigint>(
+        this.addresses.marketDriver,
+        this.abis.MarketDriver,
+        "laneCount",
+        [id]
       );
 
-      return mapFundingStream(account, asVaultId(vaultId), side, rate, active);
+      const count = Number(laneCount);
+      const lanes = [];
+
+      for (let index = 0; index < count; index += 1) {
+        const lane = await this.call<RawLane>(
+          this.addresses.marketDriver,
+          this.abis.MarketDriver,
+          "laneAt",
+          [id, BigInt(index)]
+        );
+
+        const vaultBytes = lane.vaultId;
+        const position = await this.call<RawPosition>(
+          this.addresses.vault,
+          this.abis.Vault,
+          "getPosition",
+          [vaultBytes, lane.side, id]
+        );
+
+        lanes.push(mapLane(asTokenId(id), lane, position));
+      }
+
+      return mapNft(
+        asTokenId(id),
+        account,
+        asMarketId(bytes32ToHex(marketIdRaw)),
+        count,
+        lanes
+      );
     } catch (error) {
       if (error instanceof LiveStreakConfigError) {
         throw error;
       }
 
-      throw contractsReadFailed("funding stream", error);
+      throw contractsReadFailed("nft", error);
     }
   }
 
@@ -251,13 +293,20 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
       );
 
       const staked = await this.call<bigint>(
-        this.addresses.lvstToken,
-        this.abis.LvstToken,
-        "skeletonStaked",
+        this.addresses.treasury,
+        this.abis.Treasury,
+        "lvstStaked",
         [account as `0x${string}`]
       );
 
-      return mapLvstAccount(account, balance, staked);
+      const pendingDividends = await this.call<bigint>(
+        this.addresses.treasury,
+        this.abis.Treasury,
+        "lvstPendingDividends",
+        [account as `0x${string}`]
+      );
+
+      return mapLvstAccount(account, balance, staked, pendingDividends);
     } catch (error) {
       throw contractsReadFailed("LVST account", error);
     }
@@ -297,18 +346,6 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
     }
   }
 
-  private async readRawPosition(
-    user: `0x${string}`,
-    vaultId: `0x${string}`,
-    side: OptionsVaultSide
-  ): Promise<RawSidePosition> {
-    return this.call<RawSidePosition>(this.addresses.vault, this.abis.Vault, "position", [
-      user,
-      vaultId,
-      sideToSolidityValue(side)
-    ]);
-  }
-
   private async call<T>(
     address: `0x${string}`,
     abi: readonly unknown[],
@@ -318,3 +355,6 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
     return (await this.reader.read({ address, abi, functionName, args })) as T;
   }
 }
+
+export type { RawVaultPools };
+export { mapVaultPools, mapVaultShareTotals };

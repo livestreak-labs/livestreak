@@ -78,7 +78,16 @@ class OptionsRuntimeStoreInMemory implements OptionsRuntimeStore {
     this.markets.set(copy.market.marketId, copy);
 
     for (const vault of copy.vaults) {
-      this.vaults.set(vault.vaultId, { vault });
+      this.vaults.set(vault.vaultId, {
+        vault,
+        pools: vault.pools,
+        shareTotals: { yes: 0n, no: 0n },
+        hot: vault.steward,
+        dispute: {
+          active: vault.steward.disputeId !== undefined,
+          disputeId: vault.steward.disputeId
+        }
+      });
     }
 
     this.lastError = undefined;

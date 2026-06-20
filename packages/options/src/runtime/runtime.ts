@@ -27,7 +27,7 @@ export interface OptionsRuntime {
   readPanel: () => OptionsPanel;
   refresh: () => Promise<OptionsRuntimeState>;
   refreshMarket: (marketId: MarketId) => Promise<OptionsRuntimeState>;
-  refreshVault: (vaultId: VaultId, user?: UserAddress) => Promise<OptionsRuntimeState>;
+  refreshVault: (vaultId: VaultId) => Promise<OptionsRuntimeState>;
   refreshUser: (user: UserAddress, marketId?: MarketId) => Promise<OptionsRuntimeState>;
   subscribeSnapshots: (listener: (state: OptionsRuntimeState) => void) => () => void;
   startPolling: () => { readonly stop: () => void };
@@ -91,13 +91,9 @@ class OptionsRuntimeFacade implements OptionsRuntime {
     }
   }
 
-  async refreshVault(vaultId: VaultId, user?: UserAddress): Promise<OptionsRuntimeState> {
+  async refreshVault(vaultId: VaultId): Promise<OptionsRuntimeState> {
     try {
-      const snapshot = await refreshVaultSnapshot(
-        this.transport,
-        vaultId,
-        user ?? this.config.user
-      );
+      const snapshot = await refreshVaultSnapshot(this.transport, vaultId);
       this.store.setVaultSnapshot(snapshot);
       return this.publish();
     } catch (error) {

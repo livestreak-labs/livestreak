@@ -9,6 +9,7 @@ export {
   type ContractReader,
   type ContractsOptionsReadTransportInput,
   type ContractsReadEntity,
+  type OptionsContractAddresses,
   contractsReadFailed,
   contractsReadNotFound,
   createContractsOptionsReadTransport

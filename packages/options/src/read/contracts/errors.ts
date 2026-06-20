@@ -5,8 +5,9 @@ import { LiveStreakConfigError, LiveStreakRuntimeError } from "@livestreak/core"
 export type ContractsReadEntity =
   | "market"
   | "vault"
-  | "user position"
-  | "funding stream"
+  | "vault share totals"
+  | "owner tokens"
+  | "nft"
   | "LVST account"
   | "protocol summary";
 

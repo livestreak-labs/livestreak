@@ -8,7 +8,10 @@ describe("options public exports", () => {
     expect(publicExport("OptionsVaultSide")).toBeUndefined();
     expect(publicExport("validateOptionsVaultSide")).toBeTypeOf("function");
     expect(publicExport("totalVaultPool")).toBeTypeOf("function");
+    expect(publicExport("priceOf")).toBeTypeOf("function");
+    expect(publicExport("sharesPerUsdc")).toBeTypeOf("function");
     expect(publicExport("asMarketId")).toBeTypeOf("function");
+    expect(publicExport("asTokenId")).toBeTypeOf("function");
   });
 
   it("exports read transport type surface and read helpers", () => {
@@ -24,13 +27,29 @@ describe("options public exports", () => {
     expect(publicExport("projectOptionsPanel")).toBeTypeOf("function");
   });
 
-  it("exports write transport and write helpers", () => {
+  it("exports NFT-lane write transport and write helpers", () => {
     expect(publicExport("createContractsOptionsWriteTransport")).toBeTypeOf("function");
-    expect(publicExport("setFundingRate")).toBeTypeOf("function");
-    expect(publicExport("stopFundingStream")).toBeTypeOf("function");
-    expect(publicExport("claimLossFlow")).toBeTypeOf("function");
-    expect(publicExport("stakeFlow")).toBeTypeOf("function");
-    expect(publicExport("unstakeFlow")).toBeTypeOf("function");
+    expect(publicExport("fundStream")).toBeTypeOf("function");
+    expect(publicExport("setLanes")).toBeTypeOf("function");
+    expect(publicExport("stopFunding")).toBeTypeOf("function");
+    expect(publicExport("stopAllFunding")).toBeTypeOf("function");
+    expect(publicExport("withdraw")).toBeTypeOf("function");
+    expect(publicExport("withdrawMany")).toBeTypeOf("function");
+    expect(publicExport("claimLossLvst")).toBeTypeOf("function");
+    expect(publicExport("stakeLvst")).toBeTypeOf("function");
+    expect(publicExport("unstakeLvst")).toBeTypeOf("function");
+    expect(publicExport("claimDividends")).toBeTypeOf("function");
+    expect(publicExport("transferNft")).toBeTypeOf("function");
+    expect(publicExport("approveNft")).toBeTypeOf("function");
+    expect(publicExport("setApprovalForAll")).toBeTypeOf("function");
+  });
+
+  it("does not export retired R1 write names", () => {
+    expect(publicExport("setFundingRate")).toBeUndefined();
+    expect(publicExport("stopFundingStream")).toBeUndefined();
+    expect(publicExport("claimLossFlow")).toBeUndefined();
+    expect(publicExport("stakeFlow")).toBeUndefined();
+    expect(publicExport("unstakeFlow")).toBeUndefined();
   });
 
   it("does not export blocked write functions", () => {

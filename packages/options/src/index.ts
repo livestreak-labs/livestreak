@@ -1,19 +1,19 @@
 export type {
   LvstAccount,
   MarketId,
-  OptionsFundingStream,
+  OptionsLane,
   OptionsMarket,
   OptionsMarketSnapshot,
   OptionsMarketStatus,
   OptionsMarketTiming,
+  OptionsNft,
+  OptionsNftSnapshot,
   OptionsProtocolSummary,
-  OptionsSidePosition,
   OptionsUserOptionsSnapshot,
-  OptionsUserVaultPosition,
   OptionsVault,
-  OptionsVaultFundingSnapshot,
   OptionsVaultOutcome,
   OptionsVaultPools,
+  OptionsVaultShareTotals,
   OptionsVaultSide,
   OptionsVaultSnapshot,
   OptionsVaultStatus,
@@ -21,19 +21,23 @@ export type {
   OptionsVaultTiming,
   OptionsVaultType,
   TokenAddress,
+  TokenId,
   UserAddress,
   VaultId
 } from "./model/index.js";
 export {
   asMarketId,
   asTokenAddress,
+  asTokenId,
   asUserAddress,
   asVaultId,
-  emptySidePosition,
-  hasVaultExposure,
-  isFundingStreamPaused,
+  BASE_PRICE,
+  CURVE_K,
   isOptionsVaultSide,
   OPTIONS_VAULT_SIDES,
+  priceOf,
+  SHARE_SCALE,
+  sharesPerUsdc,
   totalVaultPool,
   validateOptionsVaultSide
 } from "./model/index.js";
@@ -48,17 +52,18 @@ export {
   createContractsOptionsReadTransport,
   readMarketSnapshot,
   readUserOptionsSnapshot,
-  readVaultSnapshot
+  readVaultSnapshot,
+  type OptionsContractAddresses
 } from "./read/index.js";
 export type {
+  OptionsLanePanel,
   OptionsLvstPanel,
   OptionsMarketPanel,
+  OptionsNftPanel,
   OptionsPanel,
   OptionsProtocolPanel,
-  OptionsSidePanel,
   OptionsUserPanel,
-  OptionsVaultPanel,
-  OptionsVaultUserPanel
+  OptionsVaultPanel
 } from "./panel/index.js";
 export { projectOptionsPanel } from "./panel/index.js";
 export type {
@@ -70,21 +75,37 @@ export type {
 } from "./runtime/index.js";
 export { createOptionsRuntime, validateOptionsRuntimeConfig } from "./runtime/index.js";
 export type {
-  ClaimLossFlowInput,
+  ApproveNftInput,
+  ClaimLossLvstInput,
   ContractWriteRequest,
   ContractWriter,
   ContractsOptionsWriteTransportInput,
+  FundStreamInput,
+  LaneWriteInput,
   OptionsWriteTransport,
-  SetFundingRateInput,
-  StakeFlowInput,
-  StopFundingStreamInput,
-  UnstakeFlowInput
+  SetApprovalForAllInput,
+  SetLanesInput,
+  StakeLvstInput,
+  StopAllFundingInput,
+  StopFundingInput,
+  TransferNftInput,
+  UnstakeLvstInput,
+  WithdrawInput,
+  WithdrawManyInput
 } from "./write/index.js";
 export {
-  claimLossFlow,
+  approveNft,
+  claimDividends,
+  claimLossLvst,
   createContractsOptionsWriteTransport,
-  setFundingRate,
-  stakeFlow,
-  stopFundingStream,
-  unstakeFlow
+  fundStream,
+  setApprovalForAll,
+  setLanes,
+  stakeLvst,
+  stopAllFunding,
+  stopFunding,
+  transferNft,
+  unstakeLvst,
+  withdraw,
+  withdrawMany
 } from "./write/index.js";
