@@ -1,14 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
 import { Effect, Exit } from "effect";
 import { keccak256, encodeAbiParameters } from "viem";
-import { assertUserOperationSucceeded, computeMarketId } from "#market/chains/evm.js";
+import {
+  assertUserOperationSucceeded,
+  computeMarketId,
+  observeRunStreamId
+} from "#market/chains/evm.js";
+import { createEvmMarketRegistrar } from "#market/chains/evm.js";
 import { createMarketRegistrar } from "#market/chains/index.js";
-import { testPlaceholderDeriveStreamId } from "#market/types.js";
+import { validateMarketRunId } from "#market/validate.js";
 import type { ObserveRunMarketConfig } from "#market/types.js";
 
 const GOLDEN_OBSERVER = "0x00000000000000000000000000000000000000aa" as const;
-const GOLDEN_STREAM_ID =
-  "0x00000000000000000000000000000000000000000000000000000000000000bb" as const;
+const GOLDEN_RUN_ID = "run_golden";
+const GOLDEN_STREAM_ID = keccak256(
+  encodeAbiParameters(
+    [{ type: "address" }, { type: "string" }],
+    [GOLDEN_OBSERVER, GOLDEN_RUN_ID]
+  )
+);
 const GOLDEN_MARKET_ID = keccak256(
   encodeAbiParameters(
     [{ type: "address" }, { type: "bytes32" }],
@@ -41,9 +51,7 @@ vi.mock("@livestreak/wallet", () => ({
   })
 }));
 
-import { createEvmMarketRegistrar } from "#market/chains/evm.js";
-
-const minimalEvmConfig = (deriveStreamId = testPlaceholderDeriveStreamId): ObserveRunMarketConfig => ({
+const minimalEvmConfig = (): ObserveRunMarketConfig => ({
   walletInit: {
     chain: "evm",
     seedSource: "raw",
@@ -62,11 +70,33 @@ const minimalEvmConfig = (deriveStreamId = testPlaceholderDeriveStreamId): Obser
   },
   seed: "test-seed",
   marketRegistryAddress: "0x0000000000000000000000000000000000000001",
-  title: "Local market",
-  deriveStreamId
+  title: "Local market"
 });
 
 describe("market chain seam", () => {
+  it("observeRunStreamId matches keccak256(abi.encode(observer, runId)) golden vector", () => {
+    expect(observeRunStreamId(GOLDEN_OBSERVER, GOLDEN_RUN_ID)).toBe(GOLDEN_STREAM_ID);
+  });
+
+  it("observeRunStreamId is deterministic and runId-sensitive", () => {
+    const first = observeRunStreamId(GOLDEN_OBSERVER, "run_a");
+    const second = observeRunStreamId(GOLDEN_OBSERVER, "run_a");
+    const third = observeRunStreamId(GOLDEN_OBSERVER, "run_b");
+
+    expect(first).toBe(second);
+    expect(first).not.toBe(third);
+  });
+
+  it("rejects empty runId", async () => {
+    const exit = await Effect.runPromiseExit(validateMarketRunId(""));
+    expect(Exit.isFailure(exit)).toBe(true);
+  });
+
+  it("rejects whitespace-only runId", async () => {
+    const exit = await Effect.runPromiseExit(validateMarketRunId("   "));
+    expect(Exit.isFailure(exit)).toBe(true);
+  });
+
   it("computeMarketId matches MarketRegistry.computeMarketId golden vector", () => {
     expect(computeMarketId(GOLDEN_OBSERVER, GOLDEN_STREAM_ID)).toBe(GOLDEN_MARKET_ID);
   });
@@ -100,23 +130,23 @@ describe("market chain seam", () => {
     }
   });
 
-  it("registers with locally computed marketId when receipt logs are empty", async () => {
-    const streamId = testPlaceholderDeriveStreamId("run_local_market_id");
+  it("registers with canonical streamId and marketId when receipt logs are empty", async () => {
+    const runId = "run_local_market_id";
+    const streamId = observeRunStreamId(evmWalletMocks.observer, runId);
     const expectedMarketId = computeMarketId(evmWalletMocks.observer, streamId);
 
     const registrar = createEvmMarketRegistrar(minimalEvmConfig());
     const exit = await Effect.runPromiseExit(
       registrar.registerMarket({
-        runId: "run_local_market_id",
-        title: "Local market",
-        streamId
+        runId,
+        title: "Local market"
       })
     );
 
     expect(Exit.isSuccess(exit)).toBe(true);
     if (Exit.isSuccess(exit)) {
-      expect(exit.value.marketId).toBe(expectedMarketId);
       expect(exit.value.streamId).toBe(streamId);
+      expect(exit.value.marketId).toBe(expectedMarketId);
       expect(evmWalletMocks.readOnly.getUserOperationReceipt).toHaveBeenCalledWith("0xuserop");
     }
   });
@@ -130,16 +160,14 @@ describe("market chain seam", () => {
       },
       seed: "test-seed",
       marketRegistryAddress: "0x0000000000000000000000000000000000000001",
-      title: "Sui stream",
-      deriveStreamId: testPlaceholderDeriveStreamId
+      title: "Sui stream"
     };
 
     const registrar = await Effect.runPromise(createMarketRegistrar(config));
     const exit = await Effect.runPromiseExit(
       registrar.registerMarket({
         runId: "run_sui",
-        title: config.title,
-        streamId: testPlaceholderDeriveStreamId("run_sui")
+        title: config.title
       })
     );
 

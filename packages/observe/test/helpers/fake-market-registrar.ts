@@ -46,7 +46,7 @@ export const defaultFakeRegisterResult = (
 ): MarketRegisterResult => ({
   userOpHash: "0xuserop",
   marketId: "0x0000000000000000000000000000000000000000000000000000000000000001",
-  streamId: input.streamId,
+  streamId: "0x00000000000000000000000000000000000000000000000000000000000000aa",
   title: input.title
 });
 

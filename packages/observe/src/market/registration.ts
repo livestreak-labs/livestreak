@@ -10,7 +10,7 @@ import type {
   ObserveRunMarketConfig,
   ObserveRunMarketOptions
 } from "./types.js";
-import { validateObserveRunMarketOptions } from "./validate.js";
+import { validateMarketRunId, validateObserveRunMarketOptions } from "./validate.js";
 
 export interface MarketRegistrationForkInput {
   readonly runId: string;
@@ -43,7 +43,8 @@ export const runMarketRegistrationLifecycle = (
   input: MarketRegistrationForkInput
 ): Effect.Effect<void, LiveStreakError> =>
   Effect.gen(function* () {
-    const streamId = input.registration.deriveStreamId(input.runId);
+    yield* validateMarketRunId(input.runId);
+
     const pending: MarketLifecycleState = {
       status: "pending",
       startedAtMs: Date.now()
@@ -54,8 +55,7 @@ export const runMarketRegistrationLifecycle = (
     const registerResult = yield* input.registrar
       .registerMarket({
         runId: input.runId,
-        title: input.registration.title,
-        streamId
+        title: input.registration.title
       })
       .pipe(
         Effect.matchEffect({

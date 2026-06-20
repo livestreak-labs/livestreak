@@ -47,7 +47,6 @@ export interface ObserveRunMarketConfig {
   readonly seed: string | Uint8Array;
   readonly marketRegistryAddress: EvmAddress;
   readonly title: string;
-  readonly deriveStreamId: (runId: string) => StreamId;
 }
 
 export interface ObserveRunMarketOptions {
@@ -58,7 +57,6 @@ export interface ObserveRunMarketOptions {
 export interface MarketRegisterInput {
   readonly runId: string;
   readonly title: string;
-  readonly streamId: StreamId;
 }
 
 export interface MarketRegisterResult {
@@ -73,9 +71,3 @@ export interface MarketRegistrar {
     input: MarketRegisterInput
   ) => import("effect").Effect.Effect<MarketRegisterResult, import("@livestreak/core").LiveStreakError>;
 }
-
-/** Test-only streamId placeholder — NOT a canonical contracts formula. */
-export const testPlaceholderDeriveStreamId = (runId: string): StreamId => {
-  const hex = Buffer.from(runId, "utf8").toString("hex").padEnd(64, "0").slice(0, 64);
-  return `0x${hex}`;
-};

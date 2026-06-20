@@ -10,8 +10,18 @@ import type {
   ObserveRunMarketConfig,
   StreamId
 } from "#market/types.js";
+import { validateMarketRunId } from "#market/validate.js";
 
 const { marketRegistryAbi } = evm;
+
+/** Byte-identical to observe's canonical streamId: keccak256(abi.encode(observer, runId)). */
+export const observeRunStreamId = (observer: EvmAddress, runId: string): StreamId =>
+  keccak256(
+    encodeAbiParameters(
+      [{ type: "address" }, { type: "string" }],
+      [observer, runId]
+    )
+  );
 
 /** Byte-identical to MarketRegistry.computeMarketId(observer, streamId). */
 export const computeMarketId = (
@@ -38,6 +48,8 @@ export const createEvmMarketRegistrar = (
         );
       }
 
+      const runId = yield* validateMarketRunId(input.runId);
+
       const manager = createWalletManager(
         "evm",
         config.seed,
@@ -58,12 +70,13 @@ export const createEvmMarketRegistrar = (
         catch: (error) => toRuntimeError("Failed to read wallet address", error)
       });
 
-      const marketId = computeMarketId(observer as EvmAddress, input.streamId);
+      const streamId = observeRunStreamId(observer as EvmAddress, runId);
+      const marketId = computeMarketId(observer as EvmAddress, streamId);
 
       const data = encodeFunctionData({
         abi: marketRegistryAbi,
         functionName: "registerMarket",
-        args: [input.title, input.streamId]
+        args: [input.title, streamId]
       });
 
       const sendResult = yield* Effect.tryPromise({
@@ -81,7 +94,7 @@ export const createEvmMarketRegistrar = (
       return {
         userOpHash: sendResult.hash,
         marketId,
-        streamId: input.streamId,
+        streamId,
         title: input.title
       } satisfies MarketRegisterResult;
     })
