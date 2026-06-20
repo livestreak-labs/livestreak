@@ -20,6 +20,7 @@
     "@livestreak/contracts": "file:../packages/contracts",
     "@livestreak/host": "file:../packages/host",
     "@livestreak/observe": "file:../packages/observe",
+    "@livestreak/options": "file:../packages/options",
     "@livestreak/schema": "file:../packages/schema",
     "@livestreak/wallet": "file:../packages/wallet",
     "effect": "3.21.3",

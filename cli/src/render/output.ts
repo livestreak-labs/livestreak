@@ -1,4 +1,6 @@
 import type { OnChainStreamState } from "../edges/market.js";
+import type { OperatorCreateVaultResult } from "../edges/vault.js";
+import type { OptionsBoard } from "@livestreak/options";
 
 export interface ProduceRenderInput {
   readonly title: string;
@@ -57,3 +59,68 @@ export const renderHostHealth = (input: {
     `health:  ${input.healthy ? "ok" : "degraded"}`,
     `walrus:  ${input.walrusNetwork ?? "not configured"}`
   ].join("\n");
+
+export const renderOptionsBoard = (board: OptionsBoard): string => {
+  const { panel } = board;
+  const lines = [
+    "livestreak vaults",
+    "",
+    `revision: ${board.revision}`,
+    `account:  ${panel.account}`,
+    ""
+  ];
+
+  for (const market of panel.markets) {
+    lines.push(`market ${market.marketId} — ${market.title}`);
+    for (const vault of market.vaults) {
+      lines.push(
+        `  vault ${vault.vaultId} [${vault.status}/${vault.outcome}] ${vault.question}`
+      );
+      lines.push(
+        `    pools yes=${vault.pools.yesUSDC} no=${vault.pools.noUSDC}`
+      );
+    }
+    lines.push("");
+  }
+
+  if (panel.nfts.length > 0) {
+    lines.push("positions:");
+    for (const nft of panel.nfts) {
+      lines.push(`  token ${nft.tokenId} market=${nft.marketId} lanes=${nft.laneCount}`);
+      for (const lane of nft.lanes) {
+        lines.push(
+          `    ${lane.vaultId} ${lane.side} claimable=${lane.claimableUSDC ?? "0"} loss=${lane.lossClaimableLVST ?? "0"}`
+        );
+      }
+    }
+    lines.push("");
+  }
+
+  lines.push(
+    `LVST balance=${panel.lvst.balanceLVST} staked=${panel.lvst.stakedLVST} dividends=${panel.lvst.pendingDividendsUSDC}`
+  );
+
+  return lines.join("\n");
+};
+
+export const renderTxResult = (
+  action: string,
+  txs: Record<string, string | undefined>
+): string => {
+  const lines = [`livestreak ${action}`, ""];
+  for (const [key, value] of Object.entries(txs)) {
+    if (value !== undefined) {
+      lines.push(`${key}: ${value}`);
+    }
+  }
+  return lines.join("\n");
+};
+
+export const renderVaultCreateResult = (result: OperatorCreateVaultResult): string => {
+  const lines = ["livestreak vault create", "", `vaultId: ${result.vaultId}`];
+  if (result.approveTx !== undefined) {
+    lines.push(`approveTx: ${result.approveTx}`);
+  }
+  lines.push(`createTx: ${result.createTx}`);
+  return lines.join("\n");
+};

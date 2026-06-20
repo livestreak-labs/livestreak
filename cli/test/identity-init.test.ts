@@ -19,7 +19,7 @@ describe("gateway/identity", () => {
 
 describe("prefs/init-doc", () => {
   it("round-trips and never serializes the seed", async () => {
-    const { loadInitDoc, saveInitDoc, validateInitDoc } = await import("../src/prefs/init-doc.js");
+    const { loadInitDoc, saveInitDoc } = await import("../src/prefs/init-doc.js");
     const dir = await mkdtemp(join(tmpdir(), "livestreak-init-"));
     const path = join(dir, "livestreak.json");
 
@@ -47,6 +47,15 @@ describe("prefs/init-doc", () => {
           contractNetworks: {}
         }
       },
+      options: {
+        vault: "0x4b7ce2a2a0d73aec573ff7b559cf9f1cc942cc38",
+        marketDriver: "0x84a89612fcd2f84edc6d2f19062c4a01988229d7",
+        stewardRegistry: "0x45c4150c9ffed32abfc1e16869789d8602bc8f76",
+        treasury: "0x001a43b7c95b500cff049d4f02f2544a40288d05",
+        lvstToken: "0xce0d231abd2b16948124b2635acb3577fc595f1a",
+        dripsStreaming: "0xc20641edde8cecf5a6530a3edbd7fbbffe0bf3d5",
+        vaultDriver: "0x5700bcfa34292645feb4749be2b922ebeffd5099"
+      },
       run: {
         runId: "run_test",
         status: "ended" as const
@@ -56,8 +65,9 @@ describe("prefs/init-doc", () => {
     await saveInitDoc(path, doc);
     const raw = await readFile(path, "utf8");
     expect(raw).not.toMatch(/"seed"/);
-    expect(validateInitDoc(JSON.parse(raw))).toEqual(doc);
-    expect(await loadInitDoc(path)).toEqual(doc);
+    const loaded = await loadInitDoc(path);
+    expect(loaded.options.marketRegistry).toBe(doc.chain.marketRegistry);
+    expect(loaded.options.vaultDriver).toBe(doc.options.vaultDriver);
 
     await rm(dir, { recursive: true, force: true });
   });

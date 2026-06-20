@@ -4,9 +4,10 @@ import { Command } from "@effect/cli";
 import { NodeContext, NodeRuntime } from "@effect/platform-node";
 import { Effect } from "effect";
 import { hostCommand, produceCommand } from "./commands/produce.js";
+import { optionsCommands } from "./commands/options.js";
 
 const root = Command.make("livestreak", {}, () => Effect.void).pipe(
-  Command.withSubcommands([produceCommand, hostCommand])
+  Command.withSubcommands([produceCommand, hostCommand, ...optionsCommands])
 );
 
 const cli = Command.run(root, {

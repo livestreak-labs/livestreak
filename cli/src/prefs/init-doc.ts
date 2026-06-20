@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import type { WalrusNetwork } from "@livestreak/host";
+import type { OptionsContractAddresses } from "@livestreak/options";
 import type { EvmWalletInitConfig } from "@livestreak/schema";
 
 export interface LivestreakChainConfig {
@@ -24,10 +25,16 @@ export interface LivestreakRunCache {
   readonly status?: "pending" | "registered" | "ended" | "failed";
 }
 
+/** Options contract addresses + vaultDriver for operator vault-seed. */
+export interface LivestreakOptionsConfig extends OptionsContractAddresses {
+  readonly vaultDriver: `0x${string}`;
+}
+
 export interface LivestreakInitDoc {
   readonly chain: LivestreakChainConfig;
   readonly host: LivestreakHostConfig;
   readonly wallet: LivestreakWalletConfig;
+  readonly options: LivestreakOptionsConfig;
   readonly run?: LivestreakRunCache;
 }
 
@@ -66,9 +73,10 @@ export const validateInitDoc = (input: unknown): LivestreakInitDoc => {
   const chain = readChain(record["chain"]);
   const host = readHost(record["host"]);
   const wallet = readWallet(record["wallet"]);
+  const options = readOptions(record["options"], chain.marketRegistry);
   const run = record["run"] === undefined ? undefined : readRun(record["run"]);
 
-  return { chain, host, wallet, ...(run === undefined ? {} : { run }) };
+  return { chain, host, wallet, options, ...(run === undefined ? {} : { run }) };
 };
 
 // --- helpers ---
@@ -113,6 +121,32 @@ const readHost = (value: unknown): LivestreakHostConfig => {
   }
 
   return { url, walrusNetwork };
+};
+
+const readOptions = (
+  value: unknown,
+  chainMarketRegistry: `0x${string}`
+): LivestreakOptionsConfig => {
+  if (typeof value !== "object" || value === null) {
+    throw new Error("options config required");
+  }
+
+  const record = value as Record<string, unknown>;
+  const marketRegistry =
+    record["marketRegistry"] === undefined
+      ? chainMarketRegistry
+      : readAddress(record["marketRegistry"], "options.marketRegistry");
+
+  return {
+    marketRegistry,
+    vault: readAddress(record["vault"], "options.vault"),
+    marketDriver: readAddress(record["marketDriver"], "options.marketDriver"),
+    stewardRegistry: readAddress(record["stewardRegistry"], "options.stewardRegistry"),
+    treasury: readAddress(record["treasury"], "options.treasury"),
+    lvstToken: readAddress(record["lvstToken"], "options.lvstToken"),
+    dripsStreaming: readAddress(record["dripsStreaming"], "options.dripsStreaming"),
+    vaultDriver: readAddress(record["vaultDriver"], "options.vaultDriver")
+  };
 };
 
 const readWallet = (value: unknown): LivestreakWalletConfig => {
