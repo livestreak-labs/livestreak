@@ -22,6 +22,8 @@ use sui::table::{Self, Table};
 const MAX_LANES: u64 = 10;
 const DRIVER_ID_SHIFT: u8 = 224;
 const COLLECTION_DESCRIPTION: vector<u8> = b"LiveStreak market position NFT";
+const COLLECTION_IMAGE: vector<u8> =
+    b"data:image/svg+xml;charset=utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='400' height='400' rx='28' fill='#0b1020'/><text x='200' y='186' fill='#ffffff' font-family='sans-serif' font-size='34' font-weight='700' text-anchor='middle'>LiveStreak</text><text x='200' y='226' fill='#7dd3fc' font-family='sans-serif' font-size='18' text-anchor='middle'>Market Position</text></svg>";
 
 const E_SALT_USED: u64 = 1;
 const E_UNKNOWN_MARKET: u64 = 2;
@@ -113,12 +115,17 @@ fun init(otw: MARKET_DRIVER, ctx: &mut TxContext) {
 
     let publisher = package::claim(otw, ctx);
     let mut display_obj = display::new<MarketPositionNFT>(&publisher, ctx);
-    display::add(&mut display_obj, std::string::utf8(b"name"), std::string::utf8(b"Market Position"));
+    display::add(
+        &mut display_obj,
+        std::string::utf8(b"name"),
+        std::string::utf8(b"Market Position #{token_id}"),
+    );
     display::add(
         &mut display_obj,
         std::string::utf8(b"description"),
         std::string::utf8(COLLECTION_DESCRIPTION),
     );
+    display::add(&mut display_obj, std::string::utf8(b"image_url"), std::string::utf8(COLLECTION_IMAGE));
     display::update_version(&mut display_obj);
     transfer::public_transfer(publisher, ctx.sender());
     transfer::public_transfer(display_obj, ctx.sender());
