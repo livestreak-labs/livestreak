@@ -89,8 +89,48 @@ public fun set_market_steward(
     assert_owner(registry, ctx);
     assert!(steward != @0x0, E_ZERO_STEWARD);
     assert!(table::contains(&registry.stewards, steward), E_UNREGISTERED);
-    table::add(&mut registry.market_steward, market_id, steward);
+    if (table::contains(&registry.market_steward, market_id)) {
+        *table::borrow_mut(&mut registry.market_steward, market_id) = steward;
+    } else {
+        table::add(&mut registry.market_steward, market_id, steward);
+    };
     event::emit(MarketStewardSet { market_id, steward });
+}
+
+public fun hot_state(registry: &StewardRegistry, vault_id: &vector<u8>): Option<HotState> {
+    if (table::contains(&registry.vault_hot_state, *vault_id)) {
+        option::some(*table::borrow(&registry.vault_hot_state, *vault_id))
+    } else {
+        option::none()
+    }
+}
+
+public fun dispute_state(registry: &StewardRegistry, vault_id: &vector<u8>): Option<DisputeState> {
+    if (table::contains(&registry.dispute_state, *vault_id)) {
+        option::some(*table::borrow(&registry.dispute_state, *vault_id))
+    } else {
+        option::none()
+    }
+}
+
+public fun hot_active(state: &HotState): bool {
+    state.active
+}
+
+public fun hot_until(state: &HotState): u64 {
+    state.until
+}
+
+public fun hot_severity(state: &HotState): u8 {
+    state.severity
+}
+
+public fun dispute_active(state: &DisputeState): bool {
+    state.active
+}
+
+public fun dispute_challenge_until(state: &DisputeState): u64 {
+    state.challenge_until
 }
 
 public fun effective_steward(registry: &StewardRegistry, market_id: &vector<u8>): address {
