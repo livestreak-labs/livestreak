@@ -1,6 +1,7 @@
 import { Command, Options } from "@effect/cli";
 import { Console, Effect, Option } from "effect";
 import {
+  asMarketId,
   asUserAddress,
   type ApproveNftInput,
   type SetApprovalForAllInput,
@@ -8,14 +9,52 @@ import {
 } from "@livestreak/options";
 import { resolveOperatorContext } from "./context.js";
 import { createOptionsEdge } from "../edges/options.js";
+import { operatorMintNft } from "../edges/nft-mint.js";
+import { defaultInitDocPath, saveInitDoc } from "../prefs/init-doc.js";
 import {
   configOpt,
   parseApprovedFlag,
+  parseMarketIdArg,
   parseTokenId,
   passwordOpt,
   readCommandConfig
 } from "./cli-args.js";
-import { renderTxResult } from "../render/output.js";
+import { renderNftMintResult, renderTxResult } from "../render/output.js";
+
+export const runNftMint = async (input: {
+  readonly configPath?: string;
+  readonly password?: string;
+  readonly market: string;
+  readonly salt?: string;
+  readonly to?: string;
+}): Promise<string> => {
+  const configPath = input.configPath ?? defaultInitDocPath;
+  const ctx = await resolveOperatorContext({ ...input, configPath });
+  const marketId = parseMarketIdArg(input.market);
+
+  const result = await operatorMintNft({
+    account: ctx.account,
+    publicClient: ctx.publicClient,
+    marketDriverAddress: ctx.doc.options.marketDriver,
+    marketId: asMarketId(marketId),
+    ...(input.salt !== undefined ? { salt: input.salt } : {}),
+    ...(input.to !== undefined ? { to: input.to as `0x${string}` } : {})
+  });
+
+  const tokenId = result.tokenId.toString();
+  await saveInitDoc(configPath, {
+    ...ctx.doc,
+    run: {
+      runId: ctx.doc.run?.runId ?? `mint-${Date.now()}`,
+      ...(ctx.doc.run?.streamId === undefined ? {} : { streamId: ctx.doc.run.streamId }),
+      marketId,
+      tokenId,
+      ...(ctx.doc.run?.status === undefined ? {} : { status: ctx.doc.run.status })
+    }
+  });
+
+  return renderNftMintResult({ tokenId, tx: result.tx, marketId });
+};
 
 export const runNftTransfer = async (input: {
   readonly configPath?: string;
@@ -88,6 +127,28 @@ export const runNftApproveAll = async (input: {
   return renderTxResult("nft approve-all", { tx });
 };
 
+const nftMintCommand = Command.make(
+  "mint",
+  {
+    market: Options.text("market"),
+    salt: Options.text("salt").pipe(Options.optional),
+    to: Options.text("to").pipe(Options.optional),
+    config: configOpt,
+    password: passwordOpt
+  },
+  ({ market, salt, to, config, password }) =>
+    Effect.tryPromise({
+      try: () =>
+        runNftMint({
+          market,
+          ...(Option.isSome(salt) ? { salt: salt.value } : {}),
+          ...(Option.isSome(to) ? { to: to.value } : {}),
+          ...readCommandConfig(config, password)
+        }),
+      catch: (error) => (error instanceof Error ? error : new Error(String(error)))
+    }).pipe(Effect.flatMap((output) => Console.log(output)))
+);
+
 const nftTransferCommand = Command.make(
   "transfer",
   {
@@ -136,7 +197,12 @@ const nftApproveAllCommand = Command.make(
 );
 
 export const nftCommand = Command.make("nft", {}).pipe(
-  Command.withSubcommands([nftTransferCommand, nftApproveCommand, nftApproveAllCommand])
+  Command.withSubcommands([
+    nftMintCommand,
+    nftTransferCommand,
+    nftApproveCommand,
+    nftApproveAllCommand
+  ])
 );
 
 export const nftCommands = [nftCommand];

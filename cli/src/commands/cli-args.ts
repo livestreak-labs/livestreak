@@ -11,6 +11,11 @@ export const passwordOpt = Options.text("password").pipe(Options.optional);
 
 export const marketOpt = Options.text("market").pipe(Options.optional);
 
+export const tokenOpt = Options.text("token").pipe(
+  Options.withDescription("Position NFT token id (defaults to run.tokenId in livestreak.json)"),
+  Options.optional
+);
+
 export const readCommandConfig = (
   config: Option.Option<string>,
   password: Option.Option<string>
@@ -25,6 +30,24 @@ export const parseTokenId = (value: string): ReturnType<typeof asTokenId> => {
   } catch {
     throw new Error("token must be a numeric token id");
   }
+};
+
+/** Resolve --token or fall back to the persisted run cache tokenId. */
+export const resolveTokenArg = (
+  token: string | undefined,
+  runTokenId: string | undefined
+): string => {
+  if (token !== undefined && token.trim().length > 0) {
+    return token.trim();
+  }
+
+  if (runTokenId !== undefined && runTokenId.trim().length > 0) {
+    return runTokenId.trim();
+  }
+
+  throw new Error(
+    "token required: pass --token or mint an NFT first (persisted as run.tokenId in livestreak.json)"
+  );
 };
 
 export const parseBigIntArg = (value: string, label: string): bigint => {
@@ -106,4 +129,12 @@ export const parseVaultIdList = (value: string): readonly ReturnType<typeof asVa
   }
 
   return parts.map((vaultId) => parseVaultId(vaultId));
+};
+
+export const parseMarketIdArg = (value: string): `0x${string}` => {
+  const trimmed = value.trim().toLowerCase();
+  if (!/^0x[0-9a-f]{64}$/.test(trimmed)) {
+    throw new Error(`market id must be a 0x-prefixed bytes32, got "${value}"`);
+  }
+  return trimmed as `0x${string}`;
 };

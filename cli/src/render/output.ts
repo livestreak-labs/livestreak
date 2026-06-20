@@ -2,6 +2,12 @@ import type { OnChainStreamState } from "../edges/market.js";
 import type { OperatorCreateVaultResult } from "../edges/vault.js";
 import type { OptionsBoard } from "@livestreak/options";
 
+export interface NftMintRenderInput {
+  readonly tokenId: string;
+  readonly marketId: string;
+  readonly tx: string;
+}
+
 export interface ProduceRenderInput {
   readonly title: string;
   readonly marketId: `0x${string}`;
@@ -124,3 +130,14 @@ export const renderVaultCreateResult = (result: OperatorCreateVaultResult): stri
   lines.push(`createTx: ${result.createTx}`);
   return lines.join("\n");
 };
+
+export const renderNftMintResult = (input: NftMintRenderInput): string =>
+  [
+    "livestreak nft mint",
+    "",
+    `tokenId:  ${input.tokenId}`,
+    `marketId: ${input.marketId}`,
+    `tx:       ${input.tx}`,
+    "",
+    "run.tokenId saved to livestreak.json"
+  ].join("\n");

@@ -58,6 +58,7 @@ describe("prefs/init-doc", () => {
       },
       run: {
         runId: "run_test",
+        tokenId: "42",
         status: "ended" as const
       }
     };
@@ -68,6 +69,7 @@ describe("prefs/init-doc", () => {
     const loaded = await loadInitDoc(path);
     expect(loaded.options.marketRegistry).toBe(doc.chain.marketRegistry);
     expect(loaded.options.vaultDriver).toBe(doc.options.vaultDriver);
+    expect(loaded.run?.tokenId).toBe("42");
 
     await rm(dir, { recursive: true, force: true });
   });

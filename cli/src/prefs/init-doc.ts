@@ -22,6 +22,7 @@ export interface LivestreakRunCache {
   readonly runId: string;
   readonly streamId?: `0x${string}`;
   readonly marketId?: `0x${string}`;
+  readonly tokenId?: string;
   readonly status?: "pending" | "registered" | "ended" | "failed";
 }
 
@@ -179,6 +180,9 @@ const readRun = (value: unknown): LivestreakRunCache => {
     ...(typeof record["marketId"] === "string"
       ? { marketId: record["marketId"] as `0x${string}` }
       : {}),
+    ...(record["tokenId"] === undefined
+      ? {}
+      : { tokenId: readRunTokenId(record["tokenId"]) }),
     ...(record["status"] === "pending" ||
     record["status"] === "registered" ||
     record["status"] === "ended" ||
@@ -186,6 +190,24 @@ const readRun = (value: unknown): LivestreakRunCache => {
       ? { status: record["status"] }
       : {})
   };
+};
+
+const readRunTokenId = (value: unknown): string => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error("run.tokenId must be a non-empty numeric string");
+  }
+
+  const trimmed = value.trim();
+  try {
+    const parsed = BigInt(trimmed);
+    if (parsed < 0n) {
+      throw new Error("run.tokenId must be a non-negative integer");
+    }
+  } catch {
+    throw new Error("run.tokenId must be a numeric string");
+  }
+
+  return trimmed;
 };
 
 const readNonEmptyString = (value: unknown, label: string): string => {

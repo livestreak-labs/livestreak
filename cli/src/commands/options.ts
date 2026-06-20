@@ -22,7 +22,9 @@ import {
   parseBigIntArg,
   parseTokenId,
   passwordOpt,
-  readCommandConfig
+  readCommandConfig,
+  resolveTokenArg,
+  tokenOpt
 } from "./cli-args.js";
 import {
   renderOptionsBoard,
@@ -87,13 +89,14 @@ export const runVaultCreate = async (input: {
 export const runFund = async (input: {
   readonly configPath?: string;
   readonly password?: string;
-  readonly token: string;
+  readonly token?: string;
   readonly vault: string;
   readonly side: string;
   readonly rate: string;
   readonly deposit: string;
 }): Promise<string> => {
   const ctx = await resolveOperatorContext(input);
+  const token = resolveTokenArg(input.token, ctx.doc.run?.tokenId);
   const edge = createOptionsEdge({
     doc: ctx.doc,
     walletInit: ctx.walletInit,
@@ -102,7 +105,7 @@ export const runFund = async (input: {
   });
 
   const fundArgs: FundStreamInput = {
-    tokenId: parseTokenId(input.token),
+    tokenId: parseTokenId(token),
     vaultId: asVaultId(input.vault),
     side: validateOptionsVaultSide(input.side),
     rate: parseBigIntArg(input.rate, "rate"),
@@ -125,13 +128,14 @@ export const runFund = async (input: {
 export const runClaim = async (input: {
   readonly configPath?: string;
   readonly password?: string;
-  readonly token: string;
+  readonly token?: string;
   readonly vault: string;
   readonly side: string;
   readonly loss?: boolean;
   readonly to?: string;
 }): Promise<string> => {
   const ctx = await resolveOperatorContext(input);
+  const token = resolveTokenArg(input.token, ctx.doc.run?.tokenId);
   const edge = createOptionsEdge({
     doc: ctx.doc,
     walletInit: ctx.walletInit,
@@ -144,7 +148,7 @@ export const runClaim = async (input: {
 
   if (input.loss === true) {
     const args: ClaimLossLvstInput = {
-      tokenId: parseTokenId(input.token),
+      tokenId: parseTokenId(token),
       vaultId: asVaultId(input.vault),
       side,
       to
@@ -154,7 +158,7 @@ export const runClaim = async (input: {
   }
 
   const args: WithdrawInput = {
-    tokenId: parseTokenId(input.token),
+    tokenId: parseTokenId(token),
     vaultId: asVaultId(input.vault),
     to
   };
@@ -261,7 +265,7 @@ export const vaultCommand = Command.make("vault", {}).pipe(
 export const fundCommand = Command.make(
   "fund",
   {
-    token: Options.text("token"),
+    token: tokenOpt,
     vault: Options.text("vault"),
     side: Options.text("side"),
     rate: Options.text("rate"),
@@ -273,7 +277,7 @@ export const fundCommand = Command.make(
     Effect.tryPromise({
       try: () =>
         runFund({
-          token,
+          ...(Option.isSome(token) ? { token: token.value } : {}),
           vault,
           side,
           rate,
@@ -289,7 +293,7 @@ const lossFlag = Options.boolean("loss").pipe(Options.optional);
 export const claimCommand = Command.make(
   "claim",
   {
-    token: Options.text("token"),
+    token: tokenOpt,
     vault: Options.text("vault"),
     side: Options.text("side"),
     loss: lossFlag,
@@ -301,7 +305,7 @@ export const claimCommand = Command.make(
     Effect.tryPromise({
       try: () =>
         runClaim({
-          token,
+          ...(Option.isSome(token) ? { token: token.value } : {}),
           vault,
           side,
           ...(Option.isSome(loss) && loss.value ? { loss: true } : {}),

@@ -20,7 +20,9 @@ import {
   parseVaultId,
   parseVaultIdList,
   passwordOpt,
-  readCommandConfig
+  readCommandConfig,
+  resolveTokenArg,
+  tokenOpt
 } from "./cli-args.js";
 import { renderTxResult } from "../render/output.js";
 
@@ -36,11 +38,12 @@ const addDepositOpt = Options.text("add-deposit").pipe(Options.optional);
 export const runSetLanes = async (input: {
   readonly configPath?: string;
   readonly password?: string;
-  readonly token: string;
+  readonly token?: string;
   readonly lanes: readonly string[];
   readonly addDeposit?: string;
 }): Promise<string> => {
   const ctx = await resolveOperatorContext(input);
+  const token = resolveTokenArg(input.token, ctx.doc.run?.tokenId);
   const edge = createOptionsEdge({
     doc: ctx.doc,
     walletInit: ctx.walletInit,
@@ -65,7 +68,7 @@ export const runSetLanes = async (input: {
   }
 
   const args: SetLanesInput = {
-    tokenId: parseTokenId(input.token),
+    tokenId: parseTokenId(token),
     lanes,
     addDeposit
   };
@@ -77,11 +80,12 @@ export const runSetLanes = async (input: {
 export const runStopFunding = async (input: {
   readonly configPath?: string;
   readonly password?: string;
-  readonly token: string;
+  readonly token?: string;
   readonly vault: string;
   readonly side: string;
 }): Promise<string> => {
   const ctx = await resolveOperatorContext(input);
+  const token = resolveTokenArg(input.token, ctx.doc.run?.tokenId);
   const edge = createOptionsEdge({
     doc: ctx.doc,
     walletInit: ctx.walletInit,
@@ -90,7 +94,7 @@ export const runStopFunding = async (input: {
   });
 
   const args: StopFundingInput = {
-    tokenId: parseTokenId(input.token),
+    tokenId: parseTokenId(token),
     vaultId: parseVaultId(input.vault),
     side: validateOptionsVaultSide(input.side)
   };
@@ -102,9 +106,10 @@ export const runStopFunding = async (input: {
 export const runStopAllFunding = async (input: {
   readonly configPath?: string;
   readonly password?: string;
-  readonly token: string;
+  readonly token?: string;
 }): Promise<string> => {
   const ctx = await resolveOperatorContext(input);
+  const token = resolveTokenArg(input.token, ctx.doc.run?.tokenId);
   const edge = createOptionsEdge({
     doc: ctx.doc,
     walletInit: ctx.walletInit,
@@ -113,7 +118,7 @@ export const runStopAllFunding = async (input: {
   });
 
   const args: StopAllFundingInput = {
-    tokenId: parseTokenId(input.token)
+    tokenId: parseTokenId(token)
   };
 
   const tx = await edge.callAction("stopAllFunding", args);
@@ -123,11 +128,12 @@ export const runStopAllFunding = async (input: {
 export const runWithdrawMany = async (input: {
   readonly configPath?: string;
   readonly password?: string;
-  readonly token: string;
+  readonly token?: string;
   readonly vaults: string;
   readonly to?: string;
 }): Promise<string> => {
   const ctx = await resolveOperatorContext(input);
+  const token = resolveTokenArg(input.token, ctx.doc.run?.tokenId);
   const edge = createOptionsEdge({
     doc: ctx.doc,
     walletInit: ctx.walletInit,
@@ -136,7 +142,7 @@ export const runWithdrawMany = async (input: {
   });
 
   const args: WithdrawManyInput = {
-    tokenId: parseTokenId(input.token),
+    tokenId: parseTokenId(token),
     vaultIds: parseVaultIdList(input.vaults),
     to: asUserAddress(input.to ?? ctx.userAddress)
   };
@@ -181,7 +187,7 @@ export const buildWithdrawManyEnvelope = (
 export const setLanesCommand = Command.make(
   "set-lanes",
   {
-    token: Options.text("token"),
+    token: tokenOpt,
     lane: laneOpt,
     addDeposit: addDepositOpt,
     config: configOpt,
@@ -191,7 +197,7 @@ export const setLanesCommand = Command.make(
     Effect.tryPromise({
       try: () =>
         runSetLanes({
-          token,
+          ...(Option.isSome(token) ? { token: token.value } : {}),
           lanes: lane,
           ...(Option.isSome(addDeposit) ? { addDeposit: addDeposit.value } : {}),
           ...readCommandConfig(config, password)
@@ -203,7 +209,7 @@ export const setLanesCommand = Command.make(
 export const stopFundingCommand = Command.make(
   "stop-funding",
   {
-    token: Options.text("token"),
+    token: tokenOpt,
     vault: Options.text("vault"),
     side: Options.text("side"),
     config: configOpt,
@@ -211,7 +217,13 @@ export const stopFundingCommand = Command.make(
   },
   ({ token, vault, side, config, password }) =>
     Effect.tryPromise({
-      try: () => runStopFunding({ token, vault, side, ...readCommandConfig(config, password) }),
+      try: () =>
+        runStopFunding({
+          ...(Option.isSome(token) ? { token: token.value } : {}),
+          vault,
+          side,
+          ...readCommandConfig(config, password)
+        }),
       catch: (error) => (error instanceof Error ? error : new Error(String(error)))
     }).pipe(Effect.flatMap((output) => Console.log(output)))
 );
@@ -219,13 +231,17 @@ export const stopFundingCommand = Command.make(
 export const stopAllCommand = Command.make(
   "stop-all",
   {
-    token: Options.text("token"),
+    token: tokenOpt,
     config: configOpt,
     password: passwordOpt
   },
   ({ token, config, password }) =>
     Effect.tryPromise({
-      try: () => runStopAllFunding({ token, ...readCommandConfig(config, password) }),
+      try: () =>
+        runStopAllFunding({
+          ...(Option.isSome(token) ? { token: token.value } : {}),
+          ...readCommandConfig(config, password)
+        }),
       catch: (error) => (error instanceof Error ? error : new Error(String(error)))
     }).pipe(Effect.flatMap((output) => Console.log(output)))
 );
@@ -233,7 +249,7 @@ export const stopAllCommand = Command.make(
 export const withdrawManyCommand = Command.make(
   "withdraw-many",
   {
-    token: Options.text("token"),
+    token: tokenOpt,
     vaults: Options.text("vaults"),
     to: Options.text("to").pipe(Options.optional),
     config: configOpt,
@@ -243,7 +259,7 @@ export const withdrawManyCommand = Command.make(
     Effect.tryPromise({
       try: () =>
         runWithdrawMany({
-          token,
+          ...(Option.isSome(token) ? { token: token.value } : {}),
           vaults,
           ...(Option.isSome(to) ? { to: to.value } : {}),
           ...readCommandConfig(config, password)
