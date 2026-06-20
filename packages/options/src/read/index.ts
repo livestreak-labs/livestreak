@@ -7,6 +7,7 @@ export {
 export { readClaimsView } from "./claims.js";
 export { readSessionPnl } from "./pnl.js";
 export { gatherUserVaultClaims } from "./aggregation.js";
+export { getStreamMedia } from "./media.js";
 export {
   type ContractReadRequest,
   type ContractReader,

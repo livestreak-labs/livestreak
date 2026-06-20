@@ -1,5 +1,12 @@
 export type { OptionsLane } from "./lane.js";
 export type {
+  GatewayOverrides,
+  OptionsStreamMedia,
+  OptionsStreamState,
+  OptionsStreamStatus
+} from "./media.js";
+export { resolveStreamMedia, SCHEME_GATEWAY } from "./media.js";
+export type {
   OptionsClaimEntry,
   OptionsClaimsView,
   UserVaultClaimRow

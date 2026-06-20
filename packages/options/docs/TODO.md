@@ -4,7 +4,7 @@ See [architecture.md](./architecture.md). Browser-safe consumer workflow — no 
 no `Effect.run*`, no `@livestreak/wallet` in `src/`. ABIs from `@livestreak/contracts/evm/abis`;
 addresses + transports (`ContractReader`/`ContractWriter`) injected at the app/CLI edge.
 
-## ✅ Shipped & verified (R1–R3) — `check`/`build` green, 15 files / 120 tests
+## ✅ Shipped & verified (R1–R4) — options is feature-complete; `check`/`build` green, 16 files / 128 tests
 
 - **R1 — NFT-lane core** (committed `8d120aa`). Model keyed `tokenId → lanes` (one side per vault;
   multi-NFT via `tokensOfOwner`). Reads: `getVault` + `getVaultPools`, `getPosition`, steward
@@ -17,16 +17,16 @@ addresses + transports (`ContractReader`/`ContractWriter`) injected at the app/C
   fabricated; Drips `streamsState[3]` = remaining balance); exhaustive `OptionsClaimsView`; runtime
   `set`/`get`/`onChange` in-memory API; stake grey-out flags + market total-pool + NFT transfer reads.
 
-> R2 + R3 are in the working tree, **uncommitted** (R1 = `8d120aa`).
+- **R4 — consumer media read.** `getStreamMedia(marketId)` → `MarketRegistry.streamState` →
+  `{ status, vodUrl? }`; `SCHEME_GATEWAY` (walrus-testnet/mainnet, ipfs, arweave; ipfs gateway is a
+  flagged guess, overridable); `PointerScheme` type-only import. `Live` playback = phase-2.
+
+> R2–R4 are in the working tree, **uncommitted** (R1 = `8d120aa`).
 
 ## ▢ Open
 
-- [ ] **R4 — consumer media read** (queued from `from-observe__consumer-vod-read.md`; acked).
-  Browser-safe `getStreamMedia(marketId) → { status, vodUrl? }`: read `MarketRegistry.streamState` →
-  `(status, scheme, id, updatedAt, endedAt)`; on `Ended` → `vodUrl = gateway(scheme) + id` via a
-  `scheme → gateway` constant (`0 walrus-testnet · 1 walrus-mainnet · 2 ipfs · 3 arweave`), `id`
-  verbatim. Public aggregator (no host dep; host-proxy only if CORS). Reuse `PointerScheme` from
-  `@livestreak/host`. No durable state. `Live` playback = phase-2.
+None options-side — R1–R4 shipped. Remaining work is **app integration** (below, not options) and
+`Live` VOD playback (phase-2, when the live-manifest lands).
 
 ## Next (not options)
 

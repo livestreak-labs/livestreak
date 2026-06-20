@@ -14,6 +14,7 @@ import {
   type OptionsVault,
   type OptionsVaultShareTotals,
   type OptionsVaultSide,
+  type OptionsStreamState,
   type TokenId,
   type UserAddress,
   type VaultId
@@ -40,6 +41,7 @@ export interface FakeTransportSeed {
   readonly usdcAddress?: `0x${string}`;
   readonly nftApproved?: Readonly<Record<string, UserAddress>>;
   readonly approvedForAll?: Readonly<Record<string, boolean>>;
+  readonly streamStates?: Readonly<Record<string, OptionsStreamState>>;
 }
 
 export const createFakeOptionsReadTransport = (
@@ -65,6 +67,7 @@ export class FakeTransportInMemory implements OptionsReadTransport {
   private usdcAddress: `0x${string}` = "0x00000000000000000000000000000000000000aa";
   private readonly nftApproved = new Map<string, UserAddress>();
   private readonly approvedForAll = new Map<string, boolean>();
+  private readonly streamStates = new Map<string, OptionsStreamState>();
   readProtocolSummary?: () => Promise<OptionsProtocolSummary>;
 
   constructor(seed: FakeTransportSeed) {
@@ -144,6 +147,10 @@ export class FakeTransportInMemory implements OptionsReadTransport {
     for (const [key, value] of Object.entries(seed.approvedForAll ?? {})) {
       this.approvedForAll.set(key, value);
     }
+
+    for (const [key, value] of Object.entries(seed.streamStates ?? {})) {
+      this.streamStates.set(key, value);
+    }
   }
 
   async readMarket(marketId: MarketId): Promise<OptionsMarket> {
@@ -153,6 +160,15 @@ export class FakeTransportInMemory implements OptionsReadTransport {
     }
 
     return market;
+  }
+
+  async readStreamState(marketId: MarketId): Promise<OptionsStreamState> {
+    const state = this.streamStates.get(marketId);
+    if (state === undefined) {
+      throw notFound("stream state", marketId);
+    }
+
+    return state;
   }
 
   async listMarketVaults(marketId: MarketId): Promise<readonly VaultId[]> {

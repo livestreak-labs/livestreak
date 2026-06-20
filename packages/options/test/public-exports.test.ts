@@ -86,4 +86,11 @@ describe("options public exports", () => {
     expect(publicExport("projectClaimsView")).toBeTypeOf("function");
     expect(publicExport("gatherUserVaultClaims")).toBeTypeOf("function");
   });
+
+  it("exports consumer media read helpers", () => {
+    expect(publicExport("getStreamMedia")).toBeTypeOf("function");
+    expect(publicExport("resolveStreamMedia")).toBeTypeOf("function");
+    expect(publicExport("SCHEME_GATEWAY")).toBeTypeOf("object");
+    expect(publicExport("OptionsStreamMedia")).toBeUndefined();
+  });
 });

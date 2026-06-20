@@ -30,6 +30,19 @@ const ADDRESSES: OptionsContractAddresses = {
 };
 
 describe("contracts read transport", () => {
+  it("maps stream state from marketRegistry", async () => {
+    const transport = createContractsOptionsReadTransport({
+      reader: createFakeReader(),
+      addresses: ADDRESSES
+    });
+
+    const state = await transport.readStreamState(MARKET_ID);
+    expect(state.status).toBe("ended");
+    expect(state.scheme).toBe("walrus-testnet");
+    expect(state.id).toBe("blob_contract_id");
+    expect(state.endedAtMs).toBe(1_700_001_000_000);
+  });
+
   it("maps market read with creator", async () => {
     const transport = createContractsOptionsReadTransport({
       reader: createFakeReader(),
@@ -263,6 +276,16 @@ const respond = (request: ContractReadRequest, options: FakeReaderOptions): unkn
 
     if (functionName === "getVaultIds") {
       return [VAULT_ID];
+    }
+
+    if (functionName === "streamState") {
+      return {
+        status: 2,
+        scheme: 0,
+        id: "blob_contract_id",
+        updatedAt: 1_700_000_000n,
+        endedAt: 1_700_001_000n
+      };
     }
 
     if (functionName === "marketCount") {

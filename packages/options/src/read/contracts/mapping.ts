@@ -1,6 +1,10 @@
 // --- exports ---
 
+import { LiveStreakConfigError } from "@livestreak/core";
+import type { PointerScheme } from "@livestreak/host";
+
 import { sideFromSolidityValue } from "./sides.js";
+import type { OptionsStreamState } from "../../model/media.js";
 
 import { asMarketId, asTokenId, asUserAddress, asVaultId } from "../../model/ids.js";
 import type { LvstAccount } from "../../model/lvst.js";
@@ -47,6 +51,14 @@ export type RawVaultPools = {
   readonly noShareTotal: bigint;
 };
 
+export type RawStreamState = {
+  readonly status: number;
+  readonly scheme: number;
+  readonly id: string;
+  readonly updatedAt: bigint;
+  readonly endedAt: bigint;
+};
+
 export type RawLane = {
   readonly vaultId: `0x${string}`;
   readonly side: number;
@@ -76,6 +88,13 @@ export type RawDisputeState = {
 
 const VAULT_STATUSES = ["open", "hot", "locked", "resolved", "disputed"] as const satisfies readonly OptionsVaultStatus[];
 const VAULT_OUTCOMES = ["pending", "yes", "no"] as const satisfies readonly OptionsVaultOutcome[];
+const STREAM_STATUSES = ["none", "live", "ended"] as const;
+const STORAGE_SCHEMES = [
+  "walrus-testnet",
+  "walrus-mainnet",
+  "ipfs",
+  "arweave"
+] as const satisfies readonly PointerScheme[];
 
 export const bytes32ToHex = (value: `0x${string}` | string): string => {
   const normalized = value.toLowerCase();
@@ -110,6 +129,26 @@ export const mapVaultShareTotals = (data: RawVaultPools): OptionsVaultShareTotal
   yes: data.yesShareTotal,
   no: data.noShareTotal
 });
+
+export const mapStreamState = (data: RawStreamState): OptionsStreamState => {
+  const status = STREAM_STATUSES[data.status];
+  const scheme = STORAGE_SCHEMES[data.scheme];
+
+  if (status === undefined || scheme === undefined) {
+    throw new LiveStreakConfigError({
+      message: "Invalid stream state from contracts",
+      metadata: { details: `status=${data.status} scheme=${data.scheme}` }
+    });
+  }
+
+  return {
+    status,
+    scheme,
+    id: data.id,
+    updatedAtMs: Number(data.updatedAt) * 1000,
+    endedAtMs: Number(data.endedAt) * 1000
+  };
+};
 
 export const mapVault = (
   data: RawVaultData,

@@ -23,7 +23,8 @@ export type ContractsReadEntity =
   | "NFT balance"
   | "ownerOf"
   | "getApproved"
-  | "isApprovedForAll";
+  | "isApprovedForAll"
+  | "stream state";
 
 export const contractsReadNotFound = (
   entity: ContractsReadEntity,

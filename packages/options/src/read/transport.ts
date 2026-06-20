@@ -7,6 +7,7 @@ import type {
   OptionsMarket,
   OptionsNft,
   OptionsProtocolSummary,
+  OptionsStreamState,
   TokenId,
   UserAddress,
   VaultId
@@ -15,6 +16,7 @@ import type { OptionsVault, OptionsVaultShareTotals, OptionsVaultSide } from "..
 
 export interface OptionsReadTransport {
   readMarket(marketId: MarketId): Promise<OptionsMarket>;
+  readStreamState(marketId: MarketId): Promise<OptionsStreamState>;
   listMarketVaults(marketId: MarketId): Promise<readonly VaultId[]>;
   readVault(vaultId: VaultId): Promise<OptionsVault>;
   readVaultShareTotals(vaultId: VaultId): Promise<OptionsVaultShareTotals>;

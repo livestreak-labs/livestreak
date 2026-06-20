@@ -15,6 +15,7 @@ import { asMarketId, asTokenId, asVaultId } from "../../model/ids.js";
 import type { LvstAccount } from "../../model/lvst.js";
 import type { MarketId, TokenId, UserAddress, VaultId } from "../../model/ids.js";
 import type { OptionsBoardState } from "../../model/accrual.js";
+import type { OptionsStreamState } from "../../model/media.js";
 import type { OptionsMarket } from "../../model/market.js";
 import type { OptionsNft } from "../../model/nft.js";
 import type { OptionsProtocolSummary } from "../../model/snapshot.js";
@@ -33,6 +34,7 @@ import {
   mapNft,
   mapProtocolSummary,
   mapApprovedAddress,
+  mapStreamState,
   mapStreamsStateBalance,
   type RawStreamsState,
   mapVault,
@@ -45,6 +47,7 @@ import {
   type RawLane,
   type RawMarketData,
   type RawPosition,
+  type RawStreamState,
   type RawVaultData,
   type RawVaultPools
 } from "./mapping.js";
@@ -161,6 +164,27 @@ class ContractsOptionsReadTransport implements OptionsReadTransport {
       }
 
       throw contractsReadFailed("market", error);
+    }
+  }
+
+  async readStreamState(marketId: MarketId): Promise<OptionsStreamState> {
+    const marketBytes = validateMarketIdForContracts(marketId);
+
+    try {
+      const state = await this.call<RawStreamState>(
+        this.addresses.marketRegistry,
+        this.abis.MarketRegistry,
+        "streamState",
+        [marketBytes]
+      );
+
+      return mapStreamState(state);
+    } catch (error) {
+      if (error instanceof LiveStreakConfigError) {
+        throw error;
+      }
+
+      throw contractsReadFailed("stream state", error);
     }
   }
 

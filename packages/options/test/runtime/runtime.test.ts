@@ -370,6 +370,10 @@ const wrapTransport = (
     onCall();
     return transport.readMarket(marketId);
   },
+  readStreamState: async (marketId) => {
+    onCall();
+    return transport.readStreamState(marketId);
+  },
   listMarketVaults: async (marketId) => {
     onCall();
     return transport.listMarketVaults(marketId);
