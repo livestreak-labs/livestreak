@@ -2048,7 +2048,8 @@ export const marketRegistryAbi = [
     type: 'function',
     inputs: [
       { name: 'marketId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'pointer', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'scheme', internalType: 'enum MarketRegistry.StorageScheme', type: 'uint8' },
+      { name: 'id', internalType: 'bytes32', type: 'bytes32' },
     ],
     name: 'goLive',
     outputs: [],
@@ -2131,7 +2132,8 @@ export const marketRegistryAbi = [
     type: 'function',
     inputs: [
       { name: 'marketId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'vodPointer', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'scheme', internalType: 'enum MarketRegistry.StorageScheme', type: 'uint8' },
+      { name: 'id', internalType: 'bytes32', type: 'bytes32' },
     ],
     name: 'setEnded',
     outputs: [],
@@ -2143,7 +2145,8 @@ export const marketRegistryAbi = [
     name: 'streamState',
     outputs: [
       { name: 'status', internalType: 'enum MarketRegistry.StreamStatus', type: 'uint8' },
-      { name: 'pointer', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'scheme', internalType: 'enum MarketRegistry.StorageScheme', type: 'uint8' },
+      { name: 'id', internalType: 'bytes32', type: 'bytes32' },
       { name: 'updatedAt', internalType: 'uint64', type: 'uint64' },
       { name: 'endedAt', internalType: 'uint64', type: 'uint64' },
     ],
@@ -2188,7 +2191,13 @@ export const marketRegistryAbi = [
     anonymous: false,
     inputs: [
       { name: 'marketId', internalType: 'bytes32', type: 'bytes32', indexed: true },
-      { name: 'pointer', internalType: 'bytes32', type: 'bytes32', indexed: false },
+      {
+        name: 'scheme',
+        internalType: 'enum MarketRegistry.StorageScheme',
+        type: 'uint8',
+        indexed: false,
+      },
+      { name: 'id', internalType: 'bytes32', type: 'bytes32', indexed: false },
       { name: 'endedAt', internalType: 'uint64', type: 'uint64', indexed: false },
     ],
     name: 'StreamEnded',
@@ -2198,7 +2207,13 @@ export const marketRegistryAbi = [
     anonymous: false,
     inputs: [
       { name: 'marketId', internalType: 'bytes32', type: 'bytes32', indexed: true },
-      { name: 'pointer', internalType: 'bytes32', type: 'bytes32', indexed: false },
+      {
+        name: 'scheme',
+        internalType: 'enum MarketRegistry.StorageScheme',
+        type: 'uint8',
+        indexed: false,
+      },
+      { name: 'id', internalType: 'bytes32', type: 'bytes32', indexed: false },
       { name: 'updatedAt', internalType: 'uint64', type: 'uint64', indexed: false },
     ],
     name: 'StreamLive',

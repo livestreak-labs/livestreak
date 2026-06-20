@@ -152,7 +152,7 @@ solidity/
 
 ### MarketRegistry (market index + stream pointer)
 
-Per `marketId`, `streamState` holds a coarse on-chain pointer: `status` (`None` / `Live` / `Ended`), `pointer` (`bytes32` manifest/VOD digest), `updatedAt`, and `endedAt`. The market creator gates `goLive` and `setEnded`; `endedAt` is set once on the first end and never moved. After `endedAt + STREAM_LOCK_GRACE` (1 day), `isLocked` is true and `setEnded` can no longer revise the pointer. Rich manifest metadata stays off-chain; consumers resolve `marketId → current media` with a single keyed read.
+Per `marketId`, `streamState` holds a coarse on-chain pointer: `status` (`None` / `Live` / `Ended`), self-describing media ref `(scheme, id)` (`StorageScheme`: walrus-testnet / walrus-mainnet / ipfs / arweave), `updatedAt`, and `endedAt`. The market creator gates `goLive` and `setEnded`; `endedAt` is set once on the first end and never moved. After `endedAt + STREAM_LOCK_GRACE` (1 day), `isLocked` is true and `setEnded` can no longer revise the pointer. Rich manifest metadata stays off-chain; consumers resolve `marketId → current media` with a single keyed read.
 
 ### MarketDriver (per-market NFT, `tokenId == Drips account`)
 

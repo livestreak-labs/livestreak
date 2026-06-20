@@ -33,9 +33,18 @@ contract MarketRegistry is Ownable {
         Ended
     }
 
+    // Cross-package contract — MUST match observe + host store ordering. Do NOT reorder/renumber.
+    enum StorageScheme {
+        WalrusTestnet,
+        WalrusMainnet,
+        Ipfs,
+        Arweave
+    }
+
     struct StreamState {
         StreamStatus status;
-        bytes32 pointer;
+        StorageScheme scheme;
+        bytes32 id;
         uint64 updatedAt;
         uint64 endedAt;
     }
@@ -44,8 +53,8 @@ contract MarketRegistry is Ownable {
 
     mapping(bytes32 => StreamState) public streamState;
 
-    event StreamLive(bytes32 indexed marketId, bytes32 pointer, uint64 updatedAt);
-    event StreamEnded(bytes32 indexed marketId, bytes32 pointer, uint64 endedAt);
+    event StreamLive(bytes32 indexed marketId, StorageScheme scheme, bytes32 id, uint64 updatedAt);
+    event StreamEnded(bytes32 indexed marketId, StorageScheme scheme, bytes32 id, uint64 endedAt);
 
     constructor(address initialOwner, Protocol protocol_) Ownable(initialOwner) {
         require(address(protocol_) != address(0), "MarketRegistry: zero protocol");
@@ -116,19 +125,20 @@ contract MarketRegistry is Ownable {
     }
 
     /// @notice Creator marks the stream live (first call) or re-points the live manifest.
-    function goLive(bytes32 marketId, bytes32 pointer) external onlyMarketCreator(marketId) {
-        require(pointer != bytes32(0), "MarketRegistry: zero pointer");
+    function goLive(bytes32 marketId, StorageScheme scheme, bytes32 id) external onlyMarketCreator(marketId) {
+        require(id != bytes32(0), "MarketRegistry: zero id");
         StreamState storage s = streamState[marketId];
         require(s.status != StreamStatus.Ended, "MarketRegistry: stream ended");
         s.status = StreamStatus.Live;
-        s.pointer = pointer;
+        s.scheme = scheme;
+        s.id = id;
         s.updatedAt = uint64(block.timestamp);
-        emit StreamLive(marketId, pointer, s.updatedAt);
+        emit StreamLive(marketId, scheme, id, s.updatedAt);
     }
 
     /// @notice Creator ends the stream (first call freezes endedAt) or revises the VOD pointer until lock.
-    function setEnded(bytes32 marketId, bytes32 vodPointer) external onlyMarketCreator(marketId) {
-        require(vodPointer != bytes32(0), "MarketRegistry: zero pointer");
+    function setEnded(bytes32 marketId, StorageScheme scheme, bytes32 id) external onlyMarketCreator(marketId) {
+        require(id != bytes32(0), "MarketRegistry: zero id");
         StreamState storage s = streamState[marketId];
         require(s.status != StreamStatus.None, "MarketRegistry: not live");
         require(!_isLocked(s), "MarketRegistry: stream locked");
@@ -136,9 +146,10 @@ contract MarketRegistry is Ownable {
             s.status = StreamStatus.Ended;
             s.endedAt = uint64(block.timestamp);
         }
-        s.pointer = vodPointer;
+        s.scheme = scheme;
+        s.id = id;
         s.updatedAt = uint64(block.timestamp);
-        emit StreamEnded(marketId, vodPointer, s.endedAt);
+        emit StreamEnded(marketId, scheme, id, s.endedAt);
     }
 
     function isLocked(bytes32 marketId) external view returns (bool) {
