@@ -12,17 +12,13 @@ use sui::coin::{Self, Coin};
 use sui::event;
 use sui::table::{Self, Table};
 
-const WAD: u256 = 1_000_000_000_000_000_000;
 const MAX_STEPS: u64 = 64;
-const SHARE_SCALE: u256 = 1_000_000;
 const BPS_DENOM: u256 = 10_000;
 const UNLIMITED_STEPS: u64 = 1_000_000;
 
 const STATUS_OPEN: u8 = 0;
-const STATUS_HOT: u8 = 1;
 const STATUS_LOCKED: u8 = 2;
 const STATUS_RESOLVED: u8 = 3;
-const STATUS_DISPUTED: u8 = 4;
 
 const OUTCOME_PENDING: u8 = 0;
 const OUTCOME_YES: u8 = 1;
@@ -36,7 +32,6 @@ const E_ZERO_RATE: u64 = 5;
 const E_ALREADY_FUNDING: u64 = 6;
 const E_LENGTH_MISMATCH: u64 = 7;
 const E_NOT_RESOLVABLE: u64 = 8;
-const E_INVALID_OUTCOME: u64 = 9;
 const E_NOT_RESOLVED: u64 = 10;
 const E_BOARD_BEHIND: u64 = 11;
 const E_DIV_ZERO: u64 = 12;

@@ -15,6 +15,7 @@ const E_BAD_ID_LENGTH: u64 = 6;
 const E_STREAM_ENDED: u64 = 7;
 const E_NOT_LIVE: u64 = 8;
 const E_STREAM_LOCKED: u64 = 9;
+const E_BAD_SCHEME: u64 = 10;
 
 const STREAM_STATUS_NONE: u8 = 0;
 const STREAM_STATUS_LIVE: u8 = 1;
@@ -162,20 +163,20 @@ public fun go_live(
     registry: &mut MarketRegistry,
     market_id: vector<u8>,
     scheme: u8,
-    stream_id: vector<u8>,
+    id: vector<u8>,
     clock: &Clock,
     ctx: &TxContext,
 ) {
     assert_market_creator(registry, &market_id, ctx);
-    assert!(vector::length(&stream_id) > 0 && vector::length(&stream_id) <= 64, E_BAD_ID_LENGTH);
+    assert!(vector::length(&id) > 0 && vector::length(&id) <= 64, E_BAD_ID_LENGTH);
     assert_valid_scheme(scheme);
     let s = borrow_stream_state(registry, &market_id);
     assert!(s.status != STREAM_STATUS_ENDED, E_STREAM_ENDED);
     let updated_at = clock::timestamp_ms(clock) / 1000;
-    let emit_id = stream_id;
+    let emit_id = id;
     s.status = STREAM_STATUS_LIVE;
     s.scheme = scheme;
-    s.id = stream_id;
+    s.id = id;
     s.updated_at = updated_at;
     event::emit(StreamLive { market_id, scheme, id: emit_id, updated_at });
 }
@@ -184,24 +185,24 @@ public fun set_ended(
     registry: &mut MarketRegistry,
     market_id: vector<u8>,
     scheme: u8,
-    stream_id: vector<u8>,
+    id: vector<u8>,
     clock: &Clock,
     ctx: &TxContext,
 ) {
     assert_market_creator(registry, &market_id, ctx);
-    assert!(vector::length(&stream_id) > 0 && vector::length(&stream_id) <= 64, E_BAD_ID_LENGTH);
+    assert!(vector::length(&id) > 0 && vector::length(&id) <= 64, E_BAD_ID_LENGTH);
     assert_valid_scheme(scheme);
     let s = borrow_stream_state(registry, &market_id);
     assert!(s.status != STREAM_STATUS_NONE, E_NOT_LIVE);
     assert!(!stream_is_locked(s, clock), E_STREAM_LOCKED);
     let updated_at = clock::timestamp_ms(clock) / 1000;
-    let emit_id = stream_id;
+    let emit_id = id;
     if (s.status != STREAM_STATUS_ENDED) {
         s.status = STREAM_STATUS_ENDED;
         s.ended_at = updated_at;
     };
     s.scheme = scheme;
-    s.id = stream_id;
+    s.id = id;
     s.updated_at = updated_at;
     let ended_at = s.ended_at;
     event::emit(StreamEnded { market_id, scheme, id: emit_id, ended_at });
@@ -258,7 +259,7 @@ fun assert_valid_scheme(scheme: u8) {
             || scheme == SCHEME_WALRUS_MAINNET
             || scheme == SCHEME_IPFS
             || scheme == SCHEME_ARWEAVE,
-        E_BAD_ID_LENGTH,
+        E_BAD_SCHEME,
     );
 }
 
