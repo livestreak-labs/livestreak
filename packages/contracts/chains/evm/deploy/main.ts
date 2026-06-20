@@ -64,14 +64,14 @@ async function deployToChain(chainName: string, rpc: string) {
   console.log(`Chain ID: ${chainId}`);
   console.log(`Deployer: ${deployer}\n`);
 
-  if (chainId === 31337n || chainId === 31337) {
+  if (Number(chainId) === 31337) {
     const ANVIL_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as Hex;
     const { walletClient: anvilWallet } = createClients(rpc, ANVIL_KEY);
     const balance = await publicClient.getBalance({ address: deployer });
     const target = parseEther("10");
     if (balance < target) {
       console.log("Funding deployer from Anvil account #0...");
-      const hash = await anvilWallet.sendTransaction({ to: deployer, value: target });
+      const hash = await anvilWallet.sendTransaction({ to: deployer, value: target } as never);
       await publicClient.waitForTransactionReceipt({ hash });
     }
   }

@@ -98,8 +98,7 @@ const mkWallet = (label: string): WalletClient =>
   createWalletClient({ account: privateKeyToAccount(keyOf(label)), chain: anvil, transport });
 const addr = (w: WalletClient) => w.account!.address;
 
-const deployer = mkWallet("deployer-fixed");
-// override deployer to anvil #0 so steward owner matches deploy wire
+// anvil #0 so steward owner matches deploy wire
 const DEPLOYER_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as Hex;
 const owner = createWalletClient({ account: privateKeyToAccount(DEPLOYER_KEY), chain: anvil, transport });
 
@@ -170,9 +169,9 @@ type Nft = { who: WalletClient; id: bigint; vaults: Set<string> };
 const nfts: Nft[] = [];
 
 const send = async (w: WalletClient, address: Address, a: Abi, fn: string, args: readonly unknown[]) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   // Explicit gas ceiling: viem's auto-estimate occasionally under-shoots for refund-heavy txs
   // (stopAll/stopSeed do setStreams(int128.min)+withdraw), causing a reasonless OOG revert.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const hash = await w.writeContract({ address, abi: a, functionName: fn, args, account: w.account!, chain: anvil, gas: 15_000_000n } as any);
   const receipt = await pub.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") {
@@ -242,7 +241,7 @@ const expectRevert = async (
 };
 
 const parseVaultCreated = (logs: readonly { address: Address; data: Hex; topics: readonly Hex[] }[]) => {
-  const events = parseEventLogs({ abi: ABIS.vaultDriver, logs, eventName: "VaultCreated" }).filter(
+  const events = parseEventLogs({ abi: ABIS.vaultDriver, logs: logs as never, eventName: "VaultCreated" }).filter(
     (e) => e.address.toLowerCase() === A.vaultDriver.toLowerCase()
   );
   if (events.length === 0) throw new Error("VaultCreated event not found in receipt");
@@ -366,7 +365,7 @@ async function main() {
   const dupVaultId = parseVaultCreated(dupReceipt.logs);
   createdVaults.push(dupVaultId);
   edge(7, "duplicate question string still mints new vaultId", dupVaultId !== v1 && dupVaultId !== `0x${"00".repeat(32)}`, "same title ≠ same vaultId (nonce+time)");
-  assert(vaults.length >= 10 && vlonely && vempty && vpanel, `≥12 vaults created (tracked=${vaults.length + 3})`);
+  assert(vaults.length >= 10 && !!vlonely && !!vempty && !!vpanel, `≥12 vaults created (tracked=${vaults.length + 3})`);
   await printLedger("after bookmaking");
 
   act("ACT 2 — stewards & mint");
@@ -677,7 +676,7 @@ async function main() {
   const dust = vaultRes + dripsRes;
 
   info(`supply Δ=${supplyEnd - supplyStart} minted=${totalMinted}`);
-  info(`withdrawn=${totalWithdrawn} refunded=${totalRefunded} skim=${skim} dust(vault+drips)=${dust}`);
+  info(`withdrawn=${totalWithdrawn} refunded=${totalRefunded} treasury=${treasuryBal} skim=${skim} dust(vault+drips)=${dust}`);
   edge(44, "totalSupply == start + minted", supplyEnd === supplyStart + totalMinted);
   edge(43, "vault+drips residual ≤ dust tolerance", dust <= 500n * BigInt(vaults.length + 6), `dust=${dust}`);
   assert(skim > 0n || vlonelySkim === 0n, "treasury skim tracked");

@@ -7,7 +7,7 @@
   "scopes": {
     "aa": {
       "status": "completed",
-      "deployedAt": "2026-06-20T05:44:22.634Z",
+      "deployedAt": "2026-06-20T06:20:26.604Z",
       "contracts": {
         "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
         "safeSingleton": "0x31ea225b4289bcf8d16764b86af6a699faa31c45",
@@ -24,7 +24,7 @@
     },
     "streaming": {
       "status": "completed",
-      "deployedAt": "2026-06-20T05:44:22.635Z",
+      "deployedAt": "2026-06-20T06:20:26.605Z",
       "contracts": {
         "dripsStreaming": "0xc20641edde8cecf5a6530a3edbd7fbbffe0bf3d5",
         "dripsProxy": "0xbf1f98e88faecf0fb3c8bea93cbdfbeef4aa57d4",
@@ -33,7 +33,7 @@
     },
     "protocol": {
       "status": "completed",
-      "deployedAt": "2026-06-20T05:44:22.708Z",
+      "deployedAt": "2026-06-20T06:20:26.645Z",
       "contracts": {
         "protocol": "0xfe7b1de3c0b7a330b04d854c91fb762886aeb69e",
         "marketRegistry": "0x978d2c1b73ff4a4ec8c1b906f829bb349792ba20",
@@ -46,16 +46,16 @@
     },
     "wire": {
       "status": "completed",
-      "deployedAt": "2026-06-20T05:44:22.795Z",
+      "deployedAt": "2026-06-20T06:20:38.795Z",
       "contracts": {
-        "vaultDriver": "0x5700bcfa34292645feb4749be2b922ebeffd5099",
+        "vaultDriver": "0x5700BcFA34292645feB4749bE2B922EbeFFd5099",
         "marketDriverLogic": "0xc9771ae8dfbb06f8d15c6465d16b5a5dc939b3bd",
-        "marketDriverProxy": "0x0b9b72cc35dfb8a1ebe309c4a0df42c544fe9332"
+        "marketDriverProxy": "0x0B9b72cc35dfb8A1Ebe309C4A0df42c544fE9332"
       }
     },
     "paymaster": {
       "status": "completed",
-      "deployedAt": "2026-06-20T05:44:22.814Z",
+      "deployedAt": "2026-06-20T06:20:46.862Z",
       "contracts": {
         "verifyingPaymaster": "0x547f60b6c453178c851d529bf36e9bccc57ba844"
       }

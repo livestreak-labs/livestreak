@@ -54,7 +54,7 @@ export async function deployPaymaster(
     functionName: "depositTo",
     args: [paymaster],
     value: parseEther("0.05")
-  });
+  } as never);
   await client.waitForTransactionReceipt({ hash: depositHash });
   console.log("  Deposited 0.05 ETH");
 
@@ -67,7 +67,7 @@ export async function deployPaymaster(
     functionName: "addStake",
     args: [86400],
     value: parseEther("0.01")
-  });
+  } as never);
   await client.waitForTransactionReceipt({ hash: stakeHash });
   console.log("  Staked 0.01 ETH");
 

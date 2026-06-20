@@ -23,7 +23,7 @@ export async function ensureNickFactory(
   const fundHash = await walletClient.sendTransaction({
     to: NICK_FACTORY_DEPLOYER,
     value: parseEther("0.01")
-  });
+  } as never);
   await publicClient.waitForTransactionReceipt({ hash: fundHash });
 
   const deployHash = await publicClient.request({
@@ -113,8 +113,8 @@ function buildInitcode(
     return bytecode;
   }
 
-  const ctorInputs = artifact.abi.filter((entry) => entry.type === "constructor")[0]?.inputs ?? [];
-  const encoded = encodeAbiParameters(ctorInputs, constructorArgs);
+  const ctorInputs = artifact.abi.filter((entry: { type: string }) => entry.type === "constructor")[0]?.inputs ?? [];
+  const encoded = encodeAbiParameters(ctorInputs as never, constructorArgs as never);
   return (bytecode + encoded.slice(2)) as Hex;
 }
 
@@ -141,7 +141,7 @@ export async function deployFromArtifact(
   const hash = await walletClient.sendTransaction({
     to: DETERMINISTIC_DEPLOYER,
     data: (salt + initcode.slice(2)) as Hex
-  });
+  } as never);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   if (!receipt.status || receipt.status === "reverted") {
     throw new Error(`CREATE2 deploy failed for ${label ?? artifactPath}`);
