@@ -40,14 +40,22 @@ export interface CreateBookmakerBridgeInput {
 
 export interface BookmakerBridge {
   readonly runtime: import("../runtime/runtime.js").BookmakerRuntime;
-  readonly readBoard: (caller: BridgeCaller) => Promise<import("../model/panel.js").BookmakerPanelView>;
-  readonly readControls: (caller: BridgeCaller) => Promise<import("./panel/types.js").BookmakerPanelSnapshot>;
+  readonly readBoard: (
+    caller: BridgeCaller,
+    nowMs: number
+  ) => Promise<import("../model/panel.js").BookmakerPanelView>;
+  readonly readControls: (
+    caller: BridgeCaller,
+    nowMs: number
+  ) => Promise<import("./panel/types.js").BookmakerPanelSnapshot>;
   readonly callAction: (
     caller: BridgeCaller,
-    envelope: CallActionEnvelope
+    envelope: CallActionEnvelope,
+    nowMs: number
   ) => Promise<import("../chains/types.js").TxId>;
   readonly subscribeBoard: (
     caller: BridgeCaller,
-    listener: (board: import("../model/panel.js").BookmakerPanelView) => void
+    listener: (board: import("../model/panel.js").BookmakerPanelView) => void,
+    nowMs: number
   ) => () => void;
 }

@@ -35,3 +35,18 @@ export const idempotencyKeyFromDraft = (draft: VaultDraft): string =>
     resolutionWindowExpiresAtMs: draft.resolutionWindow.expiresAtMs,
     creatorSide: draft.creatorSide ?? "yes"
   });
+
+export const idempotencyKeyFromCreateIntent = (intent: {
+  readonly marketId: string;
+  readonly question: string;
+  readonly resolutionSource: string;
+  readonly resolutionWindowExpiresAtMs: number;
+  readonly creatorSide: "yes" | "no";
+}): string =>
+  idempotencyKeyFor({
+    marketId: intent.marketId,
+    question: intent.question,
+    resolutionSource: intent.resolutionSource,
+    resolutionWindowExpiresAtMs: intent.resolutionWindowExpiresAtMs,
+    creatorSide: intent.creatorSide
+  });

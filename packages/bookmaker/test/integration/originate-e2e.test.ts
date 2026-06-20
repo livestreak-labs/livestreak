@@ -5,6 +5,7 @@ import { buildWriteIntentsFromDecision } from "../../src/model/write-intent.js";
 import { originateVault } from "../../src/flows/originate.js";
 import { DISCOVERY_FIND_PATH } from "../../src/similarity/host-client.js";
 import { createFakeBookmakerChain, FAKE_MARKET_ID, FAKE_VAULT_ID } from "../helpers/fake-bookmaker-chain.js";
+import { createTestRuntime } from "../helpers/test-runtime.js";
 import { marketContext, similarityResult } from "../helpers/fixtures.js";
 
 describe("originate vault e2e", () => {
@@ -62,6 +63,8 @@ describe("originate vault e2e", () => {
       return;
     }
 
+    const runtime = createTestRuntime(chain);
+
     const result = await originateVault({
       evaluation,
       marketContext: bytesMarketContext,
@@ -71,8 +74,8 @@ describe("originate vault e2e", () => {
         detection: evaluation.detection
       },
       similarityClient,
-      chain,
-      nowMs
+      nowMs,
+      guardedCreateVault: runtime.createVaultOnce.bind(runtime)
     });
 
     expect(discoveryCalls).toEqual([DISCOVERY_FIND_PATH]);

@@ -8,18 +8,19 @@ import { buildVaultDraft } from "../draft/build.js";
 import type { BookmakerDecision } from "../model/decision.js";
 import type { Detection } from "../model/detection.js";
 import type { VaultDraft } from "../model/vault-draft.js";
-import { buildCreateVaultIntent } from "../model/write-intent.js";
-import { idempotencyKeyFromDraft } from "../model/idempotency.js";
+import { buildCreateVaultIntent, type CreateVaultIntent } from "../model/write-intent.js";
 import type { SimilarityResult } from "../model/similarity.js";
-import type { BookmakerChain, CreateVaultResult } from "../chains/types.js";
 import type { BookmakerSimilarityClient } from "../similarity/client.js";
 import { findSimilar } from "../similarity/find.js";
-import type { IdempotencyStore } from "../runtime/idempotency.js";
-import { createIdempotencyStore } from "../runtime/idempotency.js";
-import { validateCreateVaultIntent } from "../validate/write-intent.js";
+import type { CreateVaultOnceResult } from "../runtime/create-vault-once.js";
 import { validateVaultDraftForCreate } from "../validate/vault-draft.js";
 
 // --- exports ---
+
+export type GuardedCreateVault = (
+  intent: CreateVaultIntent,
+  nowMs: number
+) => Promise<CreateVaultOnceResult>;
 
 export interface OriginateVaultInput {
   readonly evaluation: BookmakerDetectionEvaluation;
@@ -27,9 +28,8 @@ export interface OriginateVaultInput {
   readonly fundingToken: string;
   readonly policy: BookmakerVaultPolicy;
   readonly similarityClient: BookmakerSimilarityClient;
-  readonly chain: BookmakerChain;
   readonly nowMs: number;
-  readonly idempotencyStore?: IdempotencyStore;
+  readonly guardedCreateVault: GuardedCreateVault;
 }
 
 export type OriginateVaultResult =
@@ -48,8 +48,8 @@ export type OriginateVaultResult =
       readonly action: "created";
       readonly draft: VaultDraft;
       readonly detection: Detection;
-      readonly intent: ReturnType<typeof buildCreateVaultIntent>;
-      readonly result: CreateVaultResult;
+      readonly intent: CreateVaultIntent;
+      readonly result: CreateVaultOnceResult["result"];
       readonly idempotent: boolean;
       readonly idempotencyKey: string;
     };
@@ -73,7 +73,7 @@ export const originateVault = async (input: OriginateVaultInput): Promise<Origin
     detection
   });
 
-  return finalizeOriginateDecision(input, detection, draft, similarity, decision);
+  return finalizeOriginateDecision(input, detection, draft, decision);
 };
 
 // --- helpers ---
@@ -82,7 +82,6 @@ const finalizeOriginateDecision = async (
   input: OriginateVaultInput,
   detection: Detection,
   draft: VaultDraft,
-  _similarity: SimilarityResult,
   decision: BookmakerDecision
 ): Promise<OriginateVaultResult> => {
   if (decision.action === "skip") {
@@ -111,25 +110,16 @@ const finalizeOriginateDecision = async (
   }
 
   const intent = buildCreateVaultIntent(draftValidated.value);
-  const validated = validateCreateVaultIntent(intent, input.nowMs);
-  if (validated.ok === false) {
-    throw new LiveStreakConfigError({
-      message: validated.issues.join("; "),
-      metadata: { details: JSON.stringify(validated.issues) }
-    });
-  }
-
-  const idempotencyKey = idempotencyKeyFromDraft(draftValidated.value);
-  const idempotencyStore = input.idempotencyStore ?? createIdempotencyStore();
-  const { result, idempotent } = await idempotencyStore.run(idempotencyKey, () =>
-    input.chain.writer.createVault(validated.value)
+  const { result, idempotent, idempotencyKey } = await input.guardedCreateVault(
+    intent,
+    input.nowMs
   );
 
   return {
     action: "created",
     draft,
     detection,
-    intent: validated.value,
+    intent,
     result,
     idempotent,
     idempotencyKey

@@ -20,7 +20,9 @@ describe("buildWriteIntentsFromDecision", () => {
         question: draft.question,
         creatorSide: "yes",
         creatorStake: 5_000_000n,
-        seedRate: 8_333n
+        seedRate: 8_333n,
+        resolutionSource: draft.resolutionSource,
+        resolutionWindowExpiresAtMs: draft.resolutionWindow.expiresAtMs
       }
     ]);
   });

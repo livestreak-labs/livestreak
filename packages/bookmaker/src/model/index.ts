@@ -10,6 +10,7 @@ export type {
 export {
   idempotencyKeyFor,
   idempotencyKeyFromDraft,
+  idempotencyKeyFromCreateIntent,
   normalizeVaultQuestion
 } from "./idempotency.js";
 export type { BookmakerWatchSource } from "./watch-source.js";

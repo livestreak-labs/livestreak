@@ -27,6 +27,17 @@ See [architecture.md](./architecture.md) and [flow.md](./flow.md).
 
 ---
 
+## Slice 2b — wire idempotency into both entry points (Phase 6)
+
+- [x] `runtime/create-vault-once.ts` — sole `chain.writer.createVault` caller via `createVaultOnce`
+- [x] `originateVault` requires `guardedCreateVault` (no ephemeral `?? createIdempotencyStore()` default)
+- [x] `bridge.callAction("createVault")` validates intent + routes through `runtime.createVaultOnce`
+- [x] Bridge methods take injected `nowMs` for capability expiry (not `readSnapshot().updatedAtMs`)
+- [x] Tests: originate + bridge share one store; expiry fail/pass; non-bigint rejection
+- [x] `docs/flow.md` + this file updated
+
+---
+
 ## Follow-ups
 
 - [ ] **Residual:** receipt poll timeout after on-chain inclusion — re-check userOp receipt before retry send

@@ -6,8 +6,10 @@ import { createBookmakerChain, type BookmakerChain } from "../chains/index.js";
 import { validateBookmakerChainConfig } from "../chains/config.js";
 import type { BookmakerRuntimeConfig } from "./config.js";
 import { createIdempotencyStore, type IdempotencyStore } from "./idempotency.js";
+import { createVaultOnce, type CreateVaultOnceResult } from "./create-vault-once.js";
 import { createSnapshotSubscriptionRegistry } from "./subscriptions.js";
 import { createBookmakerRuntimeStore, type BookmakerRuntimeState, type BookmakerRuntimeStore } from "./store.js";
+import type { CreateVaultIntent } from "../model/write-intent.js";
 import { validateBookmakerRuntimeConfig } from "../validate/runtime-config.js";
 
 // --- exports ---
@@ -28,6 +30,10 @@ export interface BookmakerRuntime {
   readonly set: (key: string, value: unknown) => BookmakerRuntimeState;
   readonly get: <T>(key: string) => T | undefined;
   readonly watchMemory: (key: string, listener: (value: unknown) => void) => () => void;
+  readonly createVaultOnce: (
+    intent: CreateVaultIntent,
+    nowMs: number
+  ) => Promise<CreateVaultOnceResult>;
 }
 
 export const createBookmakerRuntime = (input: BookmakerRuntimeInput): BookmakerRuntime =>
@@ -124,6 +130,15 @@ class BookmakerRuntimeFacade implements BookmakerRuntime {
     return () => {
       watchers.delete(listener);
     };
+  }
+
+  createVaultOnce(intent: CreateVaultIntent, nowMs: number): Promise<CreateVaultOnceResult> {
+    return createVaultOnce({
+      store: this.idempotencyStore,
+      chain: this.chain,
+      intent,
+      nowMs
+    });
   }
 
   private emptyPanelSnapshot(): BookmakerPanelSnapshot {

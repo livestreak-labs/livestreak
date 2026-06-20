@@ -10,6 +10,8 @@ export type CreateVaultIntent = {
   readonly creatorSide: "yes" | "no";
   readonly creatorStake: bigint;
   readonly seedRate: bigint;
+  readonly resolutionSource: string;
+  readonly resolutionWindowExpiresAtMs: number;
 };
 
 export type JoinVaultIntent = {
@@ -26,7 +28,9 @@ export const buildCreateVaultIntent = (draft: VaultDraft): CreateVaultIntent => 
   question: draft.question,
   creatorSide: draft.creatorSide ?? "yes",
   creatorStake: draft.creatorStake!,
-  seedRate: draft.seedRate!
+  seedRate: draft.seedRate!,
+  resolutionSource: draft.resolutionSource,
+  resolutionWindowExpiresAtMs: draft.resolutionWindow.expiresAtMs
 });
 
 export const buildWriteIntentsFromDecision = (

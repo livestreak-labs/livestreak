@@ -3,8 +3,8 @@ import { LiveStreakConfigError, LiveStreakRuntimeError, isLiveStreakError } from
 
 import { idempotencyKeyFor, idempotencyKeyFromDraft } from "../../src/model/idempotency.js";
 import { originateVault } from "../../src/flows/originate.js";
-import { createIdempotencyStore } from "../../src/runtime/idempotency.js";
 import { createFakeBookmakerChain, FAKE_MARKET_ID } from "../helpers/fake-bookmaker-chain.js";
+import { createTestRuntime } from "../helpers/test-runtime.js";
 import { detection, marketContext, similarityResult, vaultDraft } from "../helpers/fixtures.js";
 
 describe("idempotencyKeyFor", () => {
@@ -43,16 +43,17 @@ describe("idempotencyKeyFor", () => {
 });
 
 describe("originateVault idempotency", () => {
-  it("creates once for duplicate originate calls with the same store", async () => {
-    const store = createIdempotencyStore();
+  it("creates once for duplicate originate calls with the same guarded executor", async () => {
     let createCalls = 0;
-    const chain = createFakeBookmakerChain(() => {
-      createCalls += 1;
-      return {
-        txId: `0x${"aa".repeat(32)}` as const,
-        vaultId: `0x${"22".repeat(32)}` as const
-      };
-    });
+    const runtime = createTestRuntime(
+      createFakeBookmakerChain(() => {
+        createCalls += 1;
+        return {
+          txId: `0x${"aa".repeat(32)}` as const,
+          vaultId: `0x${"22".repeat(32)}` as const
+        };
+      })
+    );
 
     const evaluation = {
       action: "detected" as const,
@@ -65,9 +66,8 @@ describe("originateVault idempotency", () => {
       fundingToken: "0x0000000000000000000000000000000000000002",
       policy: { duplicatePolicy: "always-create" as const, detection: evaluation.detection },
       similarityClient: { findSimilar: async () => similarityResult({ marketId: FAKE_MARKET_ID }) },
-      chain,
       nowMs: 10_000,
-      idempotencyStore: store
+      guardedCreateVault: runtime.createVaultOnce.bind(runtime)
     };
 
     const first = await originateVault(input);
@@ -88,6 +88,8 @@ describe("originateVault idempotency", () => {
 
 describe("originateVault core errors", () => {
   it("throws LiveStreakConfigError for non-detected evaluation", async () => {
+    const runtime = createTestRuntime(createFakeBookmakerChain());
+
     await expect(
       originateVault({
         evaluation: { action: "skip", reason: "no_detection", detectorCount: 0 },
@@ -95,8 +97,8 @@ describe("originateVault core errors", () => {
         fundingToken: "0xusdc",
         policy: { duplicatePolicy: "always-create", detection: detection() },
         similarityClient: { findSimilar: async () => similarityResult() },
-        chain: createFakeBookmakerChain(),
-        nowMs: 1
+        nowMs: 1,
+        guardedCreateVault: runtime.createVaultOnce.bind(runtime)
       })
     ).rejects.toBeInstanceOf(LiveStreakConfigError);
   });

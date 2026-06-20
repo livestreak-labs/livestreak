@@ -25,6 +25,13 @@ export const validateCreateVaultIntent = (
   const creatorStake = requirePositiveBigInt(value.creatorStake, "creatorStake", issues);
   const seedRate = requirePositiveBigInt(value.seedRate, "seedRate", issues);
 
+  const resolutionSource = requireNonEmptyString(value.resolutionSource, "resolutionSource", issues);
+  const resolutionWindowExpiresAtMs = requirePositiveNumber(
+    value.resolutionWindowExpiresAtMs,
+    "resolutionWindowExpiresAtMs",
+    issues
+  );
+
   if (typeof nowMs !== "number" || Number.isFinite(nowMs) === false) {
     issues.push("nowMs must be a finite number");
   }
@@ -39,7 +46,9 @@ export const validateCreateVaultIntent = (
     question: question!,
     creatorSide: creatorSide!,
     creatorStake: creatorStake!,
-    seedRate: seedRate!
+    seedRate: seedRate!,
+    resolutionSource: resolutionSource!,
+    resolutionWindowExpiresAtMs: resolutionWindowExpiresAtMs!
   });
 };
 
@@ -111,6 +120,19 @@ const requirePositiveBigInt = (
 ): bigint | undefined => {
   if (typeof value !== "bigint" || value <= 0n) {
     issues.push(`${fieldPath} must be a bigint > 0`);
+    return undefined;
+  }
+
+  return value;
+};
+
+const requirePositiveNumber = (
+  value: unknown,
+  fieldPath: string,
+  issues: string[]
+): number | undefined => {
+  if (typeof value !== "number" || Number.isFinite(value) === false || value <= 0) {
+    issues.push(`${fieldPath} must be a finite number > 0`);
     return undefined;
   }
 

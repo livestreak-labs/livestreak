@@ -66,7 +66,7 @@ export type {
   ValidationResult,
   ValidationSuccess
 } from "./validate/index.js";
-export type { OriginateVaultInput, OriginateVaultResult } from "./flows/index.js";
+export type { OriginateVaultInput, OriginateVaultResult, GuardedCreateVault } from "./flows/index.js";
 export { detectOpportunity } from "./detection/index.js";
 export { buildVaultDraft } from "./draft/index.js";
 export { chooseVaultAction } from "./decision/index.js";
@@ -113,7 +113,7 @@ export {
   asVaultId
 } from "./chains/index.js";
 export { originateVault, snapshotBookmakerPanel } from "./flows/index.js";
-export { createBookmakerRuntime, createIdempotencyStore } from "./runtime/index.js";
+export { createBookmakerRuntime, createIdempotencyStore, createVaultOnce } from "./runtime/index.js";
 export {
   createBookmakerBridge,
   authorizeBridgeCaller,

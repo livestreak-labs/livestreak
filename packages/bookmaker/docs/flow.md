@@ -10,7 +10,7 @@ observation events
   → buildVaultDraft (draft/) — derives seedRate = creatorStake / windowSeconds
   → findSimilar via POST /discovery/find (similarity/)
   → chooseVaultAction (decision/) — exact vaultKey join + fuzzy policy
-  → originateVault (flows/) — idempotency store → chains.writer.createVault(intent)
+  → originateVault (flows/) — guardedCreateVault → runtime.createVaultOnce → chains.writer.createVault(intent)
   → VaultCreated event → vaultId
   → runtime.publishSnapshot + bridge panel projection
 ```
@@ -23,9 +23,10 @@ observation events
 | `addresses` (`vaultDriver`, `marketRegistry`, `vault`, `usdc`) | EVM reader/writer |
 | `readRpcUrl` (optional) | EVM `marketExists` reads |
 | `similarityClient` or `createHostDiscoveryClient(baseUrl)` | `findSimilar` |
-| `idempotencyStore` (optional; runtime owns default) | `originateVault` at-most-once guard |
+| `guardedCreateVault` (required; typically `runtime.createVaultOnce`) | `originateVault` at-most-once guard via shared runtime store |
 | `fundingToken`, `policy`, `marketContext`, `watchSource` | runtime + draft |
-| `nowMs` | all pure stages (no `Date.now()` in `src/`) |
+| `nowMs` | all pure stages + bridge authz (no `Date.now()` in `src/`) |
+| `nowMs` on bridge methods | capability expiry + `callAction` validation clock |
 
 ## Stage edge map
 
@@ -41,7 +42,7 @@ observation events
 | Similarity | `duplicateRisk: high` + `skip-on-high` | Yes — skip |
 | Decision | Cross-market similarity result | Yes — skip `market_mismatch` |
 | Decision | Steward warnings | Yes — skip |
-| Execute | Retry / replay / concurrent duplicate create | Yes — `runtime/idempotency` store (same vault-defining key) |
+| Execute | Retry / replay / concurrent duplicate create | Yes — `runtime.createVaultOnce` + shared `idempotencyStore` (originate + bridge) |
 | Execute | Unknown `marketId` on-chain | **UNHANDLED** — reverts at `VaultDriver.createVault` |
 | Execute | Insufficient USDC balance | **UNHANDLED** — ERC20 transfer reverts |
 | Execute | Insufficient allowance | Partial — writer auto-approves up to deposit |
@@ -50,12 +51,14 @@ observation events
 | Execute | Receipt missing `VaultCreated` | Yes — `LiveStreakRuntimeError` |
 | Execute | Sui chain | Yes — stub throws `LiveStreakConfigError` |
 | Bridge | Missing scope | Yes — `LiveStreakCapabilityError` |
+| Bridge | Expired capability grant | Yes — injected `nowMs` vs `grant.expiresAt` |
+| Bridge | `createVault` double-submit | Yes — same `createVaultOnce` + store as originate |
 | Bridge | Trusted caller | Yes — short-circuit v0 |
 | Runtime | Not deployed / wrong addresses | **UNHANDLED** — fails at RPC or revert |
 
 ## Idempotency layers
 
-1. **Within-runtime (deterministic):** `idempotencyKeyFromDraft` hashes `marketId`, normalized `question`, `resolutionSource`, `resolutionWindow.expiresAtMs`, `creatorSide`. Bond size / rate excluded. `createIdempotencyStore().run(key, exec)` guarantees at-most-one chain call per key per store instance; concurrent callers share one in-flight promise.
+1. **Within-runtime (deterministic):** `idempotencyKeyFromDraft` / `idempotencyKeyFromCreateIntent` hash vault-defining fields. `BookmakerRuntime.createVaultOnce` validates intent, computes key, runs `idempotencyStore.run(key, exec)` — the only path to `chain.writer.createVault`. Originate passes `guardedCreateVault: runtime.createVaultOnce`; bridge `callAction("createVault")` calls the same method.
 2. **Cross-runtime (best-effort):** host similarity candidates may carry `vaultKey`; exact match → `joinVault` before fuzzy scoring.
 
 ## Multichain layout

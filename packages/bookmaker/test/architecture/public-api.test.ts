@@ -27,6 +27,7 @@ const requiredExports = [
   "hasBookmakerChainAddresses",
   "originateVault",
   "createBookmakerRuntime",
+  "createVaultOnce",
   "createIdempotencyStore",
   "idempotencyKeyFor",
   "idempotencyKeyFromDraft",

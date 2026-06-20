@@ -3,6 +3,8 @@
 import { LiveStreakConfigError } from "@livestreak/core";
 
 import type { TxId } from "../chains/types.js";
+import type { CreateVaultIntent } from "../model/write-intent.js";
+import { validateCreateVaultIntent } from "../validate/write-intent.js";
 import { authorizeBridgeCaller } from "./scope.js";
 import type {
   BookmakerBridge,
@@ -41,13 +43,13 @@ export const createBookmakerBridge = (input: CreateBookmakerBridgeInput): Bookma
   return {
     runtime,
 
-    readBoard: async (caller) => {
-      authorizeBridgeCaller(caller, bridgeBoardReadScope, runtime.readSnapshot().updatedAtMs);
+    readBoard: async (caller, nowMs) => {
+      authorizeBridgeCaller(caller, bridgeBoardReadScope, nowMs);
       return runtime.readPanel();
     },
 
-    readControls: async (caller) => {
-      authorizeBridgeCaller(caller, bridgeControlsReadScope, runtime.readSnapshot().updatedAtMs);
+    readControls: async (caller, nowMs) => {
+      authorizeBridgeCaller(caller, bridgeControlsReadScope, nowMs);
       const panel = runtime.readPanel();
       return {
         runtimeId: panel.runtimeId,
@@ -63,8 +65,8 @@ export const createBookmakerBridge = (input: CreateBookmakerBridgeInput): Bookma
       };
     },
 
-    callAction: async (caller, envelope) => {
-      authorizeBridgeCaller(caller, bridgeActionScope, runtime.readSnapshot().updatedAtMs);
+    callAction: async (caller, envelope, nowMs) => {
+      authorizeBridgeCaller(caller, bridgeActionScope, nowMs);
 
       if (envelope.scope !== bridgeActionScope) {
         throw new LiveStreakConfigError({
@@ -73,11 +75,11 @@ export const createBookmakerBridge = (input: CreateBookmakerBridgeInput): Bookma
         });
       }
 
-      return dispatchWriterAction(runtime, envelope.action, envelope.args);
+      return dispatchWriterAction(runtime, envelope.action, envelope.args, nowMs);
     },
 
-    subscribeBoard: (caller, listener) => {
-      authorizeBridgeCaller(caller, bridgeBoardSubscribeScope, runtime.readSnapshot().updatedAtMs);
+    subscribeBoard: (caller, listener, nowMs) => {
+      authorizeBridgeCaller(caller, bridgeBoardSubscribeScope, nowMs);
       return runtime.subscribeSnapshots(() => {
         listener(runtime.readPanel());
       });
@@ -90,7 +92,8 @@ export const createBookmakerBridge = (input: CreateBookmakerBridgeInput): Bookma
 const dispatchWriterAction = async (
   runtime: CreateBookmakerBridgeInput["runtime"],
   action: string,
-  args: unknown
+  args: unknown,
+  nowMs: number
 ): Promise<TxId> => {
   if (action !== "createVault") {
     throw new LiveStreakConfigError({
@@ -106,14 +109,32 @@ const dispatchWriterAction = async (
     });
   }
 
-  const input = args as Record<string, unknown>;
-  const result = await runtime.chain.writer.createVault({
-    marketId: String(input.marketId),
-    question: String(input.question),
-    creatorSide: input.creatorSide === "no" ? "no" : "yes",
-    creatorStake: input.creatorStake as bigint,
-    seedRate: input.seedRate as bigint
-  });
+  const intent = parseCreateVaultIntentFromArgs(args as Record<string, unknown>, nowMs);
+  const result = await runtime.createVaultOnce(intent, nowMs);
+  return result.result.txId;
+};
 
-  return result.txId;
+const parseCreateVaultIntentFromArgs = (args: Record<string, unknown>, nowMs: number): CreateVaultIntent => {
+  const validated = validateCreateVaultIntent(
+    {
+      action: "createVault",
+      marketId: args.marketId,
+      question: args.question,
+      creatorSide: args.creatorSide,
+      creatorStake: args.creatorStake,
+      seedRate: args.seedRate,
+      resolutionSource: args.resolutionSource,
+      resolutionWindowExpiresAtMs: args.resolutionWindowExpiresAtMs
+    },
+    nowMs
+  );
+
+  if (validated.ok === false) {
+    throw new LiveStreakConfigError({
+      message: validated.issues.join("; "),
+      metadata: { details: JSON.stringify(validated.issues) }
+    });
+  }
+
+  return validated.value;
 };
