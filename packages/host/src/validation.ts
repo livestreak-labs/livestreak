@@ -5,6 +5,7 @@ import { HostCacheReceiptRequest } from "./media/evidence.js";
 import { AaPaymasterRequest } from "./aa.js";
 import { HostSimilarityIndexRequest, HostSimilarityRequest } from "./discovery.js";
 import { MemoryAccessRequest } from "./memory.js";
+import { ContentBlobStoreRequest } from "./walrus.js";
 
 // --- exports ---
 
@@ -21,6 +22,8 @@ export const decodeHostDiscoveryRequest = Schema.decodeUnknownEither(HostSimilar
 export const decodeHostDiscoveryIndexRequest = Schema.decodeUnknownEither(HostSimilarityIndexRequest);
 
 export const decodeMemoryAccessRequest = Schema.decodeUnknownEither(MemoryAccessRequest);
+
+export const decodeContentBlobStoreRequest = Schema.decodeUnknownEither(ContentBlobStoreRequest);
 
 export const validationErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message.trim().length > 0) {

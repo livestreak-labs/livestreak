@@ -4,10 +4,11 @@ import { createDiscoveryStore } from "../discovery/store.js";
 import { createEvidenceStore } from "../media/evidence-store.js";
 import { createManifestStore } from "../media/manifest.js";
 import { createSessionStore } from "../media/session-store.js";
-import { createMemoryBindingStore } from "../memory/binding-store.js";
-import { createMemWalAccountOperations } from "../memory/memwal-ops.js";
-import { resolveMemoryOwnerSuiPrivateKey } from "../memory/owner-key.js";
-import type { ResolvedMemoryNetwork } from "../memory/network-profile.js";
+import { createContentStore } from "../walrus/content/content-store.js";
+import { createMemoryBindingStore } from "../walrus/memory/binding-store.js";
+import { createMemWalAccountOperations } from "../walrus/memory/memwal-ops.js";
+import { resolveMemoryOwnerSuiPrivateKey } from "../walrus/memory/owner-key.js";
+import type { ResolvedWalrus } from "../walrus/network.js";
 
 // --- exports ---
 
@@ -15,7 +16,7 @@ export interface HostRouteDeps {
   readonly config: HostServerConfig;
   readonly media: MediaRouteDeps;
   readonly discovery: DiscoveryRouteDeps;
-  readonly memory: MemoryRouteDeps;
+  readonly walrus: WalrusRouteDeps;
   readonly aa: ReturnType<typeof createAaRouteDeps>;
 }
 
@@ -29,12 +30,21 @@ export interface DiscoveryRouteDeps {
   readonly store: ReturnType<typeof createDiscoveryStore>;
 }
 
+export interface WalrusRouteDeps {
+  readonly memory: MemoryRouteDeps;
+  readonly content: ContentRouteDeps;
+}
+
 export interface MemoryRouteDeps {
   readonly bindings: ReturnType<typeof createMemoryBindingStore>;
 }
 
+export interface ContentRouteDeps {
+  readonly store: ReturnType<typeof createContentStore>;
+}
+
 export interface CreateHostRouteDepsOptions extends CreateAaRouteDepsOptions {
-  readonly memoryResolved?: ResolvedMemoryNetwork;
+  readonly walrusResolved?: ResolvedWalrus;
   readonly memoryOps?: ReturnType<typeof createMemWalAccountOperations>;
 }
 
@@ -42,8 +52,24 @@ export const createHostRouteDeps = (
   config: HostServerConfig = defaultHostServerConfig(),
   options: CreateHostRouteDepsOptions = {}
 ): HostRouteDeps => {
-  const resolved = options.memoryResolved ?? config.resolvedMemoryNetwork;
+  const resolved = options.walrusResolved ?? config.resolvedWalrus;
   const ops = options.memoryOps ?? createMemWalAccountOperations();
+
+  const disabledWalrus: ResolvedWalrus = {
+    network: "mainnet",
+    sui: {
+      rpcUrl: "https://fullnode.mainnet.sui.io:443",
+      packageId: "0x0",
+      registryId: "0x0"
+    },
+    memory: { relayerUrl: "http://walrus-disabled.invalid" },
+    blob: {
+      publisherUrl: "http://walrus-disabled.invalid",
+      aggregatorUrl: "http://walrus-disabled.invalid"
+    }
+  };
+
+  const active = resolved ?? disabledWalrus;
 
   return {
     config,
@@ -55,34 +81,37 @@ export const createHostRouteDeps = (
     discovery: {
       store: createDiscoveryStore()
     },
-    memory: {
-      bindings:
-        resolved === null
-          ? createMemoryBindingStore({
-              resolved: {
-                network: "mainnet",
-                relayerUrl: "http://memory-disabled.invalid",
-                registryId: "0x0",
-                packageId: "0x0",
-                suiRpcUrl: "https://fullnode.mainnet.sui.io:443"
-              },
-              resolveOwnerKey: async () => {
-                throw new Error("memory_not_bootstrapped");
-              },
-              ops
-            })
-          : createMemoryBindingStore({
-              resolved,
-              resolveOwnerKey: async () => {
-                const key = await resolveMemoryOwnerSuiPrivateKey(config, resolved.suiRpcUrl);
-                if (key === null) {
-                  throw new Error("memory_owner_not_configured");
-                }
+    walrus: {
+      memory: {
+        bindings:
+          resolved === null
+            ? createMemoryBindingStore({
+                resolved: active,
+                resolveOwnerKey: async () => {
+                  throw new Error("walrus_not_bootstrapped");
+                },
+                ops
+              })
+            : createMemoryBindingStore({
+                resolved: active,
+                resolveOwnerKey: async () => {
+                  const key = await resolveMemoryOwnerSuiPrivateKey(config, active.sui.rpcUrl);
+                  if (key === null) {
+                    throw new Error("memory_owner_not_configured");
+                  }
 
-                return key;
-              },
-              ops
-            })
+                  return key;
+                },
+                ops
+              })
+      },
+      content: {
+        store: createContentStore({
+          resolved: active,
+          ephemeralEpochs: config.walrusContentEphemeralEpochs,
+          lockedEpochs: config.walrusContentLockedEpochs
+        })
+      }
     },
     aa: createAaRouteDeps(config, options)
   };

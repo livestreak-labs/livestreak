@@ -1,14 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMemoryBindingStore } from "#memory/binding-store.js";
-import type { MemWalAccountOperations } from "#memory/memwal-ops.js";
-import type { ResolvedMemoryNetwork } from "#memory/network-profile.js";
+import { createMemoryBindingStore } from "#walrus/memory/binding-store.js";
+import type { MemWalAccountOperations } from "#walrus/memory/memwal-ops.js";
+import type { ResolvedWalrus } from "#walrus/network.js";
 
-const testResolved = (): ResolvedMemoryNetwork => ({
+const testResolved = (): ResolvedWalrus => ({
   network: "mainnet",
-  relayerUrl: "https://relayer.memory.walrus.xyz",
-  registryId: "0xregistry",
-  packageId: "0xpackage",
-  suiRpcUrl: "https://fullnode.mainnet.sui.io:443"
+  sui: {
+    rpcUrl: "https://fullnode.mainnet.sui.io:443",
+    packageId: "0xpackage",
+    registryId: "0xregistry"
+  },
+  memory: {
+    relayerUrl: "https://relayer.memory.walrus.xyz"
+  },
+  blob: {
+    publisherUrl: "https://publisher.walrus-mainnet.walrus.space",
+    aggregatorUrl: "https://aggregator.walrus-mainnet.walrus.space"
+  }
 });
 
 const createMockOps = (): MemWalAccountOperations => {

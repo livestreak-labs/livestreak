@@ -12,20 +12,25 @@ describe("host descriptor shape", () => {
       version: "0.1.0",
       hostId: "host_dev",
       baseUrl: "http://127.0.0.1:8787",
-      modules: ["aa", "media", "memory", "discovery"],
+      modules: ["aa", "media", "walrus_memory", "walrus_content", "discovery"],
       supportedOutputs: ["local", "file"],
       media: { simulcastAvailable: false },
+      walrus: { network: null },
       memory: {
         relayerUrl: null,
         namespaceTemplate: "market:{marketId}",
-        trustModel: "plaintext-relayer",
-        network: null
+        trustModel: "plaintext-relayer"
+      },
+      content: {
+        publisherUrl: null,
+        aggregatorUrl: null
       }
     };
 
     expect(descriptor.version).toBe("0.1.0");
     expect(descriptor.modules).toContain("media");
     expect(descriptor.memory.namespaceTemplate).toBe("market:{marketId}");
+    expect(descriptor.walrus.network).toBeNull();
   });
 });
 

@@ -1,6 +1,6 @@
 import { addDelegateKey, createAccount } from "@mysten-incubation/memwal/account";
 import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
-import type { ResolvedMemoryNetwork } from "./network-profile.js";
+import type { MemWalNetworkContext } from "../network.js";
 
 // --- exports ---
 
@@ -9,7 +9,7 @@ export interface MemWalGrantDelegateInput {
   readonly accountId: string;
   readonly delegatePublicKeyHex: string;
   readonly label: string;
-  readonly network: ResolvedMemoryNetwork;
+  readonly network: MemWalNetworkContext;
 }
 
 export interface MemWalGrantDelegateResult {
@@ -20,7 +20,7 @@ export interface MemWalGrantDelegateResult {
 export interface MemWalAccountOperations {
   readonly createHostAccount: (input: {
     readonly suiPrivateKey: string;
-    readonly network: ResolvedMemoryNetwork;
+    readonly network: MemWalNetworkContext;
   }) => Promise<{ readonly accountId: string }>;
   readonly grantDelegate: (input: MemWalGrantDelegateInput) => Promise<MemWalGrantDelegateResult>;
 }

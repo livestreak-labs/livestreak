@@ -15,7 +15,7 @@ export default defineConfig({
       { find: /^#descriptor\//, replacement: `${sourceDirectory}/descriptor/` },
       { find: /^#media\//, replacement: `${sourceDirectory}/media/` },
       { find: /^#discovery\//, replacement: `${sourceDirectory}/discovery/` },
-      { find: /^#memory\//, replacement: `${sourceDirectory}/memory/` },
+      { find: /^#walrus\//, replacement: `${sourceDirectory}/walrus/` },
       { find: /^#aa\//, replacement: `${sourceDirectory}/aa/` },
       { find: /^#test\//, replacement: `${packageDirectory}/test/` }
     ]

@@ -1,6 +1,6 @@
 import { createWalletManager } from "@livestreak/wallet";
 import { encodeSuiPrivateKey } from "@mysten/sui/cryptography";
-import type { HostServerConfig } from "../descriptor/config.js";
+import type { HostServerConfig } from "../../descriptor/config.js";
 
 // --- exports ---
 

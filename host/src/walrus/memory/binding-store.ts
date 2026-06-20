@@ -1,11 +1,14 @@
 import type { MarketMemoryBinding } from "@livestreak/host";
 import type { MemWalAccountOperations } from "./memwal-ops.js";
-import type { ResolvedMemoryNetwork } from "./network-profile.js";
+import {
+  memwalContextFromResolved,
+  type ResolvedWalrus
+} from "../network.js";
 
 // --- exports ---
 
 export interface MemoryBindingStoreConfig {
-  readonly resolved: ResolvedMemoryNetwork;
+  readonly resolved: ResolvedWalrus;
   readonly resolveOwnerKey: () => Promise<string>;
   readonly ops: MemWalAccountOperations;
 }
@@ -23,6 +26,7 @@ export const createMemoryBindingStore = (
   const bindings = new Map<string, MarketMemoryBinding>();
   const delegatesByAccount = new Map<string, Set<string>>();
   let hostAccountId: string | null = null;
+  const memwalNetwork = memwalContextFromResolved(storeConfig.resolved);
 
   return {
     get(marketId) {
@@ -39,7 +43,7 @@ export const createMemoryBindingStore = (
         const ownerKey = await storeConfig.resolveOwnerKey();
         const created = await storeConfig.ops.createHostAccount({
           suiPrivateKey: ownerKey,
-          network: storeConfig.resolved
+          network: memwalNetwork
         });
         hostAccountId = created.accountId;
       }
@@ -67,7 +71,7 @@ export const createMemoryBindingStore = (
         accountId: binding.memWalAccountId,
         delegatePublicKeyHex: normalized,
         label: `market:${marketId}`,
-        network: storeConfig.resolved
+        network: memwalNetwork
       });
 
       rememberDelegate(delegatesByAccount, binding.memWalAccountId, normalized);

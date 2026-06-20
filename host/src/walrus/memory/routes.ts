@@ -4,8 +4,8 @@ import {
   type MemoryAccessResponse,
   validationErrorMessage
 } from "@livestreak/host";
-import type { HostServerConfig } from "../descriptor/config.js";
-import { isMemoryBootstrapped, isMemoryHostConfigured } from "../descriptor/config.js";
+import type { HostServerConfig } from "../../descriptor/config.js";
+import { isMemoryBootstrapped, isMemoryHostConfigured } from "../../descriptor/config.js";
 import type { MemoryBindingStore } from "./binding-store.js";
 
 // --- exports ---
@@ -27,7 +27,7 @@ export const handleMemoryAccess = async (
     return memoryFailure(503, "memory_relayer_not_configured");
   }
 
-  const resolved = deps.config.resolvedMemoryNetwork!;
+  const resolved = deps.config.resolvedWalrus!;
 
   if (body === null || typeof body !== "object") {
     return memoryFailure(400, "Request body must be a JSON object");
@@ -62,7 +62,7 @@ export const handleMemoryAccess = async (
       ok: true,
       status: 200,
       result: {
-        relayerUrl: resolved.relayerUrl,
+        relayerUrl: resolved.memory.relayerUrl,
         namespace: binding.namespace,
         accountId: binding.memWalAccountId
       }

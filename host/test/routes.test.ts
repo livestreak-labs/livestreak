@@ -2,7 +2,7 @@ import type { EndpointDescriptor } from "@livestreak/host";
 import { describe, expect, it, vi } from "vitest";
 import { createHostRouteDeps, createHostRoutes } from "#server/routes.js";
 import { matchRoute } from "#server/http.js";
-import { handleMemoryAccess } from "#memory/routes.js";
+import { handleMemoryAccess } from "#walrus/memory/routes.js";
 import { handlePolicyEvaluate } from "#media/policy/routes.js";
 import {
   handleCacheReceipt,
@@ -75,7 +75,7 @@ const createSession = async (
 describe("host route handlers", () => {
   it("registers modular host routes and removes legacy paths", () => {
     const { routes } = createTestHost();
-    expect(routes).toHaveLength(14);
+    expect(routes).toHaveLength(16);
     expect(matchRoute("GET", "/health", routes)).toBeDefined();
     expect(matchRoute("GET", "/descriptor", routes)).toBeDefined();
     expect(matchRoute("POST", "/media/sessions", routes)).toBeDefined();
@@ -89,6 +89,8 @@ describe("host route handlers", () => {
     expect(matchRoute("POST", "/discovery/vaults", routes)).toBeDefined();
     expect(matchRoute("POST", "/discovery/find", routes)).toBeDefined();
     expect(matchRoute("POST", "/memory/access", routes)).toBeDefined();
+    expect(matchRoute("POST", "/content/blobs", routes)).toBeDefined();
+    expect(matchRoute("GET", "/content/blobs/walrus-testnet/blob_01", routes)).toBeDefined();
     expect(matchRoute("POST", "/aa/bundler/local", routes)).toBeDefined();
     expect(matchRoute("POST", "/aa/paymaster/local", routes)).toBeDefined();
     expect(matchRoute("POST", "/sessions", routes)).toBeUndefined();
@@ -598,15 +600,23 @@ describe("discovery routes", () => {
 describe("memory access route", () => {
   const configuredMemory = () => ({
     ...defaultHostServerConfig(),
-    memoryNetwork: "mainnet" as const,
+    walrusNetwork: "mainnet" as const,
     memorySuiOwnerPrivateKey: "suiprivkey1qqtest",
     memoryOwnerSeed: null,
-    resolvedMemoryNetwork: {
+    resolvedWalrus: {
       network: "mainnet" as const,
-      relayerUrl: "https://memwal.example",
-      registryId: "0xregistry",
-      packageId: "0xpackage",
-      suiRpcUrl: "https://fullnode.mainnet.sui.io:443"
+      sui: {
+        rpcUrl: "https://fullnode.mainnet.sui.io:443",
+        packageId: "0xpackage",
+        registryId: "0xregistry"
+      },
+      memory: {
+        relayerUrl: "https://memwal.example"
+      },
+      blob: {
+        publisherUrl: "https://publisher.example",
+        aggregatorUrl: "https://aggregator.example"
+      }
     }
   });
 
@@ -643,13 +653,13 @@ describe("memory access route", () => {
     }
   });
 
-  it("returns 503 when memory network selector is absent", async () => {
+  it("returns 503 when walrus network selector is absent", async () => {
     const host = createTestHost({
       ...defaultHostServerConfig(),
-      memoryNetwork: null,
+      walrusNetwork: null,
       memorySuiOwnerPrivateKey: null,
       memoryOwnerSeed: null,
-      resolvedMemoryNetwork: null
+      resolvedWalrus: null
     });
 
     const response = await matchRoute("POST", "/memory/access", host.routes)!.route.handler({
@@ -664,13 +674,13 @@ describe("memory access route", () => {
     }
   });
 
-  it("returns 503 when memory is configured but not bootstrapped", async () => {
+  it("returns 503 when memory is configured but walrus is not bootstrapped", async () => {
     const host = createTestHost({
       ...defaultHostServerConfig(),
-      memoryNetwork: "mainnet",
+      walrusNetwork: "mainnet",
       memorySuiOwnerPrivateKey: "suiprivkey1qqtest",
       memoryOwnerSeed: null,
-      resolvedMemoryNetwork: null
+      resolvedWalrus: null
     });
 
     const response = await matchRoute("POST", "/memory/access", host.routes)!.route.handler({

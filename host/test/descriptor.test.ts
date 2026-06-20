@@ -1,28 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { handleDescriptor } from "#descriptor/routes.js";
 import { defaultHostServerConfig } from "../src/descriptor/config.js";
-import { memoryNetworkProfiles } from "../src/memory/network-profile.js";
+import { walrusNetworkProfiles } from "../src/walrus/network.js";
 
 describe("host descriptor", () => {
-  it("advertises module tokens and memory bridge without internal ids", () => {
+  it("advertises module tokens and walrus capabilities without internal ids", () => {
     const config = {
       ...defaultHostServerConfig(),
-      memoryNetwork: "mainnet" as const,
+      walrusNetwork: "mainnet" as const,
       livekitApiKey: undefined
     };
 
     const descriptor = handleDescriptor({ config });
 
     expect(descriptor.modules).toEqual(
-      expect.arrayContaining(["aa", "media", "memory", "discovery"])
+      expect.arrayContaining(["aa", "media", "walrus_memory", "walrus_content", "discovery"])
     );
     expect(descriptor.media.simulcastAvailable).toBe(false);
     expect(descriptor.supportedOutputs).not.toContain("simulcast");
+    expect(descriptor.walrus).toEqual({ network: "mainnet" });
     expect(descriptor.memory).toEqual({
-      relayerUrl: memoryNetworkProfiles.mainnet.relayerUrl,
+      relayerUrl: walrusNetworkProfiles.mainnet.memory.relayerUrl,
       namespaceTemplate: "market:{marketId}",
-      trustModel: "plaintext-relayer",
-      network: "mainnet"
+      trustModel: "plaintext-relayer"
+    });
+    expect(descriptor.content).toEqual({
+      publisherUrl: walrusNetworkProfiles.mainnet.blob.publisherUrl,
+      aggregatorUrl: walrusNetworkProfiles.mainnet.blob.aggregatorUrl
     });
     expect(JSON.stringify(descriptor)).not.toContain("accountId");
     expect(JSON.stringify(descriptor)).not.toContain("memWalAccountId");
@@ -30,21 +34,19 @@ describe("host descriptor", () => {
     expect(JSON.stringify(descriptor)).not.toContain("OWNER_SEED");
   });
 
-  it("advertises null memory when network selector is absent", () => {
+  it("advertises null walrus when network selector is absent", () => {
     const config = {
       ...defaultHostServerConfig(),
-      memoryNetwork: null,
+      walrusNetwork: null,
       livekitApiKey: undefined
     };
 
     const descriptor = handleDescriptor({ config });
 
-    expect(descriptor.memory).toEqual({
-      relayerUrl: null,
-      namespaceTemplate: "market:{marketId}",
-      trustModel: "plaintext-relayer",
-      network: null
-    });
+    expect(descriptor.walrus).toEqual({ network: null });
+    expect(descriptor.memory.relayerUrl).toBeNull();
+    expect(descriptor.content.publisherUrl).toBeNull();
+    expect(descriptor.content.aggregatorUrl).toBeNull();
   });
 
   it("advertises simulcast when LiveKit is configured", () => {

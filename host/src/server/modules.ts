@@ -3,7 +3,8 @@ import { handleAaDescriptor, handleBundlerRpc, handlePaymasterRpc } from "../aa/
 import { handleDescriptor, handleHealth } from "../descriptor/routes.js";
 import { isModuleEnabled } from "../descriptor/config.js";
 import { handleFindSimilar, handleIndexVault } from "../discovery/routes.js";
-import { handleMemoryAccess } from "../memory/routes.js";
+import { handleContentBlobResolve, handleContentBlobStore } from "../walrus/content/routes.js";
+import { handleMemoryAccess } from "../walrus/memory/routes.js";
 import {
   handleCacheReceipt,
   handleCreateSession,
@@ -29,9 +30,14 @@ export const createHostModules = (deps: HostRouteDeps): HostModuleRegistration[]
     routes: mediaRoutes()
   },
   {
-    token: "memory",
-    enabled: isModuleEnabled(deps.config, "memory"),
-    routes: memoryRoutes()
+    token: "walrus_memory",
+    enabled: isModuleEnabled(deps.config, "walrus_memory"),
+    routes: walrusMemoryRoutes()
+  },
+  {
+    token: "walrus_content",
+    enabled: isModuleEnabled(deps.config, "walrus_content"),
+    routes: walrusContentRoutes()
   },
   {
     token: "discovery",
@@ -181,14 +187,51 @@ const discoveryRoutes = (): RouteDefinition[] => [
   }
 ];
 
-const memoryRoutes = (): RouteDefinition[] => [
+const walrusMemoryRoutes = (): RouteDefinition[] => [
   {
     method: "POST",
     pattern: /^\/memory\/access$/u,
     handler: async ({ body, deps: routeDeps }) => {
       const result = await handleMemoryAccess(body, {
         config: routeDeps.config,
-        bindings: routeDeps.memory.bindings
+        bindings: routeDeps.walrus.memory.bindings
+      });
+
+      if (!result.ok) {
+        return jsonFailure(result.status, result.error);
+      }
+
+      return jsonSuccess(result.status, result.result);
+    }
+  }
+];
+
+const walrusContentRoutes = (): RouteDefinition[] => [
+  {
+    method: "POST",
+    pattern: /^\/content\/blobs$/u,
+    handler: async ({ body, deps: routeDeps }) => {
+      const result = await handleContentBlobStore(body, {
+        config: routeDeps.config,
+        store: routeDeps.walrus.content.store
+      });
+
+      if (!result.ok) {
+        return jsonFailure(result.status, result.error);
+      }
+
+      return jsonSuccess(result.status, result.result);
+    }
+  },
+  {
+    method: "GET",
+    pattern: /^\/content\/blobs\/(?<scheme>[^/]+)\/(?<id>[^/]+)$/u,
+    handler: async ({ params, deps: routeDeps }) => {
+      const scheme = params.scheme ?? "";
+      const id = params.id ?? "";
+      const result = await handleContentBlobResolve(scheme, id, {
+        config: routeDeps.config,
+        store: routeDeps.walrus.content.store
       });
 
       if (!result.ok) {

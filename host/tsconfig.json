@@ -8,7 +8,7 @@
       "#descriptor/*": ["./src/descriptor/*"],
       "#media/*": ["./src/media/*"],
       "#discovery/*": ["./src/discovery/*"],
-      "#memory/*": ["./src/memory/*"],
+      "#walrus/*": ["./src/walrus/*"],
       "#aa/*": ["./src/aa/*"],
       "#test/*": ["./test/*"]
     }

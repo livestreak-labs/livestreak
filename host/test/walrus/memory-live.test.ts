@@ -5,26 +5,26 @@ import {
   addDelegateKey,
   generateDelegateKey
 } from "@mysten-incubation/memwal/account";
-import { fetchRelayerConfig, memoryNetworkProfiles } from "#memory/network-profile.js";
+import { fetchRelayerConfig, walrusNetworkProfiles } from "#walrus/network.js";
 
 const liveEnabled = process.env.MEMWAL_LIVE === "1";
 const ownerKey =
   process.env.LIVESTREAK_MEMORY_OWNER_KEY ?? process.env.LIVESTREAK_MEMORY_SUI_OWNER_KEY;
 const network =
-  process.env.LIVESTREAK_MEMORY_NETWORK === "testnet" ? "testnet" : "mainnet";
+  process.env.LIVESTREAK_WALRUS_NETWORK === "mainnet" ? "mainnet" : "testnet";
 
 describe.skipIf(!liveEnabled || ownerKey === undefined)(
   "memory live integration",
   () => {
     it("provisions, grants, remembers, and recalls via the hosted relayer", async () => {
-      const profile = memoryNetworkProfiles[network];
+      const profile = walrusNetworkProfiles[network];
       const relayerUrl =
-        process.env.LIVESTREAK_MEMORY_RELAYER_URL_OVERRIDE ?? profile.relayerUrl;
+        process.env.LIVESTREAK_WALRUS_MEMORY_RELAYER_URL_OVERRIDE ?? profile.memory.relayerUrl;
       const deployment = await fetchRelayerConfig(relayerUrl);
       const registryId =
-        process.env.LIVESTREAK_MEMORY_REGISTRY_ID_OVERRIDE ??
+        process.env.LIVESTREAK_WALRUS_REGISTRY_ID_OVERRIDE ??
         deployment.registryId ??
-        profile.registryId;
+        profile.memory.registryId;
       const delegate = await generateDelegateKey();
       const namespace = `livestreak-host-m1-${Date.now()}`;
 

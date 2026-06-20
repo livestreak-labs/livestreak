@@ -1,7 +1,14 @@
 import { Schema } from "effect";
-import { MemoryNetwork, MemoryTrustModel } from "./descriptor.js";
 
 // --- exports ---
+
+export const MemoryTrustModel = Schema.Literal(
+  "plaintext-relayer",
+  "client-encrypted",
+  "tee-attested"
+);
+
+export type MemoryTrustModel = Schema.Schema.Type<typeof MemoryTrustModel>;
 
 export const MemoryAccessRequest = Schema.Struct({
   marketId: Schema.NonEmptyString,
@@ -26,4 +33,10 @@ export const MarketMemoryBinding = Schema.Struct({
 
 export type MarketMemoryBinding = Schema.Schema.Type<typeof MarketMemoryBinding>;
 
-export { MemoryNetwork, MemoryTrustModel };
+export const MemoryDescriptorAdvert = Schema.Struct({
+  relayerUrl: Schema.Union(Schema.Null, Schema.NonEmptyString),
+  namespaceTemplate: Schema.Literal("market:{marketId}"),
+  trustModel: MemoryTrustModel
+});
+
+export type MemoryDescriptorAdvert = Schema.Schema.Type<typeof MemoryDescriptorAdvert>;
