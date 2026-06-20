@@ -268,6 +268,50 @@ public fun stream_state(registry: &MarketRegistry, market_id: &vector<u8>): Stre
     *table::borrow(&registry.stream_states, *market_id)
 }
 
+public fun stream_status(s: &StreamState): u8 {
+    s.status
+}
+
+public fun stream_scheme(s: &StreamState): u8 {
+    s.scheme
+}
+
+public fun stream_content_id(s: &StreamState): &vector<u8> {
+    &s.id
+}
+
+public fun stream_updated_at(s: &StreamState): u64 {
+    s.updated_at
+}
+
+public fun stream_ended_at(s: &StreamState): u64 {
+    s.ended_at
+}
+
+public fun status_none(): u8 {
+    STREAM_STATUS_NONE
+}
+
+public fun status_live(): u8 {
+    STREAM_STATUS_LIVE
+}
+
+public fun status_ended(): u8 {
+    STREAM_STATUS_ENDED
+}
+
+public fun scheme_walrus_testnet(): u8 {
+    SCHEME_WALRUS_TESTNET
+}
+
+public fun scheme_arweave(): u8 {
+    SCHEME_ARWEAVE
+}
+
+public fun scheme_ipfs(): u8 {
+    SCHEME_IPFS
+}
+
 // --- helpers ---
 
 fun borrow_stream_state(registry: &mut MarketRegistry, market_id: &vector<u8>): &mut StreamState {

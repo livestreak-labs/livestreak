@@ -267,11 +267,11 @@ public fun stop_seed<T>(
 
 public fun harvest<T>(
     registry: &VaultDriverRegistry,
+    vault_registry: &mut VaultRegistry<T>,
     drips_registry: &mut DripsRegistry<T>,
     streams_registry: &mut StreamsRegistry<T>,
     vault_id: vector<u8>,
     side: u8,
-    vault_addr: address,
     clock: &Clock,
     ctx: &mut TxContext,
 ): u128 {
@@ -290,7 +290,8 @@ public fun harvest<T>(
     );
     let amt = drips::collect(drips_registry, receiver, ctx);
     if (amt > 0) {
-        drips::withdraw(drips_registry, receiver, vault_addr, amt, ctx);
+        let payment = drips::withdraw_coin(drips_registry, amt, ctx);
+        vault::join_usdc(vault_registry, payment);
     };
     amt
 }

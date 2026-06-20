@@ -208,7 +208,7 @@ public fun mint_with_salt(
 public fun fund<T>(
     registry: &mut MarketDriverRegistry,
     nft: &MarketPositionNFT,
-    vault_driver: &VaultDriverRegistry,
+    vault_driver: &mut VaultDriverRegistry,
     vault_registry: &mut VaultRegistry<T>,
     drips_registry: &mut DripsRegistry<T>,
     streams_registry: &mut StreamsRegistry<T>,
@@ -229,7 +229,7 @@ public fun fund<T>(
     assert!(!table::contains(&registry.lanes, lane_key), E_VAULT_HAS_LANE);
     assert!(lane_count(registry, token_id) < MAX_LANES, E_TOO_MANY_LANES);
 
-    let curr = build_receivers(registry, vault_driver, token_id);
+    let curr = build_receivers(registry, vault_driver, vault_registry, token_id);
     ensure_lane_keys(registry, token_id);
     let keys = table::borrow_mut(&mut registry.lane_keys, token_id);
     vector::push_back(keys, vault_id);
@@ -239,7 +239,7 @@ public fun fund<T>(
         Lane { vault_id, side, rate },
     );
 
-    let next = build_receivers(registry, vault_driver, token_id);
+    let next = build_receivers(registry, vault_driver, vault_registry, token_id);
     let balance_delta = i128::from(deposit);
     driver_transfer_utils::set_streams_and_transfer(
         drips_registry,
@@ -273,7 +273,7 @@ public fun fund<T>(
 public fun stop<T>(
     registry: &mut MarketDriverRegistry,
     nft: &MarketPositionNFT,
-    vault_driver: &VaultDriverRegistry,
+    vault_driver: &mut VaultDriverRegistry,
     vault_registry: &mut VaultRegistry<T>,
     drips_registry: &mut DripsRegistry<T>,
     streams_registry: &mut StreamsRegistry<T>,
@@ -288,9 +288,9 @@ public fun stop<T>(
     let lane = *table::borrow(&registry.lanes, lane_key);
     assert!(lane.rate > 0 && lane.side == side, E_NO_LANE);
 
-    let curr = build_receivers(registry, vault_driver, token_id);
+    let curr = build_receivers(registry, vault_driver, vault_registry, token_id);
     remove_lane(registry, token_id, vault_id);
-    let next = build_receivers(registry, vault_driver, token_id);
+    let next = build_receivers(registry, vault_driver, vault_registry, token_id);
 
     drips::set_streams(
         drips_registry,
@@ -317,7 +317,7 @@ public fun stop<T>(
 public fun set_lanes<T>(
     registry: &mut MarketDriverRegistry,
     nft: &MarketPositionNFT,
-    vault_driver: &VaultDriverRegistry,
+    vault_driver: &mut VaultDriverRegistry,
     vault_registry: &mut VaultRegistry<T>,
     drips_registry: &mut DripsRegistry<T>,
     streams_registry: &mut StreamsRegistry<T>,
@@ -351,7 +351,7 @@ public fun set_lanes<T>(
         i = i + 1;
     };
 
-    let curr = build_receivers(registry, vault_driver, token_id);
+    let curr = build_receivers(registry, vault_driver, vault_registry, token_id);
     let (removed_vaults, removed_sides, removed_n) = diff_removed(registry, token_id, &desired_vault_ids, &desired_sides, &desired_rates);
     let (added_vaults, added_sides, added_rates, added_n) = diff_added(registry, token_id, &desired_vault_ids, &desired_sides, &desired_rates);
 
@@ -371,7 +371,7 @@ public fun set_lanes<T>(
         k = k + 1;
     };
 
-    let next = build_receivers(registry, vault_driver, token_id);
+    let next = build_receivers(registry, vault_driver, vault_registry, token_id);
     let balance_delta = if (add_deposit > 0) {
         i128::from(add_deposit)
     } else {
@@ -428,15 +428,15 @@ public fun set_lanes<T>(
 public fun stop_all<T>(
     registry: &mut MarketDriverRegistry,
     nft: &MarketPositionNFT,
-    vault_driver: &VaultDriverRegistry,
+    vault_driver: &mut VaultDriverRegistry,
     vault_registry: &mut VaultRegistry<T>,
     drips_registry: &mut DripsRegistry<T>,
     streams_registry: &mut StreamsRegistry<T>,
     clock: &Clock,
     ctx: &mut TxContext,
-) {
+): u128 {
     let token_id = nft.token_id;
-    let curr = build_receivers(registry, vault_driver, token_id);
+    let curr = build_receivers(registry, vault_driver, vault_registry, token_id);
     stop_all_lanes_on_vault(registry, vault_registry, token_id, clock);
 
     let empty = vector[];
@@ -461,6 +461,7 @@ public fun stop_all<T>(
     };
 
     event::emit(AllLanesStopped { token_id, refunded });
+    refunded
 }
 
 public fun withdraw<T>(
@@ -655,17 +656,19 @@ fun ensure_lane_keys(registry: &mut MarketDriverRegistry, token_id: u256) {
     };
 }
 
-fun build_receivers(
+fun build_receivers<T>(
     registry: &MarketDriverRegistry,
-    vault_driver: &VaultDriverRegistry,
+    vault_driver: &mut VaultDriverRegistry,
+    vault_registry: &VaultRegistry<T>,
     token_id: u256,
 ): vector<StreamReceiver> {
-    build_receivers_impl(registry, vault_driver, token_id)
+    build_receivers_impl(registry, vault_driver, vault_registry, token_id)
 }
 
-fun build_receivers_impl(
+fun build_receivers_impl<T>(
     registry: &MarketDriverRegistry,
-    vault_driver: &VaultDriverRegistry,
+    vault_driver: &mut VaultDriverRegistry,
+    vault_registry: &VaultRegistry<T>,
     token_id: u256,
 ): vector<StreamReceiver> {
     if (!table::contains(&registry.lane_keys, token_id)) {
@@ -680,7 +683,7 @@ fun build_receivers_impl(
         let vault_id = *vector::borrow(keys, i);
         let lane_key = LaneKey { token_id, vault_id };
         let lane = table::borrow(&registry.lanes, lane_key);
-        let recv = vault_driver::receiver_account_view(vault_driver, vault_id, lane.side);
+        let recv = vault_driver::receiver_account(vault_driver, vault_registry, vault_id, lane.side);
         vector::push_back(
             &mut receivers,
             streams::new_stream_receiver(recv, 0, lane.rate * amt_mul, 0, 0),
