@@ -80,6 +80,10 @@ public fun balances<T>(registry: &DripsRegistry<T>): (u128, u128) {
     (registry.streams_balance, registry.collectable_balance)
 }
 
+public fun held_balance<T>(registry: &DripsRegistry<T>): u128 {
+    coin::value(&registry.vault) as u128
+}
+
 public fun collectable<T>(registry: &DripsRegistry<T>, account_id: u256): u128 {
     if (!table::contains(&registry.collectable_amts, account_id)) {
         0

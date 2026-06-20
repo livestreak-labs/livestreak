@@ -28,6 +28,8 @@ const SCHEME_ARWEAVE: u8 = 3;
 
 const STREAM_LOCK_GRACE: u64 = 86_400;
 
+const E_INDEX_OOB: u64 = 10;
+
 public struct MarketRegistry has key {
     id: UID,
     market_count: u64,
@@ -152,6 +154,44 @@ public(package) fun add_vault(
     let vaults = table::borrow_mut(&mut registry.vault_ids_by_market, market_id);
     vector::push_back(vaults, vault_id);
     event::emit(VaultIndexed { market_id, vault_id });
+}
+
+public fun market_count(registry: &MarketRegistry): u64 {
+    registry.market_count
+}
+
+public fun market_id_at(registry: &MarketRegistry, index: u64): vector<u8> {
+    assert!(index < registry.market_count, E_INDEX_OOB);
+    *vector::borrow(&registry.market_ids, index)
+}
+
+public fun get_market(registry: &MarketRegistry, market_id: &vector<u8>): MarketData {
+    assert!(market_exists(registry, market_id), E_UNKNOWN_MARKET);
+    *table::borrow(&registry.markets, *market_id)
+}
+
+public fun market_title(data: &MarketData): &vector<u8> {
+    &data.title
+}
+
+public fun market_stream_id(data: &MarketData): &vector<u8> {
+    &data.stream_id
+}
+
+public fun market_creator(data: &MarketData): address {
+    data.creator
+}
+
+public fun market_created_at(data: &MarketData): u64 {
+    data.created_at
+}
+
+public fun market_data_exists(data: &MarketData): bool {
+    data.exists
+}
+
+public fun market_data_id(data: &MarketData): &vector<u8> {
+    &data.id
 }
 
 public fun get_vault_ids(registry: &MarketRegistry, market_id: &vector<u8>): &vector<vector<u8>> {

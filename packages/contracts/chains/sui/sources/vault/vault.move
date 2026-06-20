@@ -210,6 +210,48 @@ public fun market_id<T>(registry: &VaultRegistry<T>, vault_id: &vector<u8>): vec
     table::borrow(&registry.vaults, *vault_id).market_id
 }
 
+public fun get_vault<T>(registry: &VaultRegistry<T>, vault_id: &vector<u8>): VaultData {
+    assert!(vault_exists(registry, vault_id), E_UNKNOWN_VAULT);
+    *table::borrow(&registry.vaults, *vault_id)
+}
+
+public fun pot<T>(registry: &VaultRegistry<T>, vault_id: &vector<u8>): u256 {
+    if (!table::contains(&registry.pot, *vault_id)) {
+        0
+    } else {
+        *table::borrow(&registry.pot, *vault_id)
+    }
+}
+
+public fun usdc_balance<T>(registry: &VaultRegistry<T>): u128 {
+    balance::value(&registry.usdc) as u128
+}
+
+public fun pending_shares<T>(
+    registry: &VaultRegistry<T>,
+    vault_id: &vector<u8>,
+    side: u8,
+    account: u256,
+    clock: &Clock,
+): u256 {
+    side::assert_valid(side);
+    let key = PositionKey { vault_id: *vault_id, side, account };
+    if (!table::contains(&registry.positions, key)) {
+        return 0
+    };
+    let p = table::borrow(&registry.positions, key);
+    let mut cap_ts = timestamp_secs(clock);
+    let data = table::borrow(&registry.vaults, *vault_id);
+    if (data.resolved_at != 0 && (data.resolved_at as u64) < cap_ts) {
+        cap_ts = data.resolved_at;
+    };
+    if (!p.depleted && p.max_end != 0 && p.max_end < cap_ts) {
+        cap_ts = p.max_end;
+    };
+    let g_now = preview_g_at(registry, vault_id, side, cap_ts);
+    p.shares_accrued + p.rate * (g_now - p.g_paid)
+}
+
 public fun get_position<T>(
     registry: &VaultRegistry<T>,
     vault_id: &vector<u8>,
@@ -849,6 +891,26 @@ fun advance_internal<T>(
     };
     let board = table::borrow_mut(&mut registry.boards, board_key);
     board.last_advance = t;
+}
+
+fun preview_g_at<T>(
+    registry: &VaultRegistry<T>,
+    vault_id: &vector<u8>,
+    side: u8,
+    cap_ts: u64,
+): u256 {
+    let board_key = BoardKey { vault_id: *vault_id, side };
+    if (!table::contains(&registry.boards, board_key)) {
+        return 0
+    };
+    let board = table::borrow(&registry.boards, board_key);
+    let mut g = board.g;
+    let last = board.last_advance;
+    if (last == 0 || cap_ts <= last || board.side_rate == 0) {
+        return g
+    };
+    let (_, d_g) = bonding_board::seg_math(board.pool, board.side_rate, (cap_ts - last) as u256);
+    g + d_g
 }
 
 fun segment(board: &mut Board, t0: u64, t1: u64) {

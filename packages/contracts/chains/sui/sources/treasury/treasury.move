@@ -98,6 +98,10 @@ public fun skim_bps<T>(registry: &TreasuryRegistry<T>): u256 {
     registry.skim_bps
 }
 
+public fun total_skimmed<T>(registry: &TreasuryRegistry<T>): u256 {
+    registry.total_skimmed
+}
+
 public fun mint_rate<T>(registry: &TreasuryRegistry<T>): u256 {
     registry.mint_floor
         + ((registry.mint_start - registry.mint_floor) * registry.mint_knee)
