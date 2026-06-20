@@ -5,9 +5,17 @@ import { NodeContext, NodeRuntime } from "@effect/platform-node";
 import { Effect } from "effect";
 import { hostCommand, produceCommand } from "./commands/produce.js";
 import { optionsCommands } from "./commands/options.js";
+import { laneCommands } from "./commands/lanes.js";
+import { nftCommands } from "./commands/nft.js";
 
 const root = Command.make("livestreak", {}, () => Effect.void).pipe(
-  Command.withSubcommands([produceCommand, hostCommand, ...optionsCommands])
+  Command.withSubcommands([
+    produceCommand,
+    hostCommand,
+    ...optionsCommands,
+    ...laneCommands,
+    ...nftCommands
+  ])
 );
 
 const cli = Command.run(root, {

@@ -2,13 +2,11 @@ import { Command, Options } from "@effect/cli";
 import { Console, Effect, Option } from "effect";
 import {
   asMarketId,
-  asTokenId,
   asUserAddress,
   asVaultId,
   validateOptionsVaultSide,
   type ClaimLossLvstInput,
   type FundStreamInput,
-  type MarketId,
   type StakeLvstInput,
   type UnstakeLvstInput,
   type WithdrawInput
@@ -16,45 +14,21 @@ import {
 import { ensureErc20Approval } from "../chains/evm-tx.js";
 import { resolveOperatorContext } from "./context.js";
 import { createOptionsEdge } from "../edges/options.js";
-import { operatorCreateVault, sideToSeedEnum, encodeCreateVaultCall } from "../edges/vault.js";
+import { operatorCreateVault } from "../edges/vault.js";
 import { routeClaimAction } from "./claim-routing.js";
+import {
+  configOpt,
+  marketOpt,
+  parseBigIntArg,
+  parseTokenId,
+  passwordOpt,
+  readCommandConfig
+} from "./cli-args.js";
 import {
   renderOptionsBoard,
   renderTxResult,
   renderVaultCreateResult
 } from "../render/output.js";
-
-const configOpt = Options.file("config").pipe(
-  Options.withDescription("Path to livestreak.json"),
-  Options.optional
-);
-const passwordOpt = Options.text("password").pipe(Options.optional);
-const marketOpt = Options.text("market").pipe(Options.optional);
-
-const parseTokenId = (value: string): ReturnType<typeof asTokenId> => {
-  try {
-    return asTokenId(BigInt(value));
-  } catch {
-    throw new Error("token must be a numeric token id");
-  }
-};
-
-const parseBigIntArg = (value: string, label: string): bigint => {
-  try {
-    const parsed = BigInt(value);
-    if (parsed <= 0n) {
-      throw new Error(`${label} must be > 0`);
-    }
-    return parsed;
-  } catch {
-    throw new Error(`${label} must be a positive integer string`);
-  }
-};
-
-const readCommandConfig = (config: Option.Option<string>, password: Option.Option<string>) => ({
-  ...(Option.isSome(config) ? { configPath: config.value } : {}),
-  ...(Option.isSome(password) ? { password: password.value } : {})
-});
 
 export const runVaults = async (input: {
   readonly configPath?: string;
