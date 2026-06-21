@@ -60,6 +60,21 @@ export function getKeypair(): Ed25519Keypair {
     const { secretKey } = decodeSuiPrivateKey(exported);
     return Ed25519Keypair.fromSecretKey(secretKey);
   } catch {
+    // Hardcoded mnemonic is a localnet-only DX convenience. Refuse it on any real network so a
+    // missing key can never silently sign a testnet/mainnet transaction with a well-known seed.
+    const activeEnv = (() => {
+      try {
+        return execSync("sui client active-env", { encoding: "utf-8" }).trim();
+      } catch {
+        return "";
+      }
+    })();
+    if (activeEnv !== "localnet") {
+      throw new Error(
+        `getKeypair: no SUI_SECRET_KEY/SUI_MNEMONIC and no exportable active key on env "${activeEnv}". ` +
+          "The hardcoded mnemonic fallback is permitted on localnet only — set SUI_SECRET_KEY to deploy here.",
+      );
+    }
     const mnemonic =
       "cargo town galaxy wonder animal digital buddy member object detect home chapter";
     return Ed25519Keypair.deriveKeypair(mnemonic);

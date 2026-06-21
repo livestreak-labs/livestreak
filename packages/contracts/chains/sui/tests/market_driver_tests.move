@@ -977,3 +977,33 @@ fun test_withdraw_many_empty_list_returns_zero() {
     clock::destroy_for_testing(clock);
     ts::end(scenario);
 }
+
+
+// CON.S3: a desired_sides/desired_rates length mismatch must abort with E_LENGTH_MISMATCH (11),
+// NOT the misleading E_DUPLICATE_VAULT (9) it used to report.
+#[test, expected_failure(abort_code = 11)]
+fun test_set_lanes_length_mismatch_aborts() {
+    let mut scenario = ts::begin(wire::admin());
+    let mut clock = wire::new_clock(&mut scenario, wire::admin(), wire::start_secs());
+    let (market_id, _, _, _) = setup_fixture(&mut scenario, &clock);
+    let v0 = wire::bond_vault(&mut scenario, market_id, b"L0", side::yes(), &clock);
+    let v1 = wire::bond_vault(&mut scenario, market_id, b"L1", side::yes(), &clock);
+
+    // 2 vault ids, but only 1 side and 1 rate → length mismatch.
+    let desired_vaults = vector[v0, v1];
+    let desired_sides = vector[side::yes()];
+    let desired_rates = vector[wire::rate()];
+
+    wire::set_lanes(
+        &mut scenario,
+        wire::alice(),
+        desired_vaults,
+        desired_sides,
+        desired_rates,
+        deposit_units(10),
+        &clock,
+    );
+
+    clock::destroy_for_testing(clock);
+    ts::end(scenario);
+}

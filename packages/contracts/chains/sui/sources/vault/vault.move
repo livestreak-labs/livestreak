@@ -911,6 +911,11 @@ fun catch_up_side<T>(
         advance_internal(registry, vault_id, side, MAX_STEPS, clock);
         guard = guard + 1;
     };
+    // If the backlog exceeds the in-tx guard, abort with a clear signal rather than silently
+    // finalizing on a half-advanced board. The brick-free drain is the permissionless `advance`
+    // entrypoint: the operator should call it (bounded, off the collect/withdraw critical path)
+    // until the board is caught up, then retry. (EVM uses a single `_advance(max)`.)
+    assert!(board_caught_up(registry, &vault_id, side, clock), E_BOARD_BEHIND);
 }
 
 fun advance_internal<T>(
