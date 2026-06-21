@@ -21,6 +21,7 @@
     "chains/sui/addresses.ts",
     "chains/sui/package.ts",
     "chains/sui/client.ts",
+    "chains/sui/deployments/localnet.ts",
     "chains/solana/index.ts"
   ],
   "exclude": ["chains/evm/lib/**", "chains/evm/out/**", "chains/evm/cache/**"]

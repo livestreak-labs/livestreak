@@ -23,6 +23,10 @@
       "types": "./dist/chains/sui/index.d.ts",
       "default": "./dist/chains/sui/index.js"
     },
+    "./sui/deployments/localnet": {
+      "types": "./dist/chains/sui/deployments/localnet.d.ts",
+      "default": "./dist/chains/sui/deployments/localnet.js"
+    },
     "./package": {
       "default": "./package.json"
     }
@@ -39,7 +43,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist chains/evm/out chains/evm/cache chains/evm/generated/abis.ts",
-    "build": "cd chains/evm && forge build && FOUNDRY_PROFILE=aa forge build && wagmi generate && cd ../.. && tsc -p tsconfig.build.json && mkdir -p dist/chains/evm/deployments && for f in chains/evm/deployments/*.json; do [ -f \"$f\" ] && cp \"$f\" dist/chains/evm/deployments/; done",
+    "build": "cd chains/evm && forge build && FOUNDRY_PROFILE=aa forge build && wagmi generate && cd ../.. && tsc -p tsconfig.build.json && mkdir -p dist/chains/evm/deployments && for f in chains/evm/deployments/*.json; do [ -f \"$f\" ] && cp \"$f\" dist/chains/evm/deployments/; done && mkdir -p dist/chains/sui/deployments && for f in chains/sui/deployments/*.json; do [ -f \"$f\" ] && cp \"$f\" dist/chains/sui/deployments/; done",
     "check": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint . && cd chains/evm && forge fmt --check solidity test",
     "deploy": "tsx chains/evm/deploy/main.ts",

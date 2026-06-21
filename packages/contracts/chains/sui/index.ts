@@ -1,4 +1,10 @@
+// Node-only helpers: loadDeployment / listDeployments read from disk and pull
+// node:fs — import from "./addresses.js" directly in Node/deploy contexts only.
 export { loadDeployment, listDeployments, DEFAULT_SUI_DEPLOYMENT } from "./addresses.js";
+
+// Browser-safe static deployment consts — no node:fs.
+export { localnetDeployment } from "./deployments/localnet.js";
+
 export { MODULES, target } from "./package.js";
 export type { LiveStreakModule } from "./package.js";
 export { LiveStreakSuiClient, SIDE_YES, SIDE_NO, USDC_ONE } from "./client.js";
