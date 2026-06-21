@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { StreamLayout } from '#/layouts/StreamLayout'
-import { mockStreams } from '#/data/mock'
+import { StreamLayout } from '#/components/template/stream-layout'
+import { useStreamMeta } from '#/hooks/use-stream-meta'
 
 export const Route = createFileRoute('/stream/$id')({
   component: StreamPage,
@@ -8,7 +8,7 @@ export const Route = createFileRoute('/stream/$id')({
 
 function StreamPage() {
   const { id } = Route.useParams()
-  const stream = mockStreams.find(s => s.id === id) ?? mockStreams[0]!
+  const stream = useStreamMeta(id)
 
   return (
     <StreamLayout

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Robot, Eye, Shield, Crosshair, CaretDown, Pulse, TrendUp, Medal } from '@phosphor-icons/react'
-import { mockAgents, type Agent, type AgentRole } from '#/data/mock'
+import { mockAgents, type Agent, type AgentRole } from '#/utils/mock'
 import { formatUSDCFull } from '#/utils/format'
 
 export const Route = createFileRoute('/agents')({

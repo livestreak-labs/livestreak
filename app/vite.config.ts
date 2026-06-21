@@ -107,14 +107,10 @@ function clientScopedPolyfills(options: Parameters<typeof nodePolyfills>[0]): Pl
   }) as unknown as PluginOption[]
 }
 
-const contractsRoot = path.resolve(import.meta.dirname, '../packages/contracts/dist/chains/sui')
-
 const config = defineConfig({
   resolve: {
     alias: {
       'sodium-javascript': path.dirname(nodeRequire.resolve('sodium-javascript')),
-      '@livestreak/contracts/sui/deployments/localnet': path.join(contractsRoot, 'deployments/localnet.js'),
-      '@livestreak/contracts/sui': path.resolve(import.meta.dirname, 'src/shims/livestreak-contracts-sui.ts'),
     },
   },
   optimizeDeps: {

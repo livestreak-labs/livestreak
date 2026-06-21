@@ -15,6 +15,14 @@
       "types": "./dist/chains/evm/index.d.ts",
       "default": "./dist/chains/evm/index.js"
     },
+    "./evm/node": {
+      "types": "./dist/chains/evm/node.d.ts",
+      "default": "./dist/chains/evm/node.js"
+    },
+    "./evm/deployments/localhost": {
+      "types": "./dist/chains/evm/deployments/localhost.d.ts",
+      "default": "./dist/chains/evm/deployments/localhost.js"
+    },
     "./evm/abis": {
       "types": "./dist/chains/evm/abis-entry.d.ts",
       "default": "./dist/chains/evm/abis-entry.js"
@@ -22,6 +30,10 @@
     "./sui": {
       "types": "./dist/chains/sui/index.d.ts",
       "default": "./dist/chains/sui/index.js"
+    },
+    "./sui/node": {
+      "types": "./dist/chains/sui/node.d.ts",
+      "default": "./dist/chains/sui/node.js"
     },
     "./sui/deployments/localnet": {
       "types": "./dist/chains/sui/deployments/localnet.d.ts",

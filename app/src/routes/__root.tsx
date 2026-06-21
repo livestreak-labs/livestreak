@@ -7,7 +7,7 @@ import appCss from '../styles.css?url'
 // tree — providers + wallet/chain SDKs — lives in RootApp and is loaded lazily
 // so its server-incompatible deps (@mysten/sui, Holepunch native modules) never
 // enter the prerendered shell's module graph.
-const RootApp = lazy(() => import('#/components/RootApp.tsx'))
+const RootApp = lazy(() => import('#/components/template/root-app.tsx'))
 
 export const Route = createRootRoute({
   head: () => ({

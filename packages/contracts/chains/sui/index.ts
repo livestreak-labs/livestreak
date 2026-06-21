@@ -1,8 +1,4 @@
-// Node-only helpers: loadDeployment / listDeployments read from disk and pull
-// node:fs — import from "./addresses.js" directly in Node/deploy contexts only.
-export { loadDeployment, listDeployments, DEFAULT_SUI_DEPLOYMENT } from "./addresses.js";
-
-// Browser-safe static deployment consts — no node:fs.
+// Browser-safe barrel — no node:fs. For disk loaders use `@livestreak/contracts/sui/node`.
 export { localnetDeployment } from "./deployments/localnet.js";
 
 export { MODULES, target } from "./package.js";
