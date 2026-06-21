@@ -4,11 +4,12 @@ import { Clock, Fire, X } from '@phosphor-icons/react'
 import { StreamSlider } from '#/components/predictions/StreamSlider'
 import { formatCountdown, formatMultiplier, calcPoolPct } from '#/utils/format'
 import type { Vault } from '#/data/mock'
+import { DEFAULT_FUND_DURATION_MIN, fundCommitmentUsd } from '#/adapters/optionsBoard'
 
 interface Props {
   vault: Vault
   onDismiss: () => void
-  onStream?: (vaultId: string, side: 'yes' | 'no', rate: number) => void
+  onStream?: (vaultId: string, side: 'yes' | 'no', rate: number, durationMinutes?: number) => void
 }
 
 export function FocusedVault({ vault, onDismiss, onStream }: Props) {
@@ -16,6 +17,7 @@ export function FocusedVault({ vault, onDismiss, onStream }: Props) {
   const [expiryMs, setExpiryMs] = useState(Math.max(0, vault.expiresAt - Date.now()))
   const [streamSide, setStreamSide] = useState<'yes' | 'no' | null>(vault.userPosition?.side ?? null)
   const [streamRate, setStreamRate] = useState(vault.userPosition ? 0.8 : 0)
+  const [fundDurationMin, setFundDurationMin] = useState(DEFAULT_FUND_DURATION_MIN)
 
   useEffect(() => {
     if (vault.status !== 'hot' && vault.status !== 'open') return
@@ -125,10 +127,33 @@ export function FocusedVault({ vault, onDismiss, onStream }: Props) {
       {/* Slider — immediately visible, the whole point */}
       <StreamSlider vaultId={vault.id} initialSide={vault.userPosition?.side ?? null} initialRate={vault.userPosition ? 0.8 : 0} onStream={(side, rate) => { setStreamSide(side); setStreamRate(rate) }} />
 
+      {streamSide && streamRate > 0.01 && (
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.06em' }}>FUND FOR</span>
+            <select
+              value={fundDurationMin}
+              onChange={e => setFundDurationMin(Number(e.target.value))}
+              style={{
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 6, color: '#fff', fontSize: 11, fontFamily: 'var(--font-mono)', padding: '4px 8px',
+              }}
+            >
+              {[15, 30, 60, 90, 120].map(min => (
+                <option key={min} value={min}>{min} min</option>
+              ))}
+            </select>
+          </div>
+          <p className="mono" style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', margin: 0 }}>
+            Funding ${fundCommitmentUsd(streamRate, fundDurationMin).toFixed(2)} over {fundDurationMin} min
+          </p>
+        </div>
+      )}
+
       {/* Start streaming button */}
       <button
         disabled={!streamSide || streamRate < 0.01}
-        onClick={() => streamSide && onStream?.(vault.id, streamSide, streamRate)}
+        onClick={() => streamSide && onStream?.(vault.id, streamSide, streamRate, fundDurationMin)}
         style={{
           width: '100%', marginTop: 18, padding: '12px 0',
           fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-display)',

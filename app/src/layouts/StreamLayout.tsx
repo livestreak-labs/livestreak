@@ -15,6 +15,7 @@ import { useFlow } from '#/hooks/useFlow.ts'
 import { useWalletContext } from '#/contexts/WalletContext.tsx'
 import { useOptionsContext } from '#/contexts/OptionsContext.tsx'
 import { isOptionsModeEnabled } from '#/config/optionsMode.ts'
+import { DEFAULT_FUND_DURATION_MIN } from '#/adapters/optionsBoard'
 
 interface StreamLayoutProps {
   streamTitle: string
@@ -40,12 +41,17 @@ export function StreamLayout({ streamTitle, category, totalPooled, streamId }: S
     setSelectedVaultId(prev => prev === vaultId ? null : vaultId)
   }, [])
 
-  const handleStream = useCallback(async (vaultId: string, side: 'yes' | 'no', rate: number) => {
+  const handleStream = useCallback(async (
+    vaultId: string,
+    side: 'yes' | 'no',
+    rate: number,
+    durationMinutes = DEFAULT_FUND_DURATION_MIN,
+  ) => {
     const vault = vaults.find(v => v.id === vaultId)
 
     if (optionsEnabled && optionsConnected) {
       try {
-        const txId = await fundStream(vaultId, side, rate)
+        const txId = await fundStream(vaultId, side, rate, durationMinutes)
         push({ type: 'stream', rate, side, option: `${vault?.option ?? vaultId} · ${txId.slice(0, 10)}…` })
       } catch (err) {
         push({

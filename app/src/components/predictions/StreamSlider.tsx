@@ -1,20 +1,30 @@
-import { useRef, useState } from 'react'
-import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
+import { useRef, useState, useLayoutEffect } from 'react'
+import { motion, AnimatePresence, useMotionValue, animate } from 'framer-motion'
 
 const MAX_RATE = 10
 const THUMB_R = 12
+const THUMB_NEUTRAL = '#7c8595'
 
 interface Props { vaultId: string; initialSide?: 'yes' | 'no' | null; initialRate?: number; disabled?: boolean; compact?: boolean; onStream?: (side: 'yes' | 'no' | null, rate: number) => void }
 
 export function StreamSlider({ initialSide = null, initialRate = 0, disabled = false, compact = false, onStream }: Props) {
   const trackRef = useRef<HTMLDivElement>(null)
+  const didInitX = useRef(false)
   const [isDragging, setIsDragging] = useState(false)
   const [side, setSide] = useState<'yes' | 'no' | null>(initialSide)
   const [rate, setRate] = useState(initialRate)
   const x = useMotionValue(0)
-  const thumbColor = useTransform(x, [-120, -5, 5, 120], ['#ff2d78', '#ff2d78', '#00ff87', '#00ff87'])
 
   function getHalfWidth() { return Math.max(1, (trackRef.current?.clientWidth ?? 280) / 2 - THUMB_R) }
+
+  useLayoutEffect(() => {
+    if (didInitX.current) return
+    didInitX.current = true
+    if (!initialSide || initialRate <= 0) return
+    const sign = initialSide === 'no' ? -1 : 1
+    const offset = sign * (Math.min(initialRate, MAX_RATE) / MAX_RATE) * getHalfWidth()
+    x.set(offset)
+  })
 
   function updateFromX(xVal: number) {
     const hw = getHalfWidth(), pct = Math.max(-1, Math.min(1, xVal / hw))
@@ -35,6 +45,7 @@ export function StreamSlider({ initialSide = null, initialRate = 0, disabled = f
 
   const rateLabel = rate > 0.01 ? `$${rate.toFixed(2)}/min` : null
   const sideColor = side === 'yes' ? '#00ff87' : side === 'no' ? '#ff2d78' : 'rgba(255,255,255,0.2)'
+  const thumbBg = side === 'yes' ? '#00ff87' : side === 'no' ? '#ff2d78' : THUMB_NEUTRAL
 
   // Shared track internals
   const trackFills = (
@@ -43,7 +54,7 @@ export function StreamSlider({ initialSide = null, initialRate = 0, disabled = f
       <div style={{ position: 'absolute', left: '50%', top: 0, height: '100%', width: '50%', background: 'linear-gradient(90deg, #00ff87, rgba(0,255,135,0.3))', borderRadius: 2, transform: `scaleX(${side === 'yes' ? rate / MAX_RATE : 0})`, transformOrigin: 'left', transition: 'transform 0.05s' }} />
       <motion.div
         drag={disabled ? false : 'x'} dragMomentum={false} dragConstraints={trackRef} dragElastic={0.05}
-        style={{ x, position: 'absolute', top: -(THUMB_R - 2), left: `calc(50% - ${THUMB_R}px)`, width: THUMB_R * 2, height: THUMB_R * 2, borderRadius: '50%', background: thumbColor, border: '2px solid rgba(0,0,0,0.3)', boxShadow: isDragging ? `0 0 20px ${sideColor}40` : '0 2px 8px rgba(0,0,0,0.5)', cursor: disabled ? 'not-allowed' : 'grab', zIndex: 2, touchAction: 'none' }}
+        style={{ x, position: 'absolute', top: -(THUMB_R - 2), left: `calc(50% - ${THUMB_R}px)`, width: THUMB_R * 2, height: THUMB_R * 2, borderRadius: '50%', background: thumbBg, transition: 'background 0.2s', border: '2px solid rgba(0,0,0,0.3)', boxShadow: isDragging ? `0 0 20px ${sideColor}40` : '0 2px 8px rgba(0,0,0,0.5)', cursor: disabled ? 'not-allowed' : 'grab', zIndex: 2, touchAction: 'none' }}
         onDrag={() => updateFromX(x.get())}
         onDragStart={() => setIsDragging(true)}
         onDragEnd={() => { setIsDragging(false); if (Math.abs(x.get()) < getHalfWidth() * 0.05) { animate(x, 0, { type: 'spring', stiffness: 500, damping: 30 }); setSide(null); setRate(0); onStream?.(null, 0) } }}

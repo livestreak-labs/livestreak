@@ -8,13 +8,14 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { sha256, toBytes, hexToBytes, bytesToHex, type Address } from 'viem'
+import { sha256, toBytes, hexToBytes, bytesToHex, parseUnits, type Address } from 'viem'
 import { Schema } from 'effect'
 import { EvmWalletInitConfig, type WalletInit } from '@livestreak/schema'
 import {
   asTokenId,
   asVaultId,
   asMarketId,
+  asUserAddress,
   bridgeActionScope,
   createOptionsBridge,
   createOptionsRuntime,
@@ -23,6 +24,7 @@ import {
   type OptionsBoard,
   type OptionsBridge,
   type OptionsChainConfig,
+  type OptionsFunctionView,
   type OptionsRuntime,
   type TxId,
   type UserAddress,
@@ -36,10 +38,12 @@ import {
 } from '#/config/deployments'
 import { defaultOptionsMarketId, isOptionsModeEnabled } from '#/config/optionsMode'
 import {
+  DEFAULT_FUND_DURATION_MIN,
   findTokenIdForVault,
-  fundDepositForRate,
+  fundDepositForDuration,
   usdPerMinToChainRate,
 } from '#/adapters/optionsBoard'
+import { findOptionsFunction } from '#/adapters/optionsControls'
 
 const STEALTH_DOMAIN = 'livestreak-stealth-v1'
 const SESSION_SECRET_KEY = 'livestreak_stealth_secret'
@@ -65,15 +69,28 @@ interface OptionsContextValue {
   ready: boolean
   isConnected: boolean
   isLoading: boolean
+  claiming: boolean
   error: string | null
   address: Address | null
   usdcBalance: number
   board: OptionsBoard | null
+  controls: readonly OptionsFunctionView[]
   bridge: OptionsBridge | null
   connect: (password: string) => Promise<void>
   disconnect: () => void
   setActiveMarketId: (marketId: string | undefined) => void
-  fundStream: (vaultId: string, side: 'yes' | 'no', rateUsdPerMin: number) => Promise<TxId>
+  findFunction: (name: string, match?: (fn: OptionsFunctionView) => boolean) => OptionsFunctionView | undefined
+  fundStream: (
+    vaultId: string,
+    side: 'yes' | 'no',
+    rateUsdPerMin: number,
+    durationMinutes?: number,
+  ) => Promise<TxId>
+  claimWin: (vaultId: string) => Promise<TxId>
+  claimLoss: (vaultId: string, side: 'yes' | 'no') => Promise<TxId>
+  stake: (amountLvst: number) => Promise<TxId>
+  unstake: (amountLvst: number) => Promise<TxId>
+  claimDividends: () => Promise<TxId>
 }
 
 const OptionsContext = createContext<OptionsContextValue | null>(null)
@@ -121,13 +138,14 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(!enabled)
   const [isConnected, setIsConnected] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [claiming, setClaiming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [address, setAddress] = useState<Address | null>(null)
   const [board, setBoard] = useState<OptionsBoard | null>(null)
+  const [controls, setControls] = useState<readonly OptionsFunctionView[]>([])
   const [usdcBalance, setUsdcBalance] = useState(0)
 
   const walletInitRef = useRef<WalletInit | null>(null)
-  const chainConfigRef = useRef<OptionsChainConfig | null>(null)
   const runtimeRef = useRef<OptionsRuntime | null>(null)
   const bridgeRef = useRef<OptionsBridge | null>(null)
   const pollingStopRef = useRef<(() => void) | null>(null)
@@ -142,6 +160,7 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     runtimeRef.current = null
     bridgeRef.current = null
     setBoard(null)
+    setControls([])
   }, [])
 
   const applyBoard = useCallback((next: OptionsBoard) => {
@@ -152,14 +171,20 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const syncFromBridge = useCallback(async (bridge: OptionsBridge) => {
+    applyBoard(await bridge.readBoard(APP_CALLER))
+    const nextControls = await bridge.readControls(APP_CALLER)
+    setControls(nextControls.functions)
+  }, [applyBoard])
+
   const refreshConnected = useCallback(async (user: UserAddress, marketId?: string) => {
     const runtime = runtimeRef.current
     const bridge = bridgeRef.current
     if (!runtime || !bridge) return
 
     await runtime.refreshUser(user, marketId ? asMarketId(marketId) : undefined)
-    applyBoard(await bridge.readBoard(APP_CALLER))
-  }, [applyBoard])
+    await syncFromBridge(bridge)
+  }, [syncFromBridge])
 
   const bootRuntime = useCallback(async (secret: Uint8Array, user: UserAddress) => {
     const walletInit = walletInitRef.current
@@ -175,7 +200,6 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
       readRpcUrl: LOCALHOST_RPC_URL,
       includeProtocolSummary: true,
     }
-    chainConfigRef.current = chainConfig
 
     const runtime = createOptionsRuntime({
       config: {
@@ -193,7 +217,10 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     runtimeRef.current = runtime
     bridgeRef.current = bridge
 
-    boardUnsubRef.current = bridge.subscribeBoard(APP_CALLER, applyBoard)
+    boardUnsubRef.current = bridge.subscribeBoard(APP_CALLER, (nextBoard) => {
+      applyBoard(nextBoard)
+      void bridge.readControls(APP_CALLER).then(next => setControls(next.functions)).catch(() => {})
+    })
     pollingStopRef.current = runtime.startPolling().stop
 
     await refreshConnected(user, marketId)
@@ -297,7 +324,6 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
   const disconnect = useCallback(() => {
     sessionStorage.removeItem(SESSION_SECRET_KEY)
     teardownRuntime()
-    chainConfigRef.current = null
     setAddress(null)
     setIsConnected(false)
     setUsdcBalance(0)
@@ -312,60 +338,131 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     }
   }, [address, isConnected, refreshConnected])
 
+  const requireUser = useCallback((): UserAddress => {
+    if (!address) throw new Error('Wallet not connected')
+    return asUserAddress(address)
+  }, [address])
+
+  const requireBridge = useCallback((): OptionsBridge => {
+    const bridge = bridgeRef.current
+    if (!bridge) throw new Error('Options bridge not ready')
+    return bridge
+  }, [])
+
+  const requirePanel = useCallback(() => {
+    if (!board) throw new Error('Options board not ready')
+    return board.panel
+  }, [board])
+
+  const resolveTokenId = useCallback((vaultId: string): bigint => {
+    const panel = requirePanel()
+    const tokenId = findTokenIdForVault(panel, vaultId)
+    if (!tokenId) throw new Error('No NFT for this market')
+    return BigInt(tokenId)
+  }, [requirePanel])
+
+  const afterWrite = useCallback(async () => {
+    const user = address as UserAddress | null
+    if (user) await refreshConnected(user, activeMarketIdRef.current)
+  }, [address, refreshConnected])
+
+  const callBridgeAction = useCallback(async (action: string, args: unknown): Promise<TxId> => {
+    setClaiming(true)
+    try {
+      const txId = await requireBridge().callAction(APP_CALLER, {
+        scope: bridgeActionScope,
+        action,
+        args,
+      })
+      await afterWrite()
+      return txId
+    } finally {
+      setClaiming(false)
+    }
+  }, [requireBridge, afterWrite])
+
+  const findFunction = useCallback((
+    name: string,
+    match?: (fn: OptionsFunctionView) => boolean,
+  ) => findOptionsFunction(controls, name, match), [controls])
+
   const fundStream = useCallback(async (
     vaultId: string,
     side: 'yes' | 'no',
     rateUsdPerMin: number,
+    durationMinutes = DEFAULT_FUND_DURATION_MIN,
   ): Promise<TxId> => {
-    const bridge = bridgeRef.current
-    const currentBoard = board
-    if (!bridge || !currentBoard) {
-      throw new Error('Options bridge not ready')
-    }
-
-    const tokenId = findTokenIdForVault(currentBoard.panel, vaultId)
-    if (!tokenId) {
-      throw new Error('No NFT for this market — mint before funding')
-    }
-
     const chainRate = usdPerMinToChainRate(rateUsdPerMin)
-    const txId = await bridge.callAction(APP_CALLER, {
-      scope: bridgeActionScope,
-      action: 'fund',
-      args: {
-        tokenId: asTokenId(BigInt(tokenId)),
-        vaultId: asVaultId(vaultId),
-        side,
-        rate: chainRate,
-        deposit: fundDepositForRate(chainRate),
-      },
+    return callBridgeAction('fund', {
+      tokenId: asTokenId(resolveTokenId(vaultId)),
+      vaultId: asVaultId(vaultId),
+      side,
+      rate: chainRate,
+      deposit: fundDepositForDuration(chainRate, durationMinutes),
     })
+  }, [callBridgeAction, resolveTokenId])
 
-    const user = address as UserAddress | null
-    if (user) {
-      await refreshConnected(user, activeMarketIdRef.current)
-    }
+  const claimWin = useCallback(async (vaultId: string): Promise<TxId> => {
+    const user = requireUser()
+    return callBridgeAction('withdraw', {
+      tokenId: asTokenId(resolveTokenId(vaultId)),
+      vaultId: asVaultId(vaultId),
+      to: user,
+    })
+  }, [callBridgeAction, requireUser, resolveTokenId])
 
-    return txId
-  }, [address, board, refreshConnected])
+  const claimLoss = useCallback(async (vaultId: string, side: 'yes' | 'no'): Promise<TxId> => {
+    const user = requireUser()
+    return callBridgeAction('claimLossLvst', {
+      tokenId: asTokenId(resolveTokenId(vaultId)),
+      vaultId: asVaultId(vaultId),
+      side,
+      to: user,
+    })
+  }, [callBridgeAction, requireUser, resolveTokenId])
+
+  const stake = useCallback(async (amountLvst: number): Promise<TxId> => {
+    return callBridgeAction('stakeLvst', {
+      amount: parseUnits(String(amountLvst), 18),
+    })
+  }, [callBridgeAction])
+
+  const unstake = useCallback(async (amountLvst: number): Promise<TxId> => {
+    return callBridgeAction('unstakeLvst', {
+      amount: parseUnits(String(amountLvst), 18),
+    })
+  }, [callBridgeAction])
+
+  const claimDividends = useCallback(async (): Promise<TxId> => {
+    return callBridgeAction('claimDividends', {})
+  }, [callBridgeAction])
 
   const value = useMemo<OptionsContextValue>(() => ({
     enabled,
     ready,
     isConnected,
     isLoading,
+    claiming,
     error,
     address,
     usdcBalance,
     board,
+    controls,
     bridge: bridgeRef.current,
     connect,
     disconnect,
     setActiveMarketId,
+    findFunction,
     fundStream,
+    claimWin,
+    claimLoss,
+    stake,
+    unstake,
+    claimDividends,
   }), [
-    enabled, ready, isConnected, isLoading, error, address, usdcBalance, board,
-    connect, disconnect, setActiveMarketId, fundStream,
+    enabled, ready, isConnected, isLoading, claiming, error, address, usdcBalance, board, controls,
+    connect, disconnect, setActiveMarketId, findFunction, fundStream, claimWin, claimLoss,
+    stake, unstake, claimDividends,
   ])
 
   return (

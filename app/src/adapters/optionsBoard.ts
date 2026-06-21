@@ -135,13 +135,23 @@ export function panelToPositions(panel: OptionsPanel, streamId?: string): Positi
   return positions
 }
 
+/** Default fund window shown in the streaming UI (minutes). */
+export const DEFAULT_FUND_DURATION_MIN = 60
+
 /** UI $/min → on-chain USDC atomic units per second (6 decimals). */
 export function usdPerMinToChainRate(rateUsdPerMin: number): bigint {
   return BigInt(Math.max(1, Math.round((rateUsdPerMin * USDC_SCALE) / 60)))
 }
 
-export function fundDepositForRate(chainRate: bigint): bigint {
-  return chainRate * 50n
+/** deposit = chainRate (USDC/sec atomic) × durationSeconds */
+export function fundDepositForDuration(chainRate: bigint, durationMinutes: number): bigint {
+  const durationSeconds = BigInt(Math.max(1, Math.round(durationMinutes * 60)))
+  return chainRate * durationSeconds
+}
+
+/** Total USDC commitment for display ($). */
+export function fundCommitmentUsd(rateUsdPerMin: number, durationMinutes: number): number {
+  return rateUsdPerMin * durationMinutes
 }
 
 export function findTokenIdForVault(panel: OptionsPanel, vaultId: string): string | undefined {

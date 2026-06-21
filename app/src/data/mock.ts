@@ -54,9 +54,9 @@ export const mockVaults: Vault[] = [
   },
   {
     id: '0x3c4d', option: 'Audience question within 5 minutes', type: 'timing', creator: '0xsteward',
-    noTotal: 210, yesTotal: 128, status: 'hot', hotUntil: Date.now() + 42000,
+    noTotal: 210, yesTotal: 128, status: 'open', hotUntil: null,
     createdAt: Date.now() - 600000, expiresAt: Date.now() + 480000,
-    outcome: 'pending', multiplier: 1.83, exitBurn: 20, createdMinute: 32,
+    outcome: 'pending', multiplier: 1.83, createdMinute: 32,
   },
   {
     id: '0x5e6f', option: 'Panel reaches consensus on AI safety', type: 'threshold', creator: '0xsteward',
@@ -86,7 +86,7 @@ export const mockEvents: WSEvent[] = [
   { id: 'e1', t: 'alert', min: 45, desc: 'AI detected key moment — speaker tone shifted significantly' },
   { id: 'e2', t: 'vault_created', min: 43, desc: 'New vault: "Viewer count exceeds 20k"' },
   { id: 'e3', t: 'stream_surge', min: 40, desc: 'YES volume surged 3x on "Speaker addresses regulation" vault' },
-  { id: 'e4', t: 'hot_period', min: 38, desc: '"Audience question within 5 minutes" entered hot period' },
+  { id: 'e4', t: 'stream_surge', min: 38, desc: 'Volume surged on "Audience question within 5 minutes"' },
   { id: 'e5', t: 'alert', min: 35, desc: 'Significant audience reaction — sentiment shift detected' },
   { id: 'e6', t: 'resolved', min: 32, desc: '"Opening remarks exceed 10 min" resolved YES' },
   { id: 'e7', t: 'milestone', min: 30, desc: 'Stream crossed 15,000 concurrent viewers' },
@@ -179,9 +179,9 @@ export interface LiveVault {
 
 export const mockLiveVaults: LiveVault[] = [
   { id: 'lv-1', streamId: 'tech-1', streamTitle: 'AI & Prediction Markets', option: 'Speaker addresses regulation next', multiplier: 2.31, totalPool: 279, status: 'open', expiresIn: 180 },
-  { id: 'lv-2', streamId: 'esports-1', streamTitle: 'LCS Finals', option: 'Team Alpha wins Game 3', multiplier: 1.92, totalPool: 485, status: 'hot', expiresIn: 45 },
+  { id: 'lv-2', streamId: 'esports-1', streamTitle: 'LCS Finals', option: 'Team Alpha wins Game 3', multiplier: 1.92, totalPool: 485, status: 'open', expiresIn: 45 },
   { id: 'lv-3', streamId: 'politics-1', streamTitle: 'Town Hall Debate', option: 'Candidate X gets more applause next', multiplier: 3.10, totalPool: 312, status: 'open', expiresIn: 300 },
-  { id: 'lv-4', streamId: 'tech-1', streamTitle: 'AI & Prediction Markets', option: 'Audience question within 5 minutes', multiplier: 1.83, totalPool: 338, status: 'hot', expiresIn: 42 },
+  { id: 'lv-4', streamId: 'tech-1', streamTitle: 'AI & Prediction Markets', option: 'Audience question within 5 minutes', multiplier: 1.83, totalPool: 338, status: 'open', expiresIn: 42 },
   { id: 'lv-5', streamId: 'entertainment-1', streamTitle: 'MasterChef Live', option: 'Chef Rivera survives elimination', multiplier: 1.45, totalPool: 210, status: 'open', expiresIn: 600 },
 ]
 

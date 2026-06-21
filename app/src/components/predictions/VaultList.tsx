@@ -13,7 +13,7 @@ interface Props {
   positions: Position[]
   selectedVaultId: string | null
   onDismissVault: () => void
-  onStream?: (vaultId: string, side: 'yes' | 'no', rate: number) => void
+  onStream?: (vaultId: string, side: 'yes' | 'no', rate: number, durationMinutes?: number) => void
 }
 
 export function VaultList({ vaults, events, positions, selectedVaultId, onDismissVault, onStream }: Props) {

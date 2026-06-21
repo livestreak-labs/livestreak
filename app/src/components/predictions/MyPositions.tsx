@@ -4,6 +4,9 @@ import { TrendUp, TrendDown, Pulse, Pause, Play } from '@phosphor-icons/react'
 import { StreamSlider } from '#/components/predictions/StreamSlider'
 import { formatUSDC, formatRate } from '#/utils/format'
 import type { Position, Vault } from '#/data/mock'
+import { isOptionsModeEnabled } from '#/config/optionsMode'
+import { useOptionsContext } from '#/contexts/OptionsContext'
+import { OptionsActionButton } from '#/components/wallet/OptionsActionButton'
 
 interface Props {
   positions: Position[]
@@ -188,7 +191,17 @@ function ActivePositionRow({ position: p, index = 0, onSelectVault }: { position
 }
 
 function ResolvedRow({ position: p, index = 0 }: { position: Position; index?: number }) {
+  const optionsEnabled = isOptionsModeEnabled()
+  const options = useOptionsContext()
+  const useOptions = optionsEnabled && options.isConnected
   const pos = p.pnl >= 0
+
+  const withdrawFn = useOptions && p.won
+    ? options.findFunction('withdraw', fn => fn.target?.vaultId === p.vaultId && fn.target?.kind === 'vault')
+    : undefined
+  const claimLossFn = useOptions && !p.won
+    ? options.findFunction('claimLossLvst', fn => fn.target?.vaultId === p.vaultId && fn.target?.side === p.side && fn.target?.kind === 'vault')
+    : undefined
   return (
     <motion.div
       initial={{ opacity: 0, transform: 'translateY(6px)', filter: 'blur(4px)' }}
@@ -218,6 +231,24 @@ function ResolvedRow({ position: p, index = 0 }: { position: Position; index?: n
             }}>{p.won ? 'WON' : 'LOST'}</span>
             {p.won && p.payout && (
               <span className="mono" style={{ fontSize: 10, color: '#ffd553' }}>+{formatUSDC(p.payout)}</span>
+            )}
+            {useOptions && p.won && (
+              <OptionsActionButton
+                label="Withdraw"
+                fn={withdrawFn}
+                onAction={() => options.claimWin(p.vaultId)}
+                variant="green"
+                compact
+              />
+            )}
+            {useOptions && !p.won && (
+              <OptionsActionButton
+                label="Claim LVST"
+                fn={claimLossFn}
+                onAction={() => options.claimLoss(p.vaultId, p.side)}
+                variant="red"
+                compact
+              />
             )}
           </div>
         </div>

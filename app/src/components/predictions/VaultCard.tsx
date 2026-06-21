@@ -4,8 +4,16 @@ import { Clock, Fire, CheckCircle, XCircle, CaretDown, TrendUp, Users } from '@p
 import { StreamSlider } from '#/components/predictions/StreamSlider'
 import { formatUSDC, formatCountdown, formatMultiplier, formatMinute, calcPoolPct } from '#/utils/format'
 import type { Vault } from '#/data/mock'
+import type { OptionsFunctionView } from '@livestreak/options'
+import { isOptionsModeEnabled } from '#/config/optionsMode'
+import { useOptionsContext } from '#/contexts/OptionsContext'
+import { OptionsActionButton } from '#/components/wallet/OptionsActionButton'
 
 export function VaultCard({ vault, index = 0 }: { vault: Vault; index?: number }) {
+  const optionsEnabled = isOptionsModeEnabled()
+  const options = useOptionsContext()
+  const useOptions = optionsEnabled && options.isConnected
+  const side = vault.userPosition?.side
   const [expanded, setExpanded] = useState(false)
   const [hotMs, setHotMs] = useState(vault.hotUntil ? Math.max(0, vault.hotUntil - Date.now()) : 0)
   const [expiryMs, setExpiryMs] = useState(Math.max(0, vault.expiresAt - Date.now()))
@@ -116,8 +124,23 @@ export function VaultCard({ vault, index = 0 }: { vault: Vault; index?: number }
 
         {/* Win / Loss states */}
         <AnimatePresence>
-          {isWin && <WinState payout={vault.payout ?? 0} />}
-          {isLoss && <LossState flowReceived={vault.flowReceived ?? 0} />}
+          {isWin && (
+            <WinState
+              payout={vault.payout ?? 0}
+              useOptions={useOptions}
+              withdrawFn={useOptions ? options.findFunction('withdraw', fn => fn.target?.vaultId === vault.id && fn.target?.kind === 'vault') : undefined}
+              onClaimWin={() => options.claimWin(vault.id)}
+            />
+          )}
+          {isLoss && (
+            <LossState
+              flowReceived={vault.flowReceived ?? 0}
+              side={side ?? 'yes'}
+              useOptions={useOptions}
+              claimLossFn={useOptions && side ? options.findFunction('claimLossLvst', fn => fn.target?.vaultId === vault.id && fn.target?.side === side && fn.target?.kind === 'vault') : undefined}
+              onClaimLoss={async () => { if (side) await options.claimLoss(vault.id, side) }}
+            />
+          )}
         </AnimatePresence>
 
         {/* Hot exit burn */}
@@ -221,34 +244,55 @@ function StatusBadge({ vault, hotMs, expiryMs }: { vault: Vault; hotMs: number; 
   )
 }
 
-function WinState({ payout }: { payout: number }) {
+function WinState({ payout, useOptions, withdrawFn, onClaimWin }: {
+  payout: number
+  useOptions: boolean
+  withdrawFn?: OptionsFunctionView
+  onClaimWin: () => Promise<unknown>
+}) {
   return (
     <motion.div initial={{ scale: 0.95, opacity: 0, filter: 'blur(4px)' }} animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, filter: 'blur(4px)', transition: { duration: 0.12 } }} transition={{ type: 'spring', stiffness: 350, damping: 30 }} style={{
       background: 'linear-gradient(135deg, rgba(255,213,83,0.08) 0%, rgba(255,150,0,0.04) 100%)',
       border: '1px solid rgba(255,213,83,0.25)', borderRadius: 7, padding: '8px 12px', marginBottom: 4,
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <CheckCircle size={14} color="#ffd553" weight="fill" />
         <span style={{ fontSize: 12, fontWeight: 600, color: '#ffd553' }}>You won</span>
       </div>
-      <span className="display text-shimmer" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '0.02em' }}>${payout.toFixed(2)}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="display text-shimmer" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '0.02em' }}>${payout.toFixed(2)}</span>
+        {useOptions && (
+          <OptionsActionButton label="Withdraw winnings" fn={withdrawFn} onAction={onClaimWin} variant="green" compact />
+        )}
+      </div>
     </motion.div>
   )
 }
 
-function LossState({ flowReceived }: { flowReceived: number }) {
+function LossState({ flowReceived, side, useOptions, claimLossFn, onClaimLoss }: {
+  flowReceived: number
+  side: 'yes' | 'no'
+  useOptions: boolean
+  claimLossFn?: OptionsFunctionView
+  onClaimLoss: () => Promise<unknown>
+}) {
+  void side
   return (
     <motion.div initial={{ opacity: 0, transform: 'translateY(6px)', filter: 'blur(4px)' }} animate={{ opacity: 1, transform: 'translateY(0px)', filter: 'blur(0px)' }} exit={{ opacity: 0, filter: 'blur(4px)', transition: { duration: 0.12 } }} transition={{ type: 'spring', stiffness: 350, damping: 30 }} style={{
       background: 'rgba(0,200,255,0.04)', border: '1px solid rgba(0,200,255,0.1)',
       borderRadius: 7, padding: '7px 12px', marginBottom: 4,
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
     }}>
       <div>
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 1 }}>LOSERS BECOME OWNERS</div>
         <span className="mono" style={{ fontSize: 13, fontWeight: 600, color: '#00c8ff' }}>+{flowReceived.toLocaleString()} $LVST</span>
       </div>
-      <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 10px' }}>Stake</button>
+      {useOptions ? (
+        <OptionsActionButton label="Claim LVST" fn={claimLossFn} onAction={onClaimLoss} variant="red" compact />
+      ) : (
+        <button className="btn-ghost" style={{ fontSize: 10, padding: '4px 10px' }}>Stake</button>
+      )}
     </motion.div>
   )
 }
