@@ -2,7 +2,7 @@
 
 import { LiveStreakConfigError } from "@livestreak/core";
 
-import type { TxId } from "../chains/types.js";
+import type { MintResult, TxId } from "../chains/types.js";
 import { projectOptionsControls, projectOptionsPanel } from "./panel/project.js";
 import type { OptionsControlsView } from "./panel/types.js";
 import { authorizeBridgeCaller } from "./scope.js";
@@ -106,12 +106,14 @@ const dispatchWriterAction = async (
   runtime: CreateOptionsBridgeInput["runtime"],
   action: string,
   args: unknown
-): Promise<TxId> => {
+): Promise<TxId | MintResult> => {
   const writer = runtime.chain.writer;
 
   switch (action) {
     case "mint":
       return writer.mint(readArgs(args));
+    case "mintWithSalt":
+      return writer.mintWithSalt(readArgs(args));
     case "fund":
       return runtime.fundStream(readArgs(args));
     case "setLanes":

@@ -504,8 +504,10 @@ const projectLanePanel = (lane: OptionsNftSnapshot["nft"]["lanes"][number]): Opt
 };
 
 const projectLvstPanel = (account: LvstAccount): OptionsLvstPanel => {
-  const unstaked =
-    account.balance > account.staked ? account.balance - account.staked : 0n;
+  // O3: staking REMOVES LVST from the wallet (Treasury._stake pulls it), so the reader's `balance`
+  // (wallet balanceOf / getBalance) already excludes staked — it IS the stakeable amount. The old
+  // `balance - staked` double-subtracted and under-reported (often 0) the unstaked total.
+  const unstaked = account.balance;
 
   return {
     account: account.account,

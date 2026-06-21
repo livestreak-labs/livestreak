@@ -7,6 +7,7 @@ import { LiveStreakConfigError } from "@livestreak/core";
 import { MODULES, target } from "@livestreak/contracts/sui";
 
 import { asMarketId, asTokenId, asUserAddress, asVaultId } from "../../model/ids.js";
+import { priceOf } from "../../model/math/curve.js";
 import type { LvstAccount } from "../../model/lvst.js";
 import type { MarketId, TokenId, UserAddress, VaultId } from "../../model/ids.js";
 import type { OptionsBoardState } from "../../model/math/accrual.js";
@@ -488,9 +489,10 @@ const readSharePrice = async (
   vaultId: VaultId,
   side: OptionsVaultSide
 ): Promise<bigint> => {
-  // Share price = pool / side_shares (if shares > 0) else 0.
+  // O4: share price is the bonding-curve price of the pool (BASE_PRICE + BASE_PRICE*pool/CURVE_K),
+  // byte-identical to Move `bonding_board::price` and the EVM `getSharePrice` — NOT the raw pool.
   const board = await readBoard(ctx, vaultId, side);
-  return board.pool;
+  return priceOf(board.pool);
 };
 
 const readPendingBoundaries = async (
@@ -837,6 +839,32 @@ const readNft = async (
       } catch {
         // leave as zero-id if vault lookup fails
       }
+    } else {
+      // O6: a laneless NFT has no lane[0] to derive the market from. Read the NFT object's OWN
+      // market_id field (the MarketPositionNFT struct carries it) so the NFT isn't dropped from the
+      // snapshot (snapshot filters by marketId === 0x000…).
+      try {
+        const nftType = `${ctx.packageId}::market_driver::MarketPositionNFT`;
+        const owned = await ctx.client.getOwnedObjects({
+          owner,
+          filter: { StructType: nftType },
+          options: { showContent: true }
+        });
+        for (const obj of owned.data) {
+          if (obj.data?.content?.dataType === "moveObject") {
+            const fields = obj.data.content.fields as Record<string, unknown>;
+            if (BigInt(String(fields["token_id"])) === tokenId) {
+              const raw = fields["market_id"];
+              if (Array.isArray(raw)) {
+                marketId = asMarketId(bytesVecToHex(raw as number[]));
+              }
+              break;
+            }
+          }
+        }
+      } catch {
+        // leave as zero-id if the owned-object scan fails
+      }
     }
 
     return mapSuiNft(tokenId, owner, marketId, laneCount, lanes);
@@ -899,10 +927,12 @@ const readUsdcBalance = async (ctx: ReaderContext, owner: UserAddress): Promise<
   }
 };
 
-const readNftBalance = async (ctx: ReaderContext, tokenId: TokenId): Promise<bigint> => {
-  // NFT balance in streams is the USDC streamed to the NFT position.
-  // On Sui, streams accumulate in drips — return 0 as an approximation since
-  // there is no single query for the NFT's streaming USDC balance without a drips read.
+const readNftBalance = async (_ctx: ReaderContext, _tokenId: TokenId): Promise<bigint> => {
+  // O5 (KNOWN PARITY GAP): the EVM reader returns Drips `streamsState(tokenId,USDC).balance`, but the
+  // Sui streams/drips registry exposes no public per-account remaining-USDC accessor. Returning a
+  // fabricated estimate on a funds display would be worse than a documented 0, so we return 0 until
+  // contracts add a `streamed_balance(streams_registry, token_id): u128` (parity with EVM). Filed to
+  // the contracts agent. Until then Sui session PnL omits remaining streamed USDC.
   return 0n;
 };
 

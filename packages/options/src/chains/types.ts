@@ -31,6 +31,19 @@ export type MintNftInput = {
   readonly to: UserAddress;
 };
 
+export type MintWithSaltInput = {
+  readonly marketId: MarketId;
+  readonly salt: string; // bytes32 hex — deterministic tokenId salt (calcTokenIdWithSalt)
+  readonly to: UserAddress;
+};
+
+// A write that CREATES an addressable entity returns both the tx id and the new entity's id, so the
+// CLI/app get the tokenId without a follow-up read.
+export type MintResult = {
+  readonly txId: TxId;
+  readonly tokenId: TokenId;
+};
+
 export type FundStreamInput = {
   readonly tokenId: TokenId;
   readonly vaultId: VaultId;
@@ -143,7 +156,8 @@ export interface OptionsReader {
 }
 
 export interface OptionsWriter {
-  mint(input: MintNftInput): Promise<TxId>;
+  mint(input: MintNftInput): Promise<MintResult>;
+  mintWithSalt(input: MintWithSaltInput): Promise<MintResult>;
   fund(input: FundStreamInput): Promise<TxId>;
   advance(input: AdvanceInput): Promise<TxId>;
   setLanes(input: SetLanesInput): Promise<TxId>;

@@ -60,7 +60,9 @@ export interface OptionsBridge {
   readonly callAction: (
     caller: BridgeCaller,
     envelope: CallActionEnvelope
-  ) => Promise<import("../chains/types.js").TxId>;
+  ) => Promise<
+    import("../chains/types.js").TxId | import("../chains/types.js").MintResult
+  >;
   readonly subscribeBoard: (
     caller: BridgeCaller,
     listener: (board: import("../runtime/board.js").OptionsBoard) => void

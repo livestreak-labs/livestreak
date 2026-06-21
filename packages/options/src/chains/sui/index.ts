@@ -72,6 +72,7 @@ const createNotImplementedReader = (): OptionsReader => ({
 
 const createNotImplementedWriter = (): OptionsWriter => ({
   mint: notImplemented("mint"),
+  mintWithSalt: notImplemented("mintWithSalt"),
   fund: notImplemented("fund"),
   advance: notImplemented("advance"),
   setLanes: notImplemented("setLanes"),

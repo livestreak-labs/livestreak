@@ -8,6 +8,7 @@ import { createWalletManager, type SuiWalletConfig } from "@livestreak/wallet";
 import { MODULES, target } from "@livestreak/contracts/sui";
 
 import { validateOptionsVaultSide } from "../../model/vault.js";
+import { asTokenId, type TokenId } from "../../model/ids.js";
 import {
   asTxId,
   type AdvanceInput,
@@ -15,6 +16,8 @@ import {
   type ClaimLossLvstInput,
   type FundStreamInput,
   type MintNftInput,
+  type MintResult,
+  type MintWithSaltInput,
   type OptionsChainConfig,
   type OptionsWriter,
   type SetApprovalForAllInput,
@@ -27,19 +30,19 @@ import {
   type WithdrawInput,
   type WithdrawManyInput
 } from "../types.js";
-import type { OptionsSuiObjectIds } from "./addresses.js";
+import { validateSuiBytes32Id, type OptionsSuiObjectIds } from "./addresses.js";
 import { sideToSuiValue } from "./decode.js";
 import { validateSuiUserAddress } from "./account.js";
 
 // Sui clock object is always the same system object.
 const SUI_CLOCK_OBJECT_ID = "0x6";
 
-// Build the raw 32-byte array from a hex vault/market ID string.
-const vaultIdByteArray = (id: string): number[] => {
-  const hex = id.startsWith("0x") ? id.slice(2) : id;
-  return Array.from({ length: 32 }, (_, i) =>
-    parseInt(hex.slice(i * 2, i * 2 + 2) || "0", 16)
-  );
+// Build the raw 32-byte array from a hex vault/market ID string (validated — OPT.sui-validate; a
+// malformed/short id used to silently zero-pad).
+const vaultIdByteArray = (id: string, field = "vaultId"): number[] => {
+  const validated = validateSuiBytes32Id(id, field);
+  const hex = validated.startsWith("0x") ? validated.slice(2) : validated;
+  return Array.from({ length: 32 }, (_, i) => parseInt(hex.slice(i * 2, i * 2 + 2), 16));
 };
 
 // Build a pure bytes32 vector argument from a hex vault/market ID string.
@@ -58,9 +61,32 @@ export const createSuiOptionsWriter = (config: OptionsChainConfig): OptionsWrite
   const packageId = ids.packageId;
   const coinType = `${packageId}::mock_usdc::MOCK_USDC`;
 
+  // OPT.rederive: derive the account/owner/client ONCE per writer (deterministic) and reuse across
+  // send + findNftObjectId + findCoinObject instead of re-deriving the wallet on every call.
+  type SuiContext = {
+    account: { sendTransaction(tx: Transaction): Promise<{ hash: string }>; getAddress(): Promise<string> };
+    owner: string;
+    client: SuiClient;
+  };
+  let suiPromise: Promise<SuiContext> | undefined;
+  const getSui = (): Promise<SuiContext> => {
+    if (suiPromise === undefined) {
+      suiPromise = (async () => {
+        const manager = createWalletManager("sui", config.seed, suiConfig);
+        const account = (await manager.getAccount()) as SuiContext["account"];
+        const owner = await account.getAddress();
+        const rpcUrl = Array.isArray(suiConfig.rpcUrl)
+          ? suiConfig.rpcUrl[0]
+          : (suiConfig.rpcUrl ?? "");
+        const client = new SuiClient({ url: rpcUrl as string });
+        return { account, owner, client };
+      })();
+    }
+    return suiPromise;
+  };
+
   const send = async (tx: Transaction): Promise<string> => {
-    const manager = createWalletManager("sui", config.seed, suiConfig);
-    const account = await manager.getAccount();
+    const { account } = await getSui();
     tx.setGasBudgetIfNotSet(100_000_000);
     let result: { hash: string };
     try {
@@ -74,15 +100,35 @@ export const createSuiOptionsWriter = (config: OptionsChainConfig): OptionsWrite
     return result.hash;
   };
 
+  // Read the minted tokenId from the MarketNftMinted event in the tx effects (mint auto-assigns it).
+  const sendMint = async (tx: Transaction): Promise<MintResult> => {
+    const hash = await send(tx);
+    const { client } = await getSui();
+    try {
+      const block = await client.waitForTransaction({
+        digest: hash,
+        options: { showEvents: true }
+      });
+      const event = block.events?.find((e) => e.type.includes("MarketNftMinted"));
+      const parsed = event?.parsedJson as { token_id?: string } | undefined;
+      if (parsed?.token_id !== undefined) {
+        return { txId: asTxId(hash), tokenId: asTokenId(BigInt(parsed.token_id)) };
+      }
+    } catch (error) {
+      throw new LiveStreakRuntimeError({
+        message: `Sui: failed to read MarketNftMinted event: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      });
+    }
+    throw new LiveStreakRuntimeError({
+      message: "Sui: mint tx did not emit a decodable MarketNftMinted event"
+    });
+  };
+
   const findNftObjectId = async (tokenId: bigint): Promise<string> => {
-    // Locate the NFT object by scanning owned objects. The wallet manager's account
-    // address resolves the owner — for write ops the sender owns the NFT.
-    const manager = createWalletManager("sui", config.seed, suiConfig);
-    const account = await manager.getAccount();
-    const owner = await account.getAddress();
-    const rpcUrl =
-      Array.isArray(suiConfig.rpcUrl) ? suiConfig.rpcUrl[0] : (suiConfig.rpcUrl ?? "");
-    const client = new SuiClient({ url: rpcUrl as string });
+    // Locate the NFT object by scanning owned objects. The sender owns the NFT for write ops.
+    const { owner, client } = await getSui();
     const nftType = `${packageId}::market_driver::MarketPositionNFT`;
     const owned = await client.getOwnedObjects({
       owner,
@@ -103,12 +149,7 @@ export const createSuiOptionsWriter = (config: OptionsChainConfig): OptionsWrite
   };
 
   const findCoinObject = async (coinType_: string, amount: bigint): Promise<string[]> => {
-    const manager = createWalletManager("sui", config.seed, suiConfig);
-    const account = await manager.getAccount();
-    const owner = await account.getAddress();
-    const rpcUrl =
-      Array.isArray(suiConfig.rpcUrl) ? suiConfig.rpcUrl[0] : (suiConfig.rpcUrl ?? "");
-    const client = new SuiClient({ url: rpcUrl as string });
+    const { owner, client } = await getSui();
     const coins = await client.getCoins({ owner, coinType: coinType_ });
     let total = 0n;
     const objectIds: string[] = [];
@@ -127,11 +168,8 @@ export const createSuiOptionsWriter = (config: OptionsChainConfig): OptionsWrite
   };
 
   return {
-    mint: async (input: MintNftInput) => {
-      const marketHex = input.marketId.startsWith("0x") ? input.marketId.slice(2) : input.marketId;
-      const marketBytes = Array.from({ length: 32 }, (_, i) =>
-        parseInt(marketHex.slice(i * 2, i * 2 + 2) || "0", 16)
-      );
+    mint: async (input: MintNftInput): Promise<MintResult> => {
+      const marketBytes = vaultIdByteArray(input.marketId, "marketId");
       const to = validateSuiUserAddress(input.to, "to");
       const metadataType = `${packageId}::driver_utils::AccountMetadata` as const;
 
@@ -146,7 +184,15 @@ export const createSuiOptionsWriter = (config: OptionsChainConfig): OptionsWrite
           tx.makeMoveVec({ type: metadataType, elements: [] })
         ]
       });
-      return asTxId(await send(tx));
+      return sendMint(tx);
+    },
+
+    // Sui's market_driver has no salted-mint entry (tokenId is auto-assigned on chain); deterministic
+    // mintWithSalt is an EVM-only feature (calcTokenIdWithSalt). Surface it explicitly.
+    mintWithSalt: async (_input: MintWithSaltInput): Promise<never> => {
+      throw new LiveStreakConfigError({
+        message: "Sui: mintWithSalt not supported (no salted-mint Move entry; tokenId is auto-assigned)"
+      });
     },
 
     fund: async (input: FundStreamInput) => {
@@ -210,23 +256,35 @@ export const createSuiOptionsWriter = (config: OptionsChainConfig): OptionsWrite
       const nftObjectId = await findNftObjectId(input.tokenId);
       const addDeposit = requireNonNegativeBigInt(input.addDeposit, "addDeposit");
 
-      const desiredVaultIds = input.lanes.map((l) => Array.from(
-        Array.from({ length: 32 }, (_, i) => {
-          const h = l.vaultId.startsWith("0x") ? l.vaultId.slice(2) : l.vaultId;
-          return parseInt(h.slice(i * 2, i * 2 + 2) || "0", 16);
-        })
-      ));
+      const desiredVaultIds = input.lanes.map((l) => vaultIdByteArray(l.vaultId, "vaultId"));
       const desiredSides = input.lanes.map((l) => sideToSuiValue(validateOptionsVaultSide(l.side)));
       const desiredRates = input.lanes.map((l) => requirePositiveBigInt(l.rate, "rate"));
 
+      // O7: when add_deposit > 0, resolve + split a USDC coin and pass Some(coin); else None. The Move
+      // entry takes Option<Coin<T>>, which can't be a pure argument — build it with 0x1::option in the
+      // PTB. (The previous code always passed an Option<u64> None, so add-deposit silently never funded.)
+      const coinOptionInner = `0x2::coin::Coin<${coinType}>`;
+
       const tx = new Transaction();
-      const paymentArg = addDeposit > 0n
-        ? (() => {
-            // inline coin resolution is complex without async; pass none for now.
-            // Caller must ensure deposit is available in wallet balance.
-            return tx.pure(bcs.option(bcs.u64()).serialize(null).toBytes());
-          })()
-        : tx.pure(bcs.option(bcs.u64()).serialize(null).toBytes());
+      let paymentArg;
+      if (addDeposit > 0n) {
+        const usdcCoins = await findCoinObject(coinType, addDeposit);
+        const primaryCoin = tx.object(usdcCoins[0]!);
+        if (usdcCoins.length > 1) {
+          tx.mergeCoins(primaryCoin, usdcCoins.slice(1).map((id) => tx.object(id)));
+        }
+        const [payment] = tx.splitCoins(primaryCoin, [tx.pure.u128(addDeposit)]);
+        paymentArg = tx.moveCall({
+          target: "0x1::option::some",
+          typeArguments: [coinOptionInner],
+          arguments: [payment!]
+        });
+      } else {
+        paymentArg = tx.moveCall({
+          target: "0x1::option::none",
+          typeArguments: [coinOptionInner]
+        });
+      }
 
       tx.moveCall({
         target: target(packageId, MODULES.marketDriver, "set_lanes"),
@@ -319,7 +377,7 @@ export const createSuiOptionsWriter = (config: OptionsChainConfig): OptionsWrite
       const to = validateSuiUserAddress(input.to, "to");
       const vaultIds = bcs
         .vector(bcs.vector(bcs.u8()))
-        .serialize(input.vaultIds.map(vaultIdByteArray))
+        .serialize(input.vaultIds.map((v) => vaultIdByteArray(v)))
         .toBytes();
 
       const tx = new Transaction();

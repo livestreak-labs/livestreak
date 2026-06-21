@@ -1,6 +1,8 @@
 import { LiveStreakConfigError } from "@livestreak/core";
 import { describe, expect, it } from "vitest";
 
+import type { Address } from "@livestreak/schema";
+
 import { asTokenId } from "../src/model/ids.js";
 import { createOptionsChain, asTxId } from "../src/chains/index.js";
 import { createSuiOptionsChain } from "../src/chains/sui/index.js";
@@ -16,9 +18,9 @@ const evmChainConfig = {
       bundlerUrl: "http://127.0.0.1:4337",
       isSponsored: false,
       useNativeCoins: false,
-      entryPointAddress: "0x0000000000000000000000000000000000000001",
-      safe4337ModuleAddress: "0x0000000000000000000000000000000000000002",
-      safeModulesSetupAddress: "0x0000000000000000000000000000000000000003",
+      entryPointAddress: "0x0000000000000000000000000000000000000001" as Address,
+      safe4337ModuleAddress: "0x0000000000000000000000000000000000000002" as Address,
+      safeModulesSetupAddress: "0x0000000000000000000000000000000000000003" as Address,
       safeModulesVersion: "0.3.0",
       contractNetworks: {}
     }
