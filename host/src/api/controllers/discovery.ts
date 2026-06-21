@@ -2,22 +2,21 @@ import { LiveStreakConfigError } from "@livestreak/core";
 import {
   decodeHostDiscoveryIndexRequest,
   decodeHostDiscoveryRequest,
-  type HostSimilarityIndexRequest,
-  type HostSimilarityResult,
   validationErrorMessage
 } from "@livestreak/host";
 import type { NextFunction, Request, Response } from "express";
 import type { DiscoveryRouteDeps, HostRouteDeps } from "../../deps.js";
+import type { HostSimilarityResultWithKeys, IndexedVault } from "../../services/discovery.js";
 import { asyncHandler, sendRouteResult } from "../middleware/respond.js";
 
 // --- exports ---
 
 export type DiscoveryRouteResponse =
-  | { readonly ok: true; readonly result: HostSimilarityResult }
+  | { readonly ok: true; readonly result: HostSimilarityResultWithKeys }
   | { readonly ok: false; readonly status: number; readonly error: LiveStreakConfigError };
 
 export type DiscoveryIndexRouteResponse =
-  | { readonly ok: true; readonly result: HostSimilarityIndexRequest }
+  | { readonly ok: true; readonly result: IndexedVault }
   | { readonly ok: false; readonly status: number; readonly error: LiveStreakConfigError };
 
 export const handleIndexVault = (
@@ -33,13 +32,26 @@ export const handleIndexVault = (
     return discoveryIndexFailure(validationErrorMessage(decoded.left));
   }
 
-  deps.store.indexVault(decoded.right);
+  // The canonical decoder strips unknown fields, so read the optional `vaultKey`
+  // straight off the raw body and thread it through the store + the echo.
+  const vaultKey = readVaultKey(body);
+  const indexed: IndexedVault = {
+    ...decoded.right,
+    ...(vaultKey === undefined ? {} : { vaultKey })
+  };
+
+  deps.store.indexVault(indexed);
 
   return {
     ok: true,
-    result: decoded.right
+    result: indexed
   };
-};
+}
+
+const readVaultKey = (body: object): string | undefined => {
+  const value = (body as { vaultKey?: unknown }).vaultKey;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+};;
 
 export const handleFindSimilar = (
   body: unknown,
