@@ -64,6 +64,6 @@ export type {
   PollUserOperationOptions,
 } from './poller.js'
 
-// MetaMask-style at-rest keystore (P2) for the gateway daemon.
-export { createKeystore, unlockKeystore } from './keystore.js'
-export type { KeystoreFile, UnlockedKeystore, CreateKeystoreParams } from './keystore.js'
+// MetaMask-style at-rest keystore for the gateway daemon. Node-only — it pulls
+// sodium-native, which must never enter a browser/SSR bundle. Import it from the
+// dedicated subpath instead of the package root: `@livestreak/wallet/keystore`.
