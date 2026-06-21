@@ -17,14 +17,18 @@ const nodeRequire = createRequire(import.meta.url)
 // @livestreak/wallet (vendored wdk-4337) is a Node/bare-runtime SDK. The browser
 // build needs node polyfills; the Nitro server build runs in real Node and must
 // keep native builtins. We therefore scope all polyfills to the client only.
+// Externalized from the Nitro *server* bundle (scope-level so subpaths + sibling
+// packages match): the wallet SDK and its native/Sui deps. Kept external so Node
+// resolves them at runtime from node_modules instead of Rollup trying to bundle
+// their CJS/ESM-interop exports (e.g. `SuiClient` from @mysten/sui/client) into
+// the server build. The runtime image keeps node_modules + packages/wallet/dist.
 const walletExternals = [
-  '@livestreak/wallet',
-  '@tetherto/wdk-wallet',
-  '@tetherto/wdk-wallet-evm',
-  '@safe-global/protocol-kit',
-  '@safe-global/relay-kit',
-  'sodium-javascript',
-  'bare-node-runtime',
+  /^@livestreak\/wallet(\/|$)/,
+  /^@tetherto\//,
+  /^@safe-global\//,
+  /^@mysten\//,
+  /^sodium-javascript(\/|$)/,
+  /^bare-node-runtime(\/|$)/,
 ]
 
 // vite-plugin-node-polyfills rewrites `buffer`/`process`/`global` imports to its
