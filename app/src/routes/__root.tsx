@@ -3,7 +3,7 @@ import { MotionConfig } from 'framer-motion'
 import appCss from '../styles.css?url'
 import { OptionsProvider } from '#/contexts/OptionsContext.tsx'
 import { WalletProvider } from '#/contexts/WalletContext.tsx'
-import { ConnectButton } from '#/components/wallet/ConnectButton.tsx'
+import { WalletControls } from '#/components/wallet/WalletControls.tsx'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -128,7 +128,7 @@ function RootComponent() {
             })}
           </div>
         </div>
-        <ConnectButton />
+        <WalletControls />
       </nav>
       {/* Page content */}
       <main style={{ flex: 1, position: 'relative', zIndex: 1 }}>

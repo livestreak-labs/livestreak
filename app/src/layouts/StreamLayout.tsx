@@ -7,7 +7,7 @@ import { WinNotification, useWinNotifications } from '#/components/hud/WinNotifi
 import { VideoPlayer } from '#/components/video/VideoPlayer.tsx'
 import { NikoNikoCard } from '#/components/video/NikoNikoCard.tsx'
 import { VaultList } from '#/components/predictions/VaultList.tsx'
-import { ConnectButton } from '#/components/wallet/ConnectButton.tsx'
+import { WalletControls } from '#/components/wallet/WalletControls.tsx'
 import { useVaults } from '#/hooks/useVaults.ts'
 import { usePositions } from '#/hooks/usePositions.ts'
 import { useWebSocket } from '#/hooks/useWebSocket.ts'
@@ -104,7 +104,7 @@ export function StreamLayout({ streamTitle, category, totalPooled, streamId }: S
             fontFamily: 'var(--font-mono)',
           }}>{category}</span>
         </div>
-        <ConnectButton />
+        <WalletControls />
       </div>
 
       {/* Stream bar */}

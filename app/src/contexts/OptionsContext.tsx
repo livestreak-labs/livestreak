@@ -11,6 +11,7 @@ import {
 import { sha256, toBytes, hexToBytes, bytesToHex, parseUnits, isAddress, type Address } from 'viem'
 import { Schema } from 'effect'
 import { EvmWalletInitConfig, type WalletInit } from '@livestreak/schema'
+import { localnetDeployment } from '@livestreak/contracts/sui/deployments/localnet'
 import {
   asTokenId,
   asVaultId,
@@ -19,6 +20,7 @@ import {
   bridgeActionScope,
   createOptionsBridge,
   createOptionsRuntime,
+  createOptionsSuiConfig,
   resolveOptionsAccountAddress,
   type BridgeCaller,
   type OptionsBoard,
@@ -39,12 +41,20 @@ import {
 } from '#/config/deployments'
 import { defaultOptionsMarketId, isOptionsModeEnabled } from '#/config/optionsMode'
 import {
+  isValidRecipientAddress,
+  readStoredChain,
+  SESSION_CHAIN_KEY,
+  type OptionsChainKind,
+} from '#/config/optionsChain'
+import {
   DEFAULT_FUND_DURATION_MIN,
   findTokenIdForVault,
   fundDepositForDuration,
   usdPerMinToChainRate,
 } from '#/adapters/optionsBoard'
 import { findOptionsFunction, findFundFunction, findStopFundingFunction } from '#/adapters/optionsControls'
+
+export type { OptionsChainKind }
 
 const STEALTH_DOMAIN = 'livestreak-stealth-v1'
 const SESSION_SECRET_KEY = 'livestreak_stealth_secret'
@@ -68,6 +78,8 @@ interface AaCapabilityDescriptor {
 interface OptionsContextValue {
   enabled: boolean
   ready: boolean
+  chain: OptionsChainKind
+  setChain: (chain: OptionsChainKind) => void
   isConnected: boolean
   isLoading: boolean
   claiming: boolean
@@ -146,9 +158,35 @@ function buildWalletInit(descriptor: AaCapabilityDescriptor): WalletInit {
   return { chain: 'evm', seedSource: 'raw', config: evmConfig }
 }
 
+function buildChainConfig(
+  chain: OptionsChainKind,
+  secret: Uint8Array,
+  walletInit: WalletInit | null,
+): OptionsChainConfig {
+  if (chain === 'sui') {
+    return createOptionsSuiConfig({
+      deployment: localnetDeployment,
+      seed: secret,
+    })
+  }
+
+  if (!walletInit) throw new Error('Options wallet config not loaded')
+
+  return {
+    walletInit,
+    seed: secret,
+    addresses: buildOptionsContractAddresses(),
+    readRpcUrl: LOCALHOST_RPC_URL,
+    includeProtocolSummary: true,
+  }
+}
+
 export function OptionsProvider({ children }: { children: ReactNode }) {
   const enabled = isOptionsModeEnabled()
-  const [ready, setReady] = useState(!enabled)
+  const [chain, setChainState] = useState<OptionsChainKind>(() =>
+    enabled ? readStoredChain() : 'evm',
+  )
+  const [ready, setReady] = useState(!enabled || readStoredChain() === 'sui')
   const [isConnected, setIsConnected] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [claiming, setClaiming] = useState(false)
@@ -164,6 +202,8 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
   const pollingStopRef = useRef<(() => void) | null>(null)
   const boardUnsubRef = useRef<(() => void) | null>(null)
   const activeMarketIdRef = useRef<string | undefined>(defaultOptionsMarketId())
+  const chainRef = useRef(chain)
+  chainRef.current = chain
 
   const teardownRuntime = useCallback(() => {
     boardUnsubRef.current?.()
@@ -200,19 +240,11 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
   }, [syncFromBridge])
 
   const bootRuntime = useCallback(async (secret: Uint8Array, user: UserAddress) => {
-    const walletInit = walletInitRef.current
-    if (!walletInit) throw new Error('Options wallet config not loaded')
-
     teardownRuntime()
 
+    const selectedChain = chainRef.current
+    const chainConfig = buildChainConfig(selectedChain, secret, walletInitRef.current)
     const marketId = activeMarketIdRef.current
-    const chainConfig: OptionsChainConfig = {
-      walletInit,
-      seed: secret,
-      addresses: buildOptionsContractAddresses(),
-      readRpcUrl: LOCALHOST_RPC_URL,
-      includeProtocolSummary: true,
-    }
 
     const runtime = createOptionsRuntime({
       config: {
@@ -239,30 +271,38 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     await refreshConnected(user, marketId)
   }, [applyBoard, refreshConnected, teardownRuntime])
 
+  const loadEvmDescriptor = useCallback(async (cancelled: () => boolean) => {
+    try {
+      const res = await fetch(`${HOST_BASE_URL}/aa/descriptor`)
+      if (!res.ok) throw new Error(`AA descriptor HTTP ${res.status}`)
+      const descriptor = (await res.json()) as AaCapabilityDescriptor
+      walletInitRef.current = buildWalletInit(descriptor)
+      if (!cancelled()) setReady(true)
+    } catch (err) {
+      if (!cancelled()) {
+        setError(err instanceof Error ? err.message : String(err))
+        setReady(true)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return
 
-    let cancelled = false
+    if (chain === 'sui') {
+      walletInitRef.current = null
+      setReady(true)
+      return
+    }
 
-    void (async () => {
-      try {
-        const res = await fetch(`${HOST_BASE_URL}/aa/descriptor`)
-        if (!res.ok) throw new Error(`AA descriptor HTTP ${res.status}`)
-        const descriptor = (await res.json()) as AaCapabilityDescriptor
-        walletInitRef.current = buildWalletInit(descriptor)
-        if (!cancelled) setReady(true)
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err))
-          setReady(true)
-        }
-      }
-    })()
+    let cancelled = false
+    setReady(false)
+    void loadEvmDescriptor(() => cancelled)
 
     return () => {
       cancelled = true
     }
-  }, [enabled])
+  }, [enabled, chain, loadEvmDescriptor])
 
   useEffect(() => {
     if (!enabled || !ready || typeof window === 'undefined') return
@@ -273,15 +313,7 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         const secret = hexToBytes(cached as `0x${string}`)
-        const walletInit = walletInitRef.current
-        if (!walletInit) return
-
-        const chainConfig: OptionsChainConfig = {
-          walletInit,
-          seed: secret,
-          addresses: buildOptionsContractAddresses(),
-          readRpcUrl: LOCALHOST_RPC_URL,
-        }
+        const chainConfig = buildChainConfig(chainRef.current, secret, walletInitRef.current)
         const user = await resolveOptionsAccountAddress(chainConfig)
         setAddress(user as Address)
         setIsConnected(true)
@@ -295,7 +327,23 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     })()
 
     return () => teardownRuntime()
-  }, [enabled, ready, bootRuntime, teardownRuntime])
+  }, [enabled, ready, chain, bootRuntime, teardownRuntime])
+
+  const disconnect = useCallback(() => {
+    sessionStorage.removeItem(SESSION_SECRET_KEY)
+    teardownRuntime()
+    setAddress(null)
+    setIsConnected(false)
+    setUsdcBalance(0)
+    setError(null)
+  }, [teardownRuntime])
+
+  const setChain = useCallback((next: OptionsChainKind) => {
+    if (next === chainRef.current) return
+    sessionStorage.setItem(SESSION_CHAIN_KEY, next)
+    disconnect()
+    setChainState(next)
+  }, [disconnect])
 
   const connect = useCallback(async (password: string) => {
     if (!enabled) return
@@ -303,7 +351,7 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
       setError('Password required')
       return
     }
-    if (!walletInitRef.current) {
+    if (chainRef.current === 'evm' && !walletInitRef.current) {
       setError('Options config not ready — is host running?')
       return
     }
@@ -314,12 +362,7 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
       const secret = toBytes(sha256(toBytes(STEALTH_DOMAIN + password)))
       sessionStorage.setItem(SESSION_SECRET_KEY, bytesToHex(secret))
 
-      const chainConfig: OptionsChainConfig = {
-        walletInit: walletInitRef.current,
-        seed: secret,
-        addresses: buildOptionsContractAddresses(),
-        readRpcUrl: LOCALHOST_RPC_URL,
-      }
+      const chainConfig = buildChainConfig(chainRef.current, secret, walletInitRef.current)
       const user = await resolveOptionsAccountAddress(chainConfig)
       setAddress(user as Address)
       setIsConnected(true)
@@ -333,15 +376,6 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
       setIsLoading(false)
     }
   }, [enabled, bootRuntime, teardownRuntime])
-
-  const disconnect = useCallback(() => {
-    sessionStorage.removeItem(SESSION_SECRET_KEY)
-    teardownRuntime()
-    setAddress(null)
-    setIsConnected(false)
-    setUsdcBalance(0)
-    setError(null)
-  }, [teardownRuntime])
 
   const setActiveMarketId = useCallback((marketId: string | undefined) => {
     activeMarketIdRef.current = marketId
@@ -484,7 +518,9 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
 
   const transferNft = useCallback(async (tokenId: string, to: string): Promise<TxId> => {
     const user = requireUser()
-    if (!isAddress(to)) throw new Error('Invalid recipient address')
+    if (!isValidRecipientAddress(chainRef.current, to)) {
+      throw new Error('Invalid recipient address')
+    }
     return callBridgeAction('transferNft', {
       from: user,
       to: asUserAddress(to),
@@ -511,6 +547,8 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
   const value = useMemo<OptionsContextValue>(() => ({
     enabled,
     ready,
+    chain,
+    setChain,
     isConnected,
     isLoading,
     claiming,
@@ -538,7 +576,7 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     approveNft,
     setApprovalForAll,
   }), [
-    enabled, ready, isConnected, isLoading, claiming, error, address, usdcBalance, board, controls,
+    enabled, ready, chain, setChain, isConnected, isLoading, claiming, error, address, usdcBalance, board, controls,
     connect, disconnect, setActiveMarketId, findFunction, findFundFunctionForVault,
     findStopFundingFunctionForVault, fundStream, stopFunding, previewAccrual, claimWin, claimLoss,
     stake, unstake, claimDividends, transferNft, approveNft, setApprovalForAll,

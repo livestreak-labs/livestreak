@@ -3,6 +3,7 @@ import { isAddress } from 'viem'
 import type { OptionsFunctionView, OptionsNftPanel } from '@livestreak/options'
 
 import { isOptionsModeEnabled } from '#/config/optionsMode'
+import { isValidRecipientAddress, type OptionsChainKind } from '#/config/optionsChain'
 import { useOptionsContext } from '#/contexts/OptionsContext'
 import { OptionsActionButton } from '#/components/wallet/OptionsActionButton'
 
@@ -16,6 +17,7 @@ export function NftPanel() {
 
   if (!optionsEnabled || !options.isConnected || !options.board) return null
 
+  const isSui = options.chain === 'sui'
   const nfts = options.board.panel.nfts
   const approveAllFn = options.findFunction('setApprovalForAll', fn => fn.target?.kind === 'global')
 
@@ -25,7 +27,7 @@ export function NftPanel() {
         POSITION NFTS
       </div>
 
-      <ApproveAllRow fn={approveAllFn} onApproveAll={options.setApprovalForAll} />
+      {!isSui && <ApproveAllRow fn={approveAllFn} onApproveAll={options.setApprovalForAll} />}
 
       {nfts.length === 0 ? (
         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', padding: '0 4px 14px', margin: 0 }}>
@@ -36,10 +38,13 @@ export function NftPanel() {
           <NftRow
             key={nft.tokenId}
             nft={nft}
+            chain={options.chain}
             transferFn={options.findFunction('transferNft', fn =>
               fn.target?.kind === 'nft' && fn.target.tokenId === nft.tokenId)}
-            approveFn={options.findFunction('approveNft', fn =>
-              fn.target?.kind === 'nft' && fn.target.tokenId === nft.tokenId)}
+            approveFn={!isSui
+              ? options.findFunction('approveNft', fn =>
+                fn.target?.kind === 'nft' && fn.target.tokenId === nft.tokenId)
+              : undefined}
             onTransfer={(to) => options.transferNft(nft.tokenId, to)}
             onApprove={(operator) => options.approveNft(nft.tokenId, operator)}
           />
@@ -95,12 +100,14 @@ function ApproveAllRow({
 
 function NftRow({
   nft,
+  chain,
   transferFn,
   approveFn,
   onTransfer,
   onApprove,
 }: {
   nft: OptionsNftPanel
+  chain: OptionsChainKind
   transferFn?: OptionsFunctionView
   approveFn?: OptionsFunctionView
   onTransfer: (to: string) => Promise<unknown>
@@ -108,8 +115,9 @@ function NftRow({
 }) {
   const [transferTo, setTransferTo] = useState('')
   const [approveOperator, setApproveOperator] = useState('')
-  const transferValid = isAddress(transferTo)
+  const transferValid = isValidRecipientAddress(chain, transferTo)
   const approveValid = isAddress(approveOperator)
+  const showApprove = chain === 'evm' && approveFn !== undefined
 
   return (
     <div style={{
@@ -126,10 +134,10 @@ function NftRow({
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-          {nft.approved && (
+          {chain === 'evm' && nft.approved && (
             <span style={{ fontSize: 9, color: '#00c8ff', fontFamily: 'var(--font-mono)' }}>approved</span>
           )}
-          {nft.isOperator && (
+          {chain === 'evm' && nft.isOperator && (
             <span style={{ fontSize: 9, color: '#00ff87', fontFamily: 'var(--font-mono)' }}>operator</span>
           )}
         </div>
@@ -143,7 +151,7 @@ function NftRow({
           <input
             value={transferTo}
             onChange={e => setTransferTo(e.target.value.trim())}
-            placeholder="Transfer to 0x…"
+            placeholder={chain === 'sui' ? 'Transfer to Sui address…' : 'Transfer to 0x…'}
             style={addressInputStyle}
           />
           <OptionsActionButton
@@ -154,6 +162,7 @@ function NftRow({
             compact
           />
         </div>
+        {showApprove && (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <input
             value={approveOperator}
@@ -169,6 +178,7 @@ function NftRow({
             compact
           />
         </div>
+        )}
       </div>
     </div>
   )
