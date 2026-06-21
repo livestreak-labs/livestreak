@@ -52,3 +52,18 @@ export type {
 } from '@tetherto/wdk-wallet'
 
 export type { FeeRates, EvmTransaction } from '@tetherto/wdk-wallet-evm'
+
+// Shared userOperation poller (systemic POLL + SUCCESS fix). All chain writers import this.
+export {
+  pollUntilUserOperationIncluded,
+  readUserOperationSuccess,
+  assertUserOperationSucceeded,
+} from './poller.js'
+export type {
+  UserOperationReceiptReader,
+  PollUserOperationOptions,
+} from './poller.js'
+
+// MetaMask-style at-rest keystore (P2) for the gateway daemon.
+export { createKeystore, unlockKeystore } from './keystore.js'
+export type { KeystoreFile, UnlockedKeystore, CreateKeystoreParams } from './keystore.js'
