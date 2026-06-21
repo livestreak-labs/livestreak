@@ -1,7 +1,7 @@
 import type { AaCapabilityDescriptor } from "@livestreak/host";
 import type { AaChainConfig } from "../../services/aa/chains.js";
 import type { Hex } from "viem";
-import type { AaRouteDeps } from "../aa-deps.js";
+import type { AaRouteDeps } from "../../deps.js";
 import { proxyBundlerRpc } from "../../services/aa/bundler.js";
 import type { PackedUserOp } from "../../services/aa/paymaster.js";
 

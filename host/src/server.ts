@@ -1,23 +1,23 @@
 import express, { type Express } from "express";
-import { bootstrapAaFromConfig, readAaServerConfig } from "../services/aa/chains.js";
-import { bootstrapHostServerConfig, defaultHostServerConfig, isModuleEnabled } from "../config/host.js";
+import { bootstrapAaFromConfig, readAaServerConfig } from "./services/aa/chains.js";
+import { bootstrapHostServerConfig, defaultHostServerConfig, isModuleEnabled } from "./config/host.js";
 import { createHostRouteDeps, type HostRouteDeps } from "./deps.js";
 import {
   errorHandler,
   malformedJsonHandler,
   notFoundHandler
-} from "./middleware/errorHandler.js";
-import { createAaRouter } from "./routes/aa.js";
-import { createContentRouter } from "./routes/content.js";
-import { createDescriptorRouter } from "./routes/descriptor.js";
-import { createDiscoveryRouter } from "./routes/discovery.js";
-import { createMediaRouter } from "./routes/media.js";
-import { createMemoryRouter } from "./routes/memory.js";
+} from "./api/middleware/errorHandler.js";
+import { createAaRouter } from "./api/routes/aa.js";
+import { createContentRouter } from "./api/routes/content.js";
+import { createDescriptorRouter } from "./api/routes/descriptor.js";
+import { createDiscoveryRouter } from "./api/routes/discovery.js";
+import { createMediaRouter } from "./api/routes/media.js";
+import { createMemoryRouter } from "./api/routes/memory.js";
 
 // --- exports ---
 
 export { createHostRouteDeps, type HostRouteDeps } from "./deps.js";
-export { bootstrapHostServerConfig } from "../config/host.js";
+export { bootstrapHostServerConfig } from "./config/host.js";
 
 export const createApp = (deps: HostRouteDeps): Express => {
   const app = express();

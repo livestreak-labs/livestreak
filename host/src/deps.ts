@@ -1,16 +1,36 @@
-import { defaultHostServerConfig, type HostServerConfig } from "../config/host.js";
-import { createAaRouteDeps, type AaRouteDeps, type CreateAaRouteDepsOptions } from "./aa-deps.js";
-import { createDiscoveryStore } from "../services/discovery.js";
-import { createEvidenceStore } from "../services/media/evidence.js";
-import { createManifestStore } from "../services/media/manifest.js";
-import { createSessionStore } from "../services/media/session.js";
-import { createContentStore } from "../services/walrus/content/content.js";
-import { createMemoryBindingStore } from "../services/walrus/memory/binding.js";
-import { createMemWalAccountOperations } from "../services/walrus/memory/memwal-ops.js";
-import { resolveMemoryOwnerKey } from "../infrastructure/wallet/index.js";
-import type { ResolvedWalrus } from "../infrastructure/walrus/network.js";
+import { defaultHostServerConfig, type HostServerConfig } from "./config/host.js";
+import { readAaServerConfig, buildPaymasterSigners, type AaServerConfig } from "./services/aa/chains.js";
+import type { PaymasterSigner } from "./services/aa/paymaster.js";
+import { createDiscoveryStore } from "./services/discovery.js";
+import { createEvidenceStore } from "./services/media/evidence.js";
+import { createManifestStore } from "./services/media/manifest.js";
+import { createSessionStore } from "./services/media/session.js";
+import { createContentStore } from "./services/walrus/content/content.js";
+import { createMemoryBindingStore } from "./services/walrus/memory/binding.js";
+import { createMemWalAccountOperations } from "./services/walrus/memory/memwal-ops.js";
+import { resolveMemoryOwnerKey } from "./infrastructure/wallet/index.js";
+import type { ResolvedWalrus } from "./infrastructure/walrus/network.js";
 
 // --- exports ---
+
+export interface AaRouteDeps {
+  readonly config: HostServerConfig;
+  readonly aa: AaServerConfig;
+  readonly paymasterSigners: Map<string, PaymasterSigner>;
+}
+
+export interface CreateAaRouteDepsOptions {
+  readonly paymasterSigners?: Map<string, PaymasterSigner>;
+}
+
+export const createAaRouteDeps = (
+  config: HostServerConfig,
+  options: CreateAaRouteDepsOptions = {}
+): AaRouteDeps => ({
+  config,
+  aa: readAaServerConfig(config),
+  paymasterSigners: options.paymasterSigners ?? buildPaymasterSigners(readAaServerConfig(config))
+});
 
 export interface HostRouteDeps {
   readonly config: HostServerConfig;
