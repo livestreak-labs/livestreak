@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Clock, Fire, X } from '@phosphor-icons/react'
-import { StreamSlider } from '#/components/predictions/StreamSlider'
+import { StreamSlider, mapAccrualPreview } from '#/components/predictions/StreamSlider'
 import { formatCountdown, formatMultiplier, calcPoolPct } from '#/utils/format'
 import type { Vault } from '#/data/mock'
 import { DEFAULT_FUND_DURATION_MIN, fundCommitmentUsd } from '#/adapters/optionsBoard'
+import { useVaultFundingControls } from '#/hooks/useVaultFundingControls'
+import { useAccrualPreview } from '#/hooks/useAccrualPreview'
 
 interface Props {
   vault: Vault
@@ -13,11 +15,29 @@ interface Props {
 }
 
 export function FocusedVault({ vault, onDismiss, onStream }: Props) {
+  const funding = useVaultFundingControls(vault.id)
   const [hotMs, setHotMs] = useState(vault.hotUntil ? Math.max(0, vault.hotUntil - Date.now()) : 0)
   const [expiryMs, setExpiryMs] = useState(Math.max(0, vault.expiresAt - Date.now()))
-  const [streamSide, setStreamSide] = useState<'yes' | 'no' | null>(vault.userPosition?.side ?? null)
+  const [streamSide, setStreamSide] = useState<'yes' | 'no' | null>(
+    funding.activeFundedSide ?? vault.userPosition?.side ?? null,
+  )
   const [streamRate, setStreamRate] = useState(vault.userPosition ? 0.8 : 0)
   const [fundDurationMin, setFundDurationMin] = useState(DEFAULT_FUND_DURATION_MIN)
+  const { preview, loading: previewLoading } = useAccrualPreview(vault.id, streamSide, streamRate)
+
+  const selectedFundFn = streamSide === 'yes'
+    ? funding.fundYes
+    : streamSide === 'no'
+      ? funding.fundNo
+      : undefined
+  const canStream = !!streamSide
+    && streamRate >= 0.01
+    && (!funding.useOptions || (selectedFundFn !== undefined && !selectedFundFn.disabled))
+
+  const accrualPreview = useMemo(
+    () => mapAccrualPreview(preview),
+    [preview],
+  )
 
   useEffect(() => {
     if (vault.status !== 'hot' && vault.status !== 'open') return
@@ -125,7 +145,24 @@ export function FocusedVault({ vault, onDismiss, onStream }: Props) {
       )}
 
       {/* Slider — immediately visible, the whole point */}
-      <StreamSlider vaultId={vault.id} initialSide={vault.userPosition?.side ?? null} initialRate={vault.userPosition ? 0.8 : 0} onStream={(side, rate) => { setStreamSide(side); setStreamRate(rate) }} />
+      <StreamSlider
+        vaultId={vault.id}
+        initialSide={funding.activeFundedSide ?? vault.userPosition?.side ?? null}
+        initialRate={vault.userPosition ? 0.8 : 0}
+        fundYes={funding.fundYes}
+        fundNo={funding.fundNo}
+        stopFn={funding.stopFn}
+        activeFundedSide={funding.activeFundedSide}
+        onStopFunding={funding.activeFundedSide
+          ? () => funding.stopFunding(vault.id, funding.activeFundedSide!)
+          : undefined}
+        sharePriceYes={vault.sharePriceYes}
+        sharePriceNo={vault.sharePriceNo}
+        accrualPreview={accrualPreview}
+        previewLoading={previewLoading}
+        showPreview={funding.useOptions}
+        onStream={(side, rate) => { setStreamSide(side); setStreamRate(rate) }}
+      />
 
       {streamSide && streamRate > 0.01 && (
         <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -152,18 +189,26 @@ export function FocusedVault({ vault, onDismiss, onStream }: Props) {
 
       {/* Start streaming button */}
       <button
-        disabled={!streamSide || streamRate < 0.01}
+        disabled={!canStream}
+        title={selectedFundFn?.disabledReason}
         onClick={() => streamSide && onStream?.(vault.id, streamSide, streamRate, fundDurationMin)}
         style={{
           width: '100%', marginTop: 18, padding: '12px 0',
           fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-display)',
-          letterSpacing: '0.04em', borderRadius: 8, border: 'none', cursor: streamSide ? 'pointer' : 'default',
+          letterSpacing: '0.04em', borderRadius: 8, border: 'none', cursor: canStream ? 'pointer' : 'default',
           background: streamSide === 'yes' ? '#00ff87' : streamSide === 'no' ? '#ff2d78' : 'rgba(255,255,255,0.06)',
           color: streamSide ? '#000' : 'rgba(255,255,255,0.25)',
+          opacity: canStream ? 1 : 0.45,
           transition: 'background 0.2s, color 0.2s',
         }}
       >
-        {!streamSide ? 'DRAG TO CHOOSE A SIDE' : hasPos ? `UPDATE STREAM → ${streamSide.toUpperCase()}` : `STREAM → ${streamSide.toUpperCase()}`}
+        {funding.activeFundedSide
+          ? 'STOP STREAM TO CHANGE SIDE'
+          : !streamSide
+            ? 'DRAG TO CHOOSE A SIDE'
+            : hasPos
+              ? `UPDATE STREAM → ${streamSide.toUpperCase()}`
+              : `STREAM → ${streamSide.toUpperCase()}`}
       </button>
 
       {/* Hot exit burn warning */}

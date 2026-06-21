@@ -11,6 +11,9 @@ export interface Vault {
   expiresAt: number
   outcome: 'pending' | 'yes' | 'no'
   multiplier: number
+  sharePriceYes?: number
+  sharePriceNo?: number
+  fundedSide?: 'yes' | 'no'
   userPosition?: { side: 'yes' | 'no'; streamed: number; shares: number; currentValue: number }
   userWon?: boolean
   payout?: number

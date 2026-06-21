@@ -1,20 +1,31 @@
-import { useState, useEffect, type CSSProperties } from 'react'
+import { useState, useEffect, useMemo, type CSSProperties } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Clock, Fire, CheckCircle, XCircle, CaretDown, TrendUp, Users } from '@phosphor-icons/react'
-import { StreamSlider } from '#/components/predictions/StreamSlider'
+import { StreamSlider, mapAccrualPreview } from '#/components/predictions/StreamSlider'
 import { formatUSDC, formatCountdown, formatMultiplier, formatMinute, calcPoolPct } from '#/utils/format'
 import type { Vault } from '#/data/mock'
 import type { OptionsFunctionView } from '@livestreak/options'
 import { isOptionsModeEnabled } from '#/config/optionsMode'
 import { useOptionsContext } from '#/contexts/OptionsContext'
 import { OptionsActionButton } from '#/components/wallet/OptionsActionButton'
+import { useVaultFundingControls } from '#/hooks/useVaultFundingControls'
+import { useAccrualPreview } from '#/hooks/useAccrualPreview'
 
 export function VaultCard({ vault, index = 0 }: { vault: Vault; index?: number }) {
   const optionsEnabled = isOptionsModeEnabled()
   const options = useOptionsContext()
   const useOptions = optionsEnabled && options.isConnected
+  const funding = useVaultFundingControls(vault.id)
   const side = vault.userPosition?.side
   const [expanded, setExpanded] = useState(false)
+  const [streamSide, setStreamSide] = useState<'yes' | 'no' | null>(null)
+  const [streamRate, setStreamRate] = useState(0)
+  const { preview, loading: previewLoading } = useAccrualPreview(
+    vault.id,
+    expanded ? streamSide : null,
+    expanded ? streamRate : 0,
+  )
+  const accrualPreview = useMemo(() => mapAccrualPreview(preview), [preview])
   const [hotMs, setHotMs] = useState(vault.hotUntil ? Math.max(0, vault.hotUntil - Date.now()) : 0)
   const [expiryMs, setExpiryMs] = useState(Math.max(0, vault.expiresAt - Date.now()))
 
@@ -92,21 +103,33 @@ export function VaultCard({ vault, index = 0 }: { vault: Vault; index?: number }
         {/* Row 2: YES / NO buttons */}
         {canBet && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-            <button className="vault-bet-btn vault-bet-yes" onClick={() => setExpanded(true)} style={{
+            <button
+              className="vault-bet-btn vault-bet-yes"
+              onClick={() => setExpanded(true)}
+              disabled={funding.useOptions && funding.fundYes?.disabled && !funding.activeFundedSide}
+              title={funding.fundYes?.disabledReason}
+              style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               padding: '7px 0', borderRadius: 7, border: '1px solid rgba(0,255,135,0.25)',
               background: hasPos && vault.userPosition?.side === 'yes' ? 'rgba(0,255,135,0.15)' : 'rgba(0,255,135,0.06)',
-              cursor: 'pointer', transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s',
+              cursor: funding.useOptions && funding.fundYes?.disabled && !funding.activeFundedSide ? 'not-allowed' : 'pointer',
+              opacity: funding.useOptions && funding.fundYes?.disabled && !funding.activeFundedSide ? 0.45 : 1,
+              transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s',
             }}>
               <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', color: '#00ff87' }}>YES</span>
               <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'rgba(0,255,135,0.6)' }}>+{formatMultiplier(vault.multiplier)}</span>
             </button>
-            <button className="vault-bet-btn vault-bet-no" onClick={() => setExpanded(true)} style={{
+            <button className="vault-bet-no" onClick={() => setExpanded(true)} style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               padding: '7px 0', borderRadius: 7, border: '1px solid rgba(255,45,120,0.25)',
               background: hasPos && vault.userPosition?.side === 'no' ? 'rgba(255,45,120,0.15)' : 'rgba(255,45,120,0.06)',
-              cursor: 'pointer', transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s',
-            }}>
+              cursor: funding.useOptions && funding.fundNo?.disabled && !funding.activeFundedSide ? 'not-allowed' : 'pointer',
+              opacity: funding.useOptions && funding.fundNo?.disabled && !funding.activeFundedSide ? 0.45 : 1,
+              transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s',
+            }}
+              disabled={funding.useOptions && funding.fundNo?.disabled && !funding.activeFundedSide}
+              title={funding.fundNo?.disabledReason}
+            >
               <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', color: '#ff2d78' }}>NO</span>
               <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'rgba(255,45,120,0.6)' }}>+{formatMultiplier(noMultiplier)}</span>
             </button>
@@ -185,7 +208,25 @@ export function VaultCard({ vault, index = 0 }: { vault: Vault; index?: number }
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '12px 14px' }}>
               {canBet && (
                 <div style={{ marginBottom: 14 }}>
-                  <StreamSlider vaultId={vault.id} initialSide={vault.userPosition?.side ?? null} initialRate={vault.userPosition ? 0.8 : 0} />
+                  <StreamSlider
+                    vaultId={vault.id}
+                    initialSide={funding.activeFundedSide ?? vault.userPosition?.side ?? null}
+                    initialRate={vault.userPosition ? 0.8 : 0}
+                    compact
+                    fundYes={funding.fundYes}
+                    fundNo={funding.fundNo}
+                    stopFn={funding.stopFn}
+                    activeFundedSide={funding.activeFundedSide}
+                    onStopFunding={funding.activeFundedSide
+                      ? () => funding.stopFunding(vault.id, funding.activeFundedSide!)
+                      : undefined}
+                    sharePriceYes={vault.sharePriceYes}
+                    sharePriceNo={vault.sharePriceNo}
+                    accrualPreview={accrualPreview}
+                    previewLoading={previewLoading}
+                    showPreview={funding.useOptions}
+                    onStream={(nextSide, nextRate) => { setStreamSide(nextSide); setStreamRate(nextRate) }}
+                  />
                 </div>
               )}
               <ExpandedDetails vault={vault} poolPct={poolPct} />

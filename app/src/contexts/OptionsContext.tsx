@@ -26,6 +26,7 @@ import {
   type OptionsChainConfig,
   type OptionsFunctionView,
   type OptionsRuntime,
+  type OptionsAccrualPreview,
   type TxId,
   type UserAddress,
 } from '@livestreak/options'
@@ -43,7 +44,7 @@ import {
   fundDepositForDuration,
   usdPerMinToChainRate,
 } from '#/adapters/optionsBoard'
-import { findOptionsFunction } from '#/adapters/optionsControls'
+import { findOptionsFunction, findFundFunction, findStopFundingFunction } from '#/adapters/optionsControls'
 
 const STEALTH_DOMAIN = 'livestreak-stealth-v1'
 const SESSION_SECRET_KEY = 'livestreak_stealth_secret'
@@ -80,12 +81,21 @@ interface OptionsContextValue {
   disconnect: () => void
   setActiveMarketId: (marketId: string | undefined) => void
   findFunction: (name: string, match?: (fn: OptionsFunctionView) => boolean) => OptionsFunctionView | undefined
+  findFundFunction: (vaultId: string, side: 'yes' | 'no') => OptionsFunctionView | undefined
+  findStopFundingFunction: (vaultId: string) => OptionsFunctionView | undefined
   fundStream: (
     vaultId: string,
     side: 'yes' | 'no',
     rateUsdPerMin: number,
     durationMinutes?: number,
   ) => Promise<TxId>
+  stopFunding: (vaultId: string, side: 'yes' | 'no') => Promise<TxId>
+  previewAccrual: (
+    vaultId: string,
+    side: 'yes' | 'no',
+    rateUsdPerMin: number,
+    horizonSec?: number,
+  ) => Promise<OptionsAccrualPreview>
   claimWin: (vaultId: string) => Promise<TxId>
   claimLoss: (vaultId: string, side: 'yes' | 'no') => Promise<TxId>
   stake: (amountLvst: number) => Promise<TxId>
@@ -386,6 +396,15 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     match?: (fn: OptionsFunctionView) => boolean,
   ) => findOptionsFunction(controls, name, match), [controls])
 
+  const findFundFunctionForVault = useCallback((
+    vaultId: string,
+    side: 'yes' | 'no',
+  ) => findFundFunction(controls, vaultId, side), [controls])
+
+  const findStopFundingFunctionForVault = useCallback((
+    vaultId: string,
+  ) => findStopFundingFunction(controls, vaultId), [controls])
+
   const fundStream = useCallback(async (
     vaultId: string,
     side: 'yes' | 'no',
@@ -401,6 +420,29 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
       deposit: fundDepositForDuration(chainRate, durationMinutes),
     })
   }, [callBridgeAction, resolveTokenId])
+
+  const stopFunding = useCallback(async (vaultId: string, side: 'yes' | 'no'): Promise<TxId> => {
+    return callBridgeAction('stopFunding', {
+      tokenId: asTokenId(resolveTokenId(vaultId)),
+      vaultId: asVaultId(vaultId),
+      side,
+    })
+  }, [callBridgeAction, resolveTokenId])
+
+  const previewAccrual = useCallback(async (
+    vaultId: string,
+    side: 'yes' | 'no',
+    rateUsdPerMin: number,
+    horizonSec?: number,
+  ): Promise<OptionsAccrualPreview> => {
+    const chainRate = usdPerMinToChainRate(rateUsdPerMin)
+    return requireBridge().previewAccrual(APP_CALLER, {
+      vaultId: asVaultId(vaultId),
+      side,
+      rate: chainRate,
+      ...(horizonSec !== undefined ? { horizonSec } : {}),
+    })
+  }, [requireBridge])
 
   const claimWin = useCallback(async (vaultId: string): Promise<TxId> => {
     const user = requireUser()
@@ -453,7 +495,11 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     disconnect,
     setActiveMarketId,
     findFunction,
+    findFundFunction: findFundFunctionForVault,
+    findStopFundingFunction: findStopFundingFunctionForVault,
     fundStream,
+    stopFunding,
+    previewAccrual,
     claimWin,
     claimLoss,
     stake,
@@ -461,7 +507,8 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     claimDividends,
   }), [
     enabled, ready, isConnected, isLoading, claiming, error, address, usdcBalance, board, controls,
-    connect, disconnect, setActiveMarketId, findFunction, fundStream, claimWin, claimLoss,
+    connect, disconnect, setActiveMarketId, findFunction, findFundFunctionForVault,
+    findStopFundingFunctionForVault, fundStream, stopFunding, previewAccrual, claimWin, claimLoss,
     stake, unstake, claimDividends,
   ])
 

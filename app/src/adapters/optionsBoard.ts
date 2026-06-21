@@ -1,12 +1,17 @@
 import type { OptionsPanel, OptionsVaultPanel } from '@livestreak/options'
+import { SHARE_SCALE } from '@livestreak/options'
 
 import type { FlowState, Position, Vault } from '#/data/mock'
 
 const USDC_SCALE = 1_000_000
 const LVST_SCALE = 1_000_000_000_000_000_000
 
-function usdcStringToNumber(value: string): number {
+export function usdcStringToNumber(value: string): number {
   return Number(BigInt(value)) / USDC_SCALE
+}
+
+export function shareStringToNumber(value: string): number {
+  return Number(BigInt(value)) / Number(SHARE_SCALE)
 }
 
 function lvstStringToNumber(value: string): number {
@@ -45,7 +50,6 @@ export function panelToVaults(panel: OptionsPanel, streamId?: string): Vault[] {
         .find(l => l.vaultId === vault.vaultId)
 
       const side = lane?.side
-      const streamed = lane ? chainRateToUsdPerMin(lane.rate) : undefined
 
       vaults.push({
         id: vault.vaultId,
@@ -54,18 +58,21 @@ export function panelToVaults(panel: OptionsPanel, streamId?: string): Vault[] {
         creator: vault.creator,
         noTotal: usdcStringToNumber(vault.pools.noUSDC),
         yesTotal: usdcStringToNumber(vault.pools.yesUSDC),
+        sharePriceYes: usdcStringToNumber(vault.pools.sharePriceYes),
+        sharePriceNo: usdcStringToNumber(vault.pools.sharePriceNo),
         status: mapVaultStatus(vault.status),
         hotUntil: null,
         createdAt: vault.timing.createdAtMs,
         expiresAt: vault.timing.expiresAtMs,
         outcome: vault.outcome,
         multiplier: vaultMultiplier(vault, side),
+        ...(lane && side ? { fundedSide: side } : {}),
         ...(lane && side
           ? {
               userPosition: {
                 side,
-                streamed: streamed ?? 0,
-                shares: usdcStringToNumber(lane.sharesAccrued),
+                streamed: chainRateToUsdPerMin(lane.rate),
+                shares: shareStringToNumber(lane.sharesAccrued),
                 currentValue: lane.claimableUSDC
                   ? usdcStringToNumber(lane.claimableUSDC)
                   : 0,
@@ -121,7 +128,7 @@ export function panelToPositions(panel: OptionsPanel, streamId?: string): Positi
         side: lane.side,
         streamed: streamRate,
         streamRate,
-        shares: usdcStringToNumber(lane.sharesAccrued),
+        shares: shareStringToNumber(lane.sharesAccrued),
         currentValue: lane.claimableUSDC ? usdcStringToNumber(lane.claimableUSDC) : 0,
         pnl: 0,
         resolved: vault.status === 'resolved',
