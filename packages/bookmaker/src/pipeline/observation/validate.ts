@@ -28,7 +28,12 @@ export const validateObservationEvent = (
 
   requireOptionalNonEmptyString(value.kind, "kind", issues);
 
-  if (value.payload !== undefined && (typeof value.payload !== "object" || value.payload === null)) {
+  if (
+    value.payload !== undefined &&
+    (typeof value.payload !== "object" || value.payload === null || Array.isArray(value.payload))
+  ) {
+    // B11: arrays are typeof "object" but `plainObject` rejects them, so without
+    // this guard an array payload passed validation yet was silently dropped.
     issues.push("payload must be a plain object when provided");
   }
 

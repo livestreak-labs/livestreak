@@ -118,14 +118,12 @@ const collectValidDetections = (
       continue;
     }
 
-    const rawId =
-      typeof (raw as { detectorId?: unknown }).detectorId === "string"
-        ? (raw as { detectorId: string }).detectorId.trim()
-        : "";
-
+    // B9: the registry `detector.id` is the single source of truth for
+    // attribution — a detector mislabeling itself must not win. Stamp it on both
+    // the stored detection and the returned tuple.
     const validated = validateDetection({
       ...(typeof raw === "object" && raw !== null ? raw : {}),
-      detectorId: rawId.length > 0 ? rawId : detector.id
+      detectorId: detector.id
     });
 
     if (validated.ok) {

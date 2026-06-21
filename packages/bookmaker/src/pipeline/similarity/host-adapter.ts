@@ -1,5 +1,6 @@
 import { LiveStreakConfigError } from "@livestreak/core";
 import type {
+  HostSimilarityIndexRequest,
   HostSimilarityRequest,
   HostSimilarityResult,
   HostSimilarityVaultDraft
@@ -39,6 +40,11 @@ export const hostSimilarityResultToBookmaker = (
     return validationFailure("HostSimilarityResult.marketId must match the bookmaker query marketId");
   }
 
+  // The host echoes an optional `vaultKey` on each candidate (the precomputed
+  // dedup key the indexer supplied). `validateCandidate` already reads it off
+  // the raw runtime object, so the deterministic exact-match path
+  // (`selectExactVaultKeyCandidate`) fires without any extra mapping here — the
+  // canonical `@livestreak/host` candidate type just doesn't declare it yet.
   return validateSimilarityResult({
     marketId: result.marketId,
     candidates: result.candidates,
@@ -46,6 +52,19 @@ export const hostSimilarityResultToBookmaker = (
     ...(result.stewardWarnings === undefined ? {} : { stewardWarnings: result.stewardWarnings })
   });
 };
+
+/** Build the discovery-index payload for a created vault (title/summary/tags + dedup key). */
+export const vaultIndexRecordToHostRequest = (record: {
+  readonly vaultId: string;
+  readonly marketId: string;
+  readonly draft: VaultDraft;
+  readonly vaultKey: string;
+}): HostSimilarityIndexRequest & { readonly vaultKey: string } => ({
+  vaultId: record.vaultId,
+  marketId: record.marketId,
+  ...vaultDraftToHostSimilarityDraft(record.draft),
+  vaultKey: record.vaultKey
+});
 
 // --- helpers ---
 

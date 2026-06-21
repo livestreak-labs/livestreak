@@ -257,9 +257,20 @@ export const validateVaultDraft = (input: unknown): ValidationResult<VaultDraft>
   });
 };
 
+export interface ValidateVaultDraftForCreateOptions {
+  /**
+   * Chain streaming minimum seed rate (resolved per-chain from config, never a
+   * constant). A seed rate below this would round funding to zero per cycle, so
+   * it is rejected with a clear error. Defaults to 1n — the absolute floor that
+   * guarantees a non-zero stream.
+   */
+  readonly minSeedRate?: bigint;
+}
+
 export const validateVaultDraftForCreate = (
   draft: VaultDraft,
-  nowMs: number
+  nowMs: number,
+  options: ValidateVaultDraftForCreateOptions = {}
 ): ValidationResult<VaultDraft> => {
   const base = validateVaultDraft(draft);
   if (base.ok === false) {
@@ -267,6 +278,7 @@ export const validateVaultDraftForCreate = (
   }
 
   const issues: string[] = [];
+  const minSeedRate = options.minSeedRate ?? 1n;
 
   if (typeof nowMs !== "number" || Number.isFinite(nowMs) === false) {
     issues.push("nowMs must be a finite number");
@@ -280,6 +292,14 @@ export const validateVaultDraftForCreate = (
 
   if (base.value.seedRate === undefined || base.value.seedRate <= 0n) {
     issues.push("seedRate must be a positive bigint for createVault");
+  } else if (base.value.seedRate < minSeedRate) {
+    // B10: the seed rate underflowed the chain streaming minimum (e.g. a small
+    // stake over a long resolution window divided down toward zero). Reject with
+    // an actionable message instead of silently streaming zero per cycle.
+    issues.push(
+      `seedRate ${base.value.seedRate} is below the chain streaming minimum ${minSeedRate}; ` +
+        "funding would round to zero per cycle — increase creatorStake or shorten the resolution window"
+    );
   }
 
   if (issues.length > 0) {
@@ -684,20 +704,6 @@ const optionalDuplicateRisk = (
 const optionalNonEmptyString = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 
-const requireOptionalNonNegativeBigInt = (
-  value: unknown,
-  fieldPath: string,
-  issues: string[]
-): void => {
-  if (value === undefined) {
-    return;
-  }
-
-  if (typeof value !== "bigint" || value < 0n) {
-    issues.push(`${fieldPath} must be a non-negative bigint when provided`);
-  }
-};
-
 const validateResolutionWindow = (
   value: unknown,
   issues: string[]
@@ -742,9 +748,6 @@ const isBinarySides = (value: unknown): value is readonly ["yes", "no"] =>
   value.length === 2 &&
   value[0] === "yes" &&
   value[1] === "no";
-
-const optionalNonNegativeBigInt = (value: unknown): bigint | undefined =>
-  typeof value === "bigint" && value >= 0n ? value : undefined;
 
 const requireSide = (
   value: unknown,

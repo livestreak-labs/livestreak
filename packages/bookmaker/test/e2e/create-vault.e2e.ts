@@ -12,7 +12,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import {
   createPublicClient,
   createWalletClient,
