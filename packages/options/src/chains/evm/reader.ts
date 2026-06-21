@@ -118,7 +118,7 @@ export const createEvmOptionsReader = (config: OptionsChainConfig): OptionsReade
   const publicClient = createPublicClient({ transport: http(rpcUrl) });
 
   return createEvmOptionsReaderFromCall(
-    config.addresses,
+    config.addresses as OptionsContractAddresses,
     async <T,>(
       address: `0x${string}`,
       abi: readonly unknown[],

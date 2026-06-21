@@ -52,21 +52,21 @@ describe("createOptionsChain", () => {
     expect(txId).toBe(asTxId("0xfake_user_op_hash"));
   });
 
-  it("dispatches sui walletInit to a stub chain whose operations throw", async () => {
-    const chain = createOptionsChain({
-      walletInit: {
-        chain: "sui",
-        seedSource: "raw",
-        config: { rpcUrl: "https://fullnode.testnet.sui.io:443" }
-      },
-      seed: "test-seed",
-      addresses: DEFAULT_FAKE_ADDRESSES
-    });
+  it("rejects sui walletInit with invalid (EVM-format) addresses at config time", () => {
+    expect(() =>
+      createOptionsChain({
+        walletInit: {
+          chain: "sui",
+          seedSource: "raw",
+          config: { rpcUrl: "https://fullnode.testnet.sui.io:443" }
+        },
+        seed: "test-seed",
+        addresses: DEFAULT_FAKE_ADDRESSES
+      })
+    ).toThrow(LiveStreakConfigError);
+  });
 
-    await expect(chain.reader.readMarket("0x01" as never)).rejects.toBeInstanceOf(
-      LiveStreakConfigError
-    );
-
+  it("createSuiOptionsChain with no config returns a stub whose operations throw", async () => {
     const suiChain = createSuiOptionsChain();
     await expect(suiChain.writer.fund({} as never)).rejects.toBeInstanceOf(LiveStreakConfigError);
     await expect(

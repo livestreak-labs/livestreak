@@ -25,7 +25,7 @@ import {
   type WithdrawManyInput
 } from "../types.js";
 import { DEFAULT_ABIS } from "./abis.js";
-import { validateOptionsContractAddresses } from "./addresses.js";
+import { validateOptionsContractAddresses, type OptionsContractAddresses } from "./addresses.js";
 import {
   sideToSolidityValue,
   validateMarketIdForContracts,
@@ -42,7 +42,7 @@ export const createEvmOptionsWriter = (config: OptionsChainConfig): OptionsWrite
   }
 
   const evmConfig = config.walletInit.config as EvmErc4337WalletConfig;
-  const addresses = validateOptionsContractAddresses(config.addresses);
+  const addresses = validateOptionsContractAddresses(config.addresses as OptionsContractAddresses);
   const abis = DEFAULT_ABIS;
 
   const send = async (
