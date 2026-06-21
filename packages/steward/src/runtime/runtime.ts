@@ -2,7 +2,7 @@ import { LiveStreakConfigError } from "@livestreak/core";
 
 import { projectStewardPanel } from "../bridge/panel/project.js";
 import type { StewardPanelView } from "../model/panel.js";
-import type { StewardStateSnapshot } from "../bridge/panel/types.js";
+import type { StewardStateSnapshot } from "./store.js";
 import type { StewardActionPlan } from "../model/action-plan.js";
 import type { StewardDecisionAction } from "../model/decision.js";
 import { planStewardActions } from "../workflow/action/plan.js";

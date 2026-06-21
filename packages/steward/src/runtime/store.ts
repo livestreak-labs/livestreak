@@ -2,9 +2,19 @@ import type { StewardActionPlan } from "../model/action-plan.js";
 import type { StewardDecision } from "../model/decision.js";
 import type { StewardFinding } from "../model/finding.js";
 import type { StewardSubject } from "../model/subject.js";
-import type { StewardStateSnapshot } from "../bridge/panel/types.js";
 
 // --- exports ---
+
+export interface StewardStateSnapshot {
+  readonly runtimeId: string;
+  readonly revision: number;
+  readonly watchedSubjects: readonly StewardSubject[];
+  readonly latestFindings: readonly StewardFinding[];
+  readonly latestDecisions?: readonly StewardDecision[];
+  readonly pendingActionPlans?: readonly StewardActionPlan[];
+  readonly lastError?: string;
+  readonly updatedAtMs?: number;
+}
 
 export interface StewardRuntimeLastError {
   readonly message: string;

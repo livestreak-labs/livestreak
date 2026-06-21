@@ -1,18 +1,10 @@
 import type { StewardPanelView } from "../../model/panel.js";
 import type { StewardSubjectKind } from "../../model/subject.js";
+import type { StewardStateSnapshot } from "../../runtime/store.js";
 
 // --- exports ---
 
-export interface StewardStateSnapshot {
-  readonly runtimeId: string;
-  readonly revision: number;
-  readonly watchedSubjects: readonly import("../../model/subject.js").StewardSubject[];
-  readonly latestFindings: readonly import("../../model/finding.js").StewardFinding[];
-  readonly latestDecisions?: readonly import("../../model/decision.js").StewardDecision[];
-  readonly pendingActionPlans?: readonly import("../../model/action-plan.js").StewardActionPlan[];
-  readonly lastError?: string;
-  readonly updatedAtMs?: number;
-}
+export type { StewardStateSnapshot } from "../../runtime/store.js";
 
 export type StewardPanelInput = StewardStateSnapshot | StewardPanelView;
 
