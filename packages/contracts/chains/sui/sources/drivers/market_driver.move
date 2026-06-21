@@ -491,6 +491,31 @@ public fun withdraw<T>(
     vault::withdraw(vault_registry, token_id, vault_id, payee, clock, ctx)
 }
 
+/// Pull winnings + overage for many vaults in one call (batch form).
+/// Same ownership / redirect rules as the single-vault `withdraw`.
+/// The caller builds `vault_ids` from `vault::account_vault_ids`.
+public fun withdraw_many<T>(
+    _registry: &MarketDriverRegistry,
+    nft: &MarketPositionNFT,
+    vault_registry: &mut VaultRegistry<T>,
+    vault_ids: vector<vector<u8>>,
+    to: address,
+    clock: &Clock,
+    ctx: &mut TxContext,
+): u128 {
+    let token_id = nft.token_id;
+    let payee = payee(nft, to, ctx);
+    let len = vector::length(&vault_ids);
+    let mut total = 0u128;
+    let mut i = 0;
+    while (i < len) {
+        let vault_id = *vector::borrow(&vault_ids, i);
+        total = total + vault::withdraw(vault_registry, token_id, vault_id, payee, clock, ctx);
+        i = i + 1;
+    };
+    total
+}
+
 public fun claim_loss_lvst<T>(
     _registry: &MarketDriverRegistry,
     nft: &MarketPositionNFT,
