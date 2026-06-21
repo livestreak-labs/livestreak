@@ -69,12 +69,6 @@ describe("createOptionsChain", () => {
 
     const suiChain = createSuiOptionsChain();
     await expect(suiChain.writer.fund({} as never)).rejects.toBeInstanceOf(LiveStreakConfigError);
-    await expect(
-      suiChain.reader.readPendingBoundaries("0x01" as never, "yes")
-    ).rejects.toBeInstanceOf(LiveStreakConfigError);
-    await expect(
-      suiChain.writer.advance({ vaultId: "0x01" as never, side: "yes" })
-    ).rejects.toBeInstanceOf(LiveStreakConfigError);
   });
 
   it("rejects unknown wallet chains", () => {

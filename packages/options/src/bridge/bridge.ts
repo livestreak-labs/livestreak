@@ -113,7 +113,7 @@ const dispatchWriterAction = async (
     case "mint":
       return writer.mint(readArgs(args));
     case "fund":
-      return runtime.fundStream(readArgs(args));
+      return writer.fund(readArgs(args));
     case "setLanes":
       return writer.setLanes(readArgs(args));
     case "stopFunding":
