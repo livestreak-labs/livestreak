@@ -407,7 +407,22 @@ const projectMarketPanel = (
     ...(marketSnapshot.market.timing === undefined
       ? {}
       : { timing: marketSnapshot.market.timing }),
-    vaults: vaultPanels
+    vaults: vaultPanels,
+    ...(marketSnapshot.streamState === undefined
+      ? {}
+      : {
+          stream: {
+            status: marketSnapshot.streamState.status,
+            scheme: marketSnapshot.streamState.scheme,
+            id: marketSnapshot.streamState.id,
+            ...(marketSnapshot.streamState.updatedAtMs === 0
+              ? {}
+              : { updatedAtMs: marketSnapshot.streamState.updatedAtMs }),
+            ...(marketSnapshot.streamState.endedAtMs === 0
+              ? {}
+              : { endedAtMs: marketSnapshot.streamState.endedAtMs })
+          }
+        })
   };
 };
 
@@ -462,7 +477,9 @@ const projectNftPanel = (entry: OptionsNftSnapshot): OptionsNftPanel => ({
   lanes: entry.nft.lanes.map(projectLanePanel),
   owner: entry.nft.owner,
   ...(entry.nft.approved === undefined ? {} : { approved: entry.nft.approved }),
-  ...(entry.nft.isOperator === undefined ? {} : { isOperator: entry.nft.isOperator })
+  ...(entry.nft.isOperator === undefined ? {} : { isOperator: entry.nft.isOperator }),
+  ...(entry.nft.balance === undefined ? {} : { balanceUSDC: entry.nft.balance.toString() }),
+  ...(entry.nft.runwayEndMs === undefined ? {} : { runwayEndMs: entry.nft.runwayEndMs })
 });
 
 const projectLanePanel = (lane: OptionsNftSnapshot["nft"]["lanes"][number]): OptionsLanePanel => {

@@ -41,6 +41,7 @@ import {
   mapProtocolSummary,
   mapStreamState,
   mapStreamsStateBalance,
+  mapStreamsStateFull,
   mapVault,
   mapVaultIds,
   mapVaultShareTotals,
@@ -612,13 +613,32 @@ const readNft = async (
       lanes.push(enrichLane(mapped, claimable, lossClaimable, winningSide));
     }
 
+    const transferFlags = await readTransferFlags(ctx, id);
+
+    // Fetch the account-level Drips balance + runway in one call.
+    let nftAccount: { balance?: bigint; runwayEndMs?: number } | undefined;
+    try {
+      const usdc = await readUsdcAddress(ctx);
+      const streamsState = await call<RawStreamsState>(
+        ctx,
+        ctx.addresses.dripsStreaming,
+        ctx.abis.DripsStreaming,
+        "streamsState",
+        [id, usdc]
+      );
+      nftAccount = mapStreamsStateFull(streamsState);
+    } catch {
+      // Non-fatal: balance/runway stay undefined if Drips is unavailable.
+    }
+
     return mapNft(
       asTokenId(id),
       account,
       asMarketId(bytes32ToHex(marketIdRaw)),
       count,
       lanes,
-      await readTransferFlags(ctx, id)
+      transferFlags,
+      nftAccount
     );
   } catch (error) {
     if (error instanceof LiveStreakConfigError) {

@@ -2,6 +2,7 @@
 
 import type {
   OptionsMarketStatus,
+  OptionsStreamStatus,
   OptionsVaultOutcome,
   OptionsVaultSide,
   OptionsVaultStatus,
@@ -30,6 +31,10 @@ export interface OptionsNftPanel {
   readonly owner: string;
   readonly approved?: string;
   readonly isOperator?: boolean;
+  /** Shared Drips account balance in USDC raw units (string). EVM only; absent on Sui. */
+  readonly balanceUSDC?: string;
+  /** Account-level runway as ms-since-epoch when the balance runs out. EVM only; absent on Sui. */
+  readonly runwayEndMs?: number;
 }
 
 export interface OptionsVaultPanel {
@@ -93,6 +98,14 @@ export interface OptionsMarketPanel {
     readonly resolvedAtMs?: number;
   };
   readonly vaults: readonly OptionsVaultPanel[];
+  /** Raw on-chain stream pointer. Absent when no stream has been set for this market. */
+  readonly stream?: {
+    readonly status: OptionsStreamStatus;
+    readonly scheme: string;
+    readonly id: string;
+    readonly updatedAtMs?: number;
+    readonly endedAtMs?: number;
+  };
 }
 
 export interface OptionsLvstPanel {
