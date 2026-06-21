@@ -301,6 +301,7 @@ export type ContractsReadEntity =
   | "winning side"
   | "board"
   | "share price"
+  | "pending boundaries"
   | "pending shares"
   | "USDC address"
   | "USDC balance"

@@ -7,6 +7,7 @@ import { encodeFunctionData, type Abi } from "viem";
 import { validateOptionsVaultSide } from "../../model/vault.js";
 import {
   asTxId,
+  type AdvanceInput,
   type ApproveNftInput,
   type ClaimLossLvstInput,
   type FundStreamInput,
@@ -98,6 +99,17 @@ export const createEvmOptionsWriter = (config: OptionsChainConfig): OptionsWrite
         side,
         rate,
         deposit
+      ]);
+    },
+
+    advance: async (input: AdvanceInput) => {
+      const vaultBytes = validateVaultIdForContracts(input.vaultId);
+      const side = sideToSolidityValue(validateOptionsVaultSide(input.side));
+
+      return send(addresses.vault, abis.Vault, "advance", [
+        vaultBytes,
+        side,
+        input.maxSteps ?? 0n
       ]);
     },
 

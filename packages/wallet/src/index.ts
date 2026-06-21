@@ -11,7 +11,13 @@ export {
   WalletManagerSui,
   WalletAccountSui,
   WalletAccountReadOnlySui,
-} from '#chains/sui.js'
+  assembleSponsoredTxBytes,
+  createLocalGasStation,
+  executeSponsoredTransaction,
+  isSponsoredSuiConfig,
+  signSenderForSponsoredTransaction,
+  verifySponsoredSignatures,
+} from '#chains/sui/index.js'
 
 export type {
   WalletChain,
@@ -28,7 +34,12 @@ export type {
   EvmErc4337WalletNativeCoinsConfig,
 } from '#chains/evm.js'
 
-export type { SuiTransaction } from '#chains/sui.js'
+export type {
+  SuiTransaction,
+  LiveStreakSuiWalletConfig,
+  SuiGasStation,
+  SuiGasCoinRef,
+} from '#chains/sui/index.js'
 
 export type { IWalletAccount } from '@tetherto/wdk-wallet'
 export type {

@@ -27,6 +27,7 @@ const createNotImplementedReader = (): OptionsReader => ({
   readWinningSide: notImplemented("readWinningSide"),
   readBoard: notImplemented("readBoard"),
   readSharePrice: notImplemented("readSharePrice"),
+  readPendingBoundaries: notImplemented("readPendingBoundaries"),
   readPendingShares: notImplemented("readPendingShares"),
   readUsdcAddress: notImplemented("readUsdcAddress"),
   readUsdcBalance: notImplemented("readUsdcBalance"),
@@ -39,6 +40,7 @@ const createNotImplementedReader = (): OptionsReader => ({
 const createNotImplementedWriter = (): OptionsWriter => ({
   mint: notImplemented("mint"),
   fund: notImplemented("fund"),
+  advance: notImplemented("advance"),
   setLanes: notImplemented("setLanes"),
   stopFunding: notImplemented("stopFunding"),
   stopAllFunding: notImplemented("stopAllFunding"),

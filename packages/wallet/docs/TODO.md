@@ -13,6 +13,20 @@ See [architecture.md](./architecture.md) and [flow.md](./flow.md).
 - [x] `check` / `build` / `lint` / `test` all green. Package importable; sodium deduped to `sodium-universal`.
 - [x] Test runner fixed: was `vitest` (looking for `*.test.ts`) silently running nothing; now `node --test` runs the `.mjs` vectors with zero transform.
 
+## Sui AA — done (2026-06-18)
+
+- [x] Native **sponsored transactions** via `src/chains/sui/sponsored-transaction.ts`:
+      `SuiGasStation.sponsor()` port + `executeSponsoredTransaction` + `assembleSponsoredTxBytes`.
+- [x] Transparent `sendTransaction` wrapper (composition over vendored account via `patchSuiAccountSend`).
+- [x] Offline design-defense vectors in `test/vectors/sui-sponsored.test.mjs` (4 attacks + manager-path oracle).
+- [x] Inbox filed: schema gas-station config + host Sui sponsorship descriptor (not edited in this slice).
+
+## Deferred
+
+- [ ] zkLogin / passkey signer abstraction (different seed model — separate track).
+- [ ] Schema `SuiGasStationInitConfig` — blocked on schema inbox (`context/temp-convo/schema/inbox/from-wallet__sui-gasstation-config.md`).
+- [ ] Host Sui sponsorship route — blocked on host inbox (`context/temp-convo/host/inbox/from-wallet__sui-sponsorship-descriptor.md`).
+
 ## Cross-package — done (2026-06-18)
 
 - [x] **App migration:** `app/src/hooks/useStealthWallet.ts` switched from the default constructor to

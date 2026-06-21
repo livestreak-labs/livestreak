@@ -86,6 +86,7 @@ export interface FakeTransportSeed {
   readonly pot?: Readonly<Record<string, bigint>>;
   readonly collected?: Readonly<Record<string, boolean>>;
   readonly boards?: Readonly<Record<string, OptionsBoardState>>;
+  readonly pendingBoundaries?: Readonly<Record<string, bigint>>;
   readonly sharePrices?: Readonly<Record<string, bigint>>;
   readonly pendingShares?: Readonly<Record<string, bigint>>;
   readonly accountVaultIds?: Readonly<Record<string, readonly VaultId[]>>;
@@ -109,6 +110,7 @@ export class FakeReaderInMemory implements OptionsReader {
   private readonly pot = new Map<string, bigint>();
   private readonly collected = new Map<string, boolean>();
   private readonly boards = new Map<string, OptionsBoardState>();
+  private readonly pendingBoundaries = new Map<string, bigint>();
   private readonly sharePrices = new Map<string, bigint>();
   private readonly pendingShares = new Map<string, bigint>();
   private readonly accountVaultIds = new Map<string, readonly VaultId[]>();
@@ -168,6 +170,10 @@ export class FakeReaderInMemory implements OptionsReader {
 
     for (const [key, value] of Object.entries(seed.boards ?? {})) {
       this.boards.set(key, value);
+    }
+
+    for (const [key, value] of Object.entries(seed.pendingBoundaries ?? {})) {
+      this.pendingBoundaries.set(key, value);
     }
 
     for (const [key, value] of Object.entries(seed.sharePrices ?? {})) {
@@ -331,6 +337,10 @@ export class FakeReaderInMemory implements OptionsReader {
 
   async readSharePrice(vaultId: VaultId, side: OptionsVaultSide): Promise<bigint> {
     return this.sharePrices.get(boardKey(vaultId, side)) ?? 0n;
+  }
+
+  async readPendingBoundaries(vaultId: VaultId, side: OptionsVaultSide): Promise<bigint> {
+    return this.pendingBoundaries.get(boardKey(vaultId, side)) ?? 0n;
   }
 
   async readPendingShares(
@@ -574,6 +584,7 @@ export const createFakeChainWriter = (): FakeChainWriter => {
     },
     mint: (input) => record("mint", input),
     fund: (input) => record("fund", input),
+    advance: (input) => record("advance", input),
     setLanes: (input) => record("setLanes", input),
     stopFunding: (input) => record("stopFunding", input),
     stopAllFunding: (input) => record("stopAllFunding", input),

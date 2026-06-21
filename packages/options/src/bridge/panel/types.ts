@@ -44,6 +44,8 @@ export interface OptionsVaultPanel {
     readonly yesUSDC: string;
     readonly noUSDC: string;
     readonly totalUSDC: string;
+    readonly sharePriceYes: string;
+    readonly sharePriceNo: string;
   };
   readonly shareTotals: {
     readonly yes: string;
@@ -129,14 +131,26 @@ export interface OptionsPanel {
 
 export interface OptionsControlsView {
   readonly account: string;
-  readonly actions: {
-    readonly canMint: boolean;
-    readonly canFund: boolean;
-    readonly canWithdraw: boolean;
-    readonly canClaimLoss: boolean;
-    readonly canStakeLvst: boolean;
-    readonly canUnstakeLvst: boolean;
-    readonly canClaimDividends: boolean;
-    readonly canTransferNft: boolean;
-  };
+  readonly revision: number;
+  readonly functions: readonly OptionsFunctionView[];
+}
+
+export type OptionsFunctionTargetKind = "market" | "vault" | "nft" | "lvst" | "global";
+
+export interface OptionsFunctionTarget {
+  readonly kind: OptionsFunctionTargetKind;
+  readonly marketId?: string;
+  readonly vaultId?: string;
+  readonly side?: OptionsVaultSide;
+  readonly tokenId?: string;
+}
+
+export interface OptionsFunctionView {
+  readonly name: string;
+  readonly scope: string;
+  readonly label: string;
+  readonly input?: string;
+  readonly target?: OptionsFunctionTarget;
+  readonly disabled: boolean;
+  readonly disabledReason?: string;
 }

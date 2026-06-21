@@ -158,6 +158,7 @@ const buildReader = (ctx: ReaderContext): OptionsReader => ({
   readWinningSide: (vaultId) => readWinningSide(ctx, vaultId),
   readBoard: (vaultId, side) => readBoard(ctx, vaultId, side),
   readSharePrice: (vaultId, side) => readSharePrice(ctx, vaultId, side),
+  readPendingBoundaries: (vaultId, side) => readPendingBoundaries(ctx, vaultId, side),
   readPendingShares: (vaultId, side, tokenId) =>
     readPendingShares(ctx, vaultId, side, tokenId),
   readUsdcAddress: () => readUsdcAddress(ctx),
@@ -384,6 +385,23 @@ const readSharePrice = async (
     ]);
   } catch (error) {
     throw contractsReadFailed("share price", error);
+  }
+};
+
+const readPendingBoundaries = async (
+  ctx: ReaderContext,
+  vaultId: VaultId,
+  side: OptionsVaultSide
+): Promise<bigint> => {
+  const vaultBytes = validateVaultIdForContracts(vaultId);
+
+  try {
+    return await call<bigint>(ctx, ctx.addresses.vault, ctx.abis.Vault, "pendingBoundaries", [
+      vaultBytes,
+      sideToSolidityValue(side)
+    ]);
+  } catch (error) {
+    throw contractsReadFailed("pending boundaries", error);
   }
 };
 

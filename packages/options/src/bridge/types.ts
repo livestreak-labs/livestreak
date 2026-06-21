@@ -53,6 +53,10 @@ export interface OptionsBridge {
     caller: BridgeCaller,
     marketId: import("../model/ids.js").MarketId
   ) => Promise<import("../model/stream.js").OptionsStreamState>;
+  readonly previewAccrual: (
+    caller: BridgeCaller,
+    input: import("../model/math/accrual.js").PreviewAccrualInput
+  ) => Promise<import("../model/math/accrual.js").OptionsAccrualPreview>;
   readonly callAction: (
     caller: BridgeCaller,
     envelope: CallActionEnvelope

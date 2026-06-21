@@ -14,6 +14,7 @@ export type { OptionsContractAddresses } from "./evm/addresses.js";
 export { validateOptionsChainConfig } from "./config.js";
 export type {
   ApproveNftInput,
+  AdvanceInput,
   ClaimLossLvstInput,
   FundStreamInput,
   LaneWriteInput,

@@ -52,7 +52,7 @@ export const createOptionsBridge = (input: CreateOptionsBridgeInput): OptionsBri
     readControls: async (caller) => {
       authorizeBridgeCaller(caller, bridgeControlsReadScope);
       const board = await runtime.readBoard();
-      return projectOptionsControls(board.panel);
+      return projectOptionsControls(board.panel, board.revision);
     },
 
     readClaims: async (caller) => {
@@ -68,6 +68,11 @@ export const createOptionsBridge = (input: CreateOptionsBridgeInput): OptionsBri
     readStreamState: async (caller, marketId) => {
       authorizeBridgeCaller(caller, bridgeBoardReadScope);
       return runtime.readStreamState(marketId);
+    },
+
+    previewAccrual: async (caller, input) => {
+      authorizeBridgeCaller(caller, bridgeBoardReadScope);
+      return runtime.previewAccrual(input);
     },
 
     callAction: async (caller, envelope) => {
@@ -108,7 +113,7 @@ const dispatchWriterAction = async (
     case "mint":
       return writer.mint(readArgs(args));
     case "fund":
-      return writer.fund(readArgs(args));
+      return runtime.fundStream(readArgs(args));
     case "setLanes":
       return writer.setLanes(readArgs(args));
     case "stopFunding":

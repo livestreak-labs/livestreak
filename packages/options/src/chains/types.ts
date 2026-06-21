@@ -103,6 +103,12 @@ export type SetApprovalForAllInput = {
   readonly approved: boolean;
 };
 
+export type AdvanceInput = {
+  readonly vaultId: VaultId;
+  readonly side: OptionsVaultSide;
+  readonly maxSteps?: bigint;
+};
+
 export interface OptionsReader {
   readMarket(marketId: MarketId): Promise<OptionsMarket>;
   readStreamState(marketId: MarketId): Promise<OptionsStreamState>;
@@ -120,6 +126,7 @@ export interface OptionsReader {
   readWinningSide(vaultId: VaultId): Promise<OptionsVaultSide | undefined>;
   readBoard(vaultId: VaultId, side: OptionsVaultSide): Promise<OptionsBoardState>;
   readSharePrice(vaultId: VaultId, side: OptionsVaultSide): Promise<bigint>;
+  readPendingBoundaries(vaultId: VaultId, side: OptionsVaultSide): Promise<bigint>;
   readPendingShares(
     vaultId: VaultId,
     side: OptionsVaultSide,
@@ -137,6 +144,7 @@ export interface OptionsReader {
 export interface OptionsWriter {
   mint(input: MintNftInput): Promise<TxId>;
   fund(input: FundStreamInput): Promise<TxId>;
+  advance(input: AdvanceInput): Promise<TxId>;
   setLanes(input: SetLanesInput): Promise<TxId>;
   stopFunding(input: StopFundingInput): Promise<TxId>;
   stopAllFunding(input: StopAllFundingInput): Promise<TxId>;
@@ -165,4 +173,5 @@ export type OptionsChainConfig = {
   readonly readRpcUrl?: string;
   readonly includeProtocolSummary?: boolean;
   readonly transferOperator?: UserAddress;
+  readonly autoAdvanceOverflow?: boolean;
 };
