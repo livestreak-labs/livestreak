@@ -12,6 +12,8 @@ const EXPECTED_EXPORTS = [
   'WalletManagerSui',
   'WalletAccountSui',
   'WalletAccountReadOnlySui',
+  'createSuiAccount',
+  'assertGasStationReturnedTxMatchesKind',
   'ConfigurationError',
   'executeSponsoredTransaction',
   'assembleSponsoredTxBytes',

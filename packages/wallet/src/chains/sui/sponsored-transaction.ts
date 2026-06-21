@@ -1,6 +1,7 @@
 import { SuiClient } from '@mysten/sui/client'
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
-import { Transaction } from '@mysten/sui/transactions'
+import { Transaction, TransactionDataBuilder } from '@mysten/sui/transactions'
+import { normalizeSuiAddress } from '@mysten/sui/utils'
 import { verifyTransactionSignature } from '@mysten/sui/verify'
 import type { TransactionResult } from '@tetherto/wdk-wallet'
 
@@ -32,7 +33,7 @@ export type AssembleSponsoredTxBytesInput = {
   gasCoins: SuiGasCoinRef[]
   gasBudget: bigint
   gasPrice: bigint
-  client: Pick<SuiClient, 'getReferenceGasPrice'>
+  client: SuiClient
 }
 
 export type ExecuteSponsoredTransactionInput = {
@@ -43,6 +44,9 @@ export type ExecuteSponsoredTransactionInput = {
   transferMaxFee?: number | bigint
 }
 
+const GAS_STATION_ALTERED_TX_ERROR =
+  'Gas station altered the transaction kind/sender; refusing to sign.'
+
 function isSimpleTransfer(
   tx: SuiTransaction,
 ): tx is { to: string; value: number | bigint } {
@@ -50,6 +54,33 @@ function isSimpleTransfer(
     typeof (tx as { to?: unknown }).to === 'string'
     && (tx as { value?: unknown }).value !== undefined
   )
+}
+
+function kindBytesFromParsedTx(parsed: TransactionDataBuilder): Uint8Array {
+  return parsed.build({ onlyTransactionKind: true })
+}
+
+export function assertGasStationReturnedTxMatchesKind(
+  txBytes: Uint8Array,
+  txKindBytes: Uint8Array,
+  expectedSender: string,
+): void {
+  const parsed = TransactionDataBuilder.fromBytes(txBytes)
+
+  if (
+    !parsed.sender
+    || normalizeSuiAddress(parsed.sender) !== normalizeSuiAddress(expectedSender)
+  ) {
+    throw new Error(GAS_STATION_ALTERED_TX_ERROR)
+  }
+
+  const returnedKindBytes = kindBytesFromParsedTx(parsed)
+  if (
+    returnedKindBytes.length !== txKindBytes.length
+    || !returnedKindBytes.every((byte, index) => byte === txKindBytes[index])
+  ) {
+    throw new Error(GAS_STATION_ALTERED_TX_ERROR)
+  }
 }
 
 export function resolveSuiClient(config: LiveStreakSuiWalletConfig): SuiClient {
@@ -88,7 +119,7 @@ export async function assembleSponsoredTxBytes(
   transaction.setGasBudget(input.gasBudget)
   transaction.setGasPrice(input.gasPrice)
 
-  const txBytes = await transaction.build({ client: input.client as SuiClient })
+  const txBytes = await transaction.build({ client: input.client })
   const { signature: sponsorSignature } = await input.sponsorKeypair.signTransaction(txBytes)
 
   return { txBytes, sponsorSignature, sponsorAddress }
@@ -99,7 +130,7 @@ export function createLocalGasStation(options: {
   gasCoins: SuiGasCoinRef[]
   gasBudget: bigint
   gasPrice: bigint
-  client: Pick<SuiClient, 'getReferenceGasPrice'>
+  client: SuiClient
 }): SuiGasStation {
   return {
     sponsor: ({ txKindBytes, sender }) =>
@@ -164,6 +195,8 @@ export async function executeSponsoredTransaction(
   if (!sponsorAddress) {
     throw new ConfigurationError('gasStation.sponsor() must return sponsorAddress.')
   }
+
+  assertGasStationReturnedTxMatchesKind(txBytes, txKindBytes, sender)
 
   const senderSignature = await signSenderForSponsoredTransaction(account, txBytes)
 

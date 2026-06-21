@@ -41,12 +41,18 @@ Portable 1:1 with EVM paymaster sponsorship — gasless UX, payer ≠ sender.
 2. Sender: txKindBytes = await tx.build({ client, onlyTransactionKind: true })
 3. Injected gasStation: { txBytes, sponsorSignature, sponsorAddress } =
      await gasStation.sponsor({ txKindBytes, sender })
-4. Sender signs the SAME txBytes via account.keyPair.privateKey (NOT vendor signTransaction).
-5. Sender submits direct to fullnode:
+4. **Trust check (before sender signs):** parse returned `txBytes` with
+   `TransactionDataBuilder.fromBytes` and assert sender + TransactionKind byte-equal the original
+   `txKindBytes` (`assertGasStationReturnedTxMatchesKind`). Reject if the gas station swapped the
+   PTB kind or sender — sender must never sign a different transaction than the one they built.
+5. Sender signs the SAME txBytes via account.keyPair.privateKey (NOT vendor signTransaction).
+6. Sender submits direct to fullnode:
      client.executeTransactionBlock({ transactionBlock: txBytes, signature: [senderSig, sponsorSig] })
 ```
 
-The gas station only **signs** — it never submits (censorship mitigation). Implementation:
+The gas station only **signs** — it never submits (censorship mitigation). **Equivocation** (gas-coin
+reuse / object locking across concurrent sponsors) is enforced at the gas-station edge (host reserved-coin
+pool), not inside this package.
 `src/chains/sui/sponsored-transaction.ts` → `executeSponsoredTransaction`.
 
 ## Consumer composes domain actions

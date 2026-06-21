@@ -8,7 +8,9 @@ import {
   ConfigurationError,
   WalletAccountSui,
   WalletManagerSui,
+  assembleSponsoredTxBytes,
   createLocalGasStation,
+  createSuiAccount,
   executeSponsoredTransaction,
   signSenderForSponsoredTransaction,
   verifySponsoredSignatures,
@@ -18,6 +20,8 @@ const TEST_MNEMONIC =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 const GOLDEN_SUI_ADDRESS =
   '0x5e93a736d04fbb25737aa40bee40171ef79f65fae833749e3c089fe7cc2161f1'
+const ATTACKER_ADDRESS =
+  '0x1111111111111111111111111111111111111111111111111111111111111111'
 
 const SPONSOR_SEED = new Uint8Array(32).fill(9)
 const sponsorKeypair = Ed25519Keypair.fromSecretKey(SPONSOR_SEED)
@@ -32,9 +36,38 @@ const GAS_COINS = [
   },
 ]
 
-function createOfflineClient(executeSpy = []) {
+const DOMAIN_OBJECT_ID =
+  '0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'
+
+function createOfflineClient(executeSpy = [], objectOwner = GOLDEN_SUI_ADDRESS) {
+  const objectRef = {
+    objectId: DOMAIN_OBJECT_ID,
+    version: '1',
+    digest: '4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi',
+  }
+
   return {
     getReferenceGasPrice: async () => GAS_PRICE,
+    getNormalizedMoveFunction: async () => ({
+      parameters: [{ TypeParameter: 0 }, 'Address'],
+      return: [],
+    }),
+    getObject: async ({ id }) => ({
+      data: {
+        objectId: id,
+        version: objectRef.version,
+        digest: objectRef.digest,
+        owner: { AddressOwner: objectOwner },
+        content: {
+          dataType: 'moveObject',
+          type: '0x2::coin::Coin<0x2::sui::SUI>',
+          hasPublicTransfer: true,
+          fields: { balance: '1000000000' },
+        },
+      },
+    }),
+    multiGetObjects: async ({ ids }) =>
+      Promise.all(ids.map((id) => createOfflineClient(executeSpy, objectOwner).getObject({ id }))),
     executeTransactionBlock: async (args) => {
       executeSpy.push(args)
       return {
@@ -60,11 +93,12 @@ describe('Sui sponsored transaction vectors', () => {
     const account = await manager.getAccount(0)
     assert.equal(account.path, "m/44'/784'/0'/0'/0'")
     assert.equal(await account.getAddress(), GOLDEN_SUI_ADDRESS)
+    assert(account instanceof WalletAccountSui)
   })
 
   it('attack 1 — divergent-bytes: both signatures verify against the same txBytes', async () => {
     const client = createOfflineClient()
-    const account = await WalletAccountSui.at(TEST_MNEMONIC, "0'/0'/0'", { provider: client })
+    const account = await createSuiAccount(TEST_MNEMONIC, "0'/0'/0'", { provider: client })
     const senderAddress = await account.getAddress()
     const { kindBytes } = await buildFixtureTransaction(client, senderAddress)
 
@@ -93,7 +127,7 @@ describe('Sui sponsored transaction vectors', () => {
 
   it('attack 2 — GasData-swap: tampered txBytes fails sender verification', async () => {
     const client = createOfflineClient()
-    const account = await WalletAccountSui.at(TEST_MNEMONIC, "0'/0'/0'", { provider: client })
+    const account = await createSuiAccount(TEST_MNEMONIC, "0'/0'/0'", { provider: client })
     const senderAddress = await account.getAddress()
     const { kindBytes } = await buildFixtureTransaction(client, senderAddress)
 
@@ -126,9 +160,11 @@ describe('Sui sponsored transaction vectors', () => {
     )
   })
 
-  it('attack 3 — equivocation: missing sponsorAddress throws ConfigurationError', async () => {
+  it('attack 3 — missing sponsorAddress guard rejects before execute', async () => {
+    // Real equivocation (gas-coin reuse / object locking) is enforced at the gas-station edge
+    // (host reserved-coin pool), not in this package.
     const client = createOfflineClient()
-    const account = await WalletAccountSui.at(TEST_MNEMONIC, "0'/0'/0'", { provider: client })
+    const account = await createSuiAccount(TEST_MNEMONIC, "0'/0'/0'", { provider: client })
     const senderAddress = await account.getAddress()
 
     const gasStation = {
@@ -156,7 +192,7 @@ describe('Sui sponsored transaction vectors', () => {
     const client = createOfflineClient(executeSpy)
     const sponsorCalls = []
 
-    const account = await WalletAccountSui.at(TEST_MNEMONIC, "0'/0'/0'", { provider: client })
+    const account = await createSuiAccount(TEST_MNEMONIC, "0'/0'/0'", { provider: client })
     const senderAddress = await account.getAddress()
 
     const gasStation = createLocalGasStation({
@@ -164,9 +200,7 @@ describe('Sui sponsored transaction vectors', () => {
       gasCoins: GAS_COINS,
       gasBudget: GAS_BUDGET,
       gasPrice: GAS_PRICE,
-      client: {
-        getReferenceGasPrice: client.getReferenceGasPrice,
-      },
+      client,
     })
 
     const signingGasStation = {
@@ -188,11 +222,74 @@ describe('Sui sponsored transaction vectors', () => {
     assert.equal(executeSpy[0].signature.length, 2)
   })
 
+  it('kind-verify — malicious gas station altering kind is rejected before execute', async () => {
+    const executeSpy = []
+    const client = createOfflineClient(executeSpy)
+    const account = await createSuiAccount(TEST_MNEMONIC, "0'/0'/0'", { provider: client })
+    const senderAddress = await account.getAddress()
+
+    const maliciousGasStation = {
+      sponsor: async ({ sender }) => {
+        const evilTx = new Transaction()
+        const [coin] = evilTx.splitCoins(evilTx.gas, [1n])
+        evilTx.transferObjects([coin], ATTACKER_ADDRESS)
+        const evilKindBytes = await evilTx.build({ client, onlyTransactionKind: true })
+        return assembleSponsoredTxBytes({
+          kindBytes: evilKindBytes,
+          sender,
+          sponsorKeypair,
+          gasCoins: GAS_COINS,
+          gasBudget: GAS_BUDGET,
+          gasPrice: GAS_PRICE,
+          client,
+        })
+      },
+    }
+
+    await assert.rejects(
+      () =>
+        executeSponsoredTransaction({
+          account,
+          transaction: { to: senderAddress, value: 1n },
+          gasStation: maliciousGasStation,
+          client,
+        }),
+      /Gas station altered the transaction kind\/sender; refusing to sign/,
+    )
+    assert.equal(executeSpy.length, 0)
+  })
+
+  it('moveCall PTB with object input builds and sponsors offline', async () => {
+    const executeSpy = []
+    const client = createOfflineClient(executeSpy)
+    const account = await createSuiAccount(TEST_MNEMONIC, "0'/0'/0'", {
+      provider: client,
+      gasStation: createLocalGasStation({
+        sponsorKeypair,
+        gasCoins: GAS_COINS,
+        gasBudget: GAS_BUDGET,
+        gasPrice: GAS_PRICE,
+        client,
+      }),
+    })
+    const senderAddress = await account.getAddress()
+
+    const tx = new Transaction()
+    tx.moveCall({
+      target: '0x2::transfer::public_transfer',
+      typeArguments: ['0x2::sui::SUI'],
+      arguments: [tx.object(DOMAIN_OBJECT_ID), tx.pure.address(senderAddress)],
+    })
+
+    await account.sendTransaction(tx)
+    assert.equal(executeSpy.length, 1)
+  })
+
   it('transparent sendTransaction routes to sponsored path when gasStation is injected', async () => {
     const executeSpy = []
     const client = createOfflineClient(executeSpy)
 
-    const account = await WalletAccountSui.at(TEST_MNEMONIC, "0'/0'/0'", {
+    const account = await createSuiAccount(TEST_MNEMONIC, "0'/0'/0'", {
       provider: client,
       gasStation: createLocalGasStation({
         sponsorKeypair,
@@ -208,7 +305,7 @@ describe('Sui sponsored transaction vectors', () => {
   })
 
   it('rejects isSponsored without an injected gasStation', async () => {
-    const account = await WalletAccountSui.at(TEST_MNEMONIC, "0'/0'/0'", {
+    const account = await createSuiAccount(TEST_MNEMONIC, "0'/0'/0'", {
       provider: createOfflineClient(),
       isSponsored: true,
     })

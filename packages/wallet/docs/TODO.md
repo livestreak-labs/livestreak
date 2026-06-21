@@ -21,6 +21,15 @@ See [architecture.md](./architecture.md) and [flow.md](./flow.md).
 - [x] Offline design-defense vectors in `test/vectors/sui-sponsored.test.mjs` (4 attacks + manager-path oracle).
 - [x] Inbox filed: schema gas-station config + host Sui sponsorship descriptor (not edited in this slice).
 
+## Sui AA hardening — done (2026-06-17)
+
+- [x] **Kind/sender trust check:** `assertGasStationReturnedTxMatchesKind` parses gas-station `txBytes`
+      before sender signs; rejects kind/sender swap (malicious gas station vector).
+- [x] **Barrel cleanup:** `createSuiAccount` in `account.ts`; vendored `WalletAccountSui` class re-exported from `#vendor`.
+- [x] **Config dead code removed:** `assertSponsoredConfig` deleted; `isSponsoredSuiConfig` = `gasStation !== undefined`.
+- [x] **Test realism:** moveCall PTB with stubbed `getObject` / `multiGetObjects`; `assembleSponsoredTxBytes` uses `SuiClient`.
+- [x] **Docs:** trust rule + equivocation-at-edge note in `flow.md`.
+
 ## Deferred
 
 - [ ] zkLogin / passkey signer abstraction (different seed model — separate track).

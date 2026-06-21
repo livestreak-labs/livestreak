@@ -11,6 +11,8 @@ export {
   WalletManagerSui,
   WalletAccountSui,
   WalletAccountReadOnlySui,
+  createSuiAccount,
+  assertGasStationReturnedTxMatchesKind,
   assembleSponsoredTxBytes,
   createLocalGasStation,
   executeSponsoredTransaction,
