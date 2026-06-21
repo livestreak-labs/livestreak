@@ -13,11 +13,18 @@ import type {
 } from '#/types/homepage'
 import { SHARE_SCALE, asMarketId, asVaultId } from '@livestreak/options'
 
-import type { FlowState, Position } from '#/types/demo'
-import { mockVaultViews } from '#/utils/mock'
+import type { FlowState, Position, VaultView } from '#/types/demo'
+import type { OptionsChainKind } from '#/utils/chain'
+import type { StreamPointer } from '#/utils/stream'
 
 const USDC_SCALE = 1_000_000
-const LVST_SCALE = 1_000_000_000_000_000_000
+
+// LVST decimals are chain-LOCAL (contracts D2 decision): EVM = 18, Sui = 9. The display scale MUST be
+// resolved per active chain — a single hardcoded 1e18 renders Sui LVST 1e9× too small.
+const LVST_SCALE_BY_CHAIN: Record<OptionsChainKind, number> = {
+  evm: 1_000_000_000_000_000_000, // 1e18
+  sui: 1_000_000_000, // 1e9
+}
 
 export function usdcStringToNumber(value: string): number {
   return Number(BigInt(value)) / USDC_SCALE
@@ -27,8 +34,8 @@ export function shareStringToNumber(value: string): number {
   return Number(BigInt(value)) / Number(SHARE_SCALE)
 }
 
-function lvstStringToNumber(value: string): number {
-  return Number(BigInt(value)) / LVST_SCALE
+function lvstStringToNumber(value: string, chain: OptionsChainKind): number {
+  return Number(BigInt(value)) / LVST_SCALE_BY_CHAIN[chain]
 }
 
 function mapVaultStatus(status: OptionsVaultPanel['status']): OptionsVault['status'] {
@@ -58,12 +65,6 @@ export function panelToVaults(panel: OptionsPanel, streamId?: string): OptionsVa
 
   for (const market of marketsForStream(panel, streamId)) {
     for (const vault of market.vaults) {
-      const lane = panel.nfts
-        .flatMap(n => n.lanes.map(l => ({ ...l, tokenId: n.tokenId })))
-        .find(l => l.vaultId === vault.vaultId)
-
-      const side = lane?.side
-
       vaults.push({
         vaultId: asVaultId(vault.vaultId),
         marketId: asMarketId(market.marketId),
@@ -82,11 +83,38 @@ export function panelToVaults(panel: OptionsPanel, streamId?: string): OptionsVa
         },
         steward: { hot: vault.status === 'hot' },
       })
+    }
+  }
 
-      mockVaultViews[vault.vaultId] = {
+  return vaults
+}
+
+/**
+ * Pure projection of board → per-vault display views (A7: replaces the old render-time mutation of
+ * the `mockVaultViews` module global). Callers memoize this; nothing is written to a shared global.
+ */
+export function panelToVaultViews(
+  panel: OptionsPanel,
+  streamId?: string,
+): Record<string, VaultView> {
+  const views: Record<string, VaultView> = {}
+
+  for (const market of marketsForStream(panel, streamId)) {
+    for (const vault of market.vaults) {
+      const lane = panel.nfts
+        .flatMap(n => n.lanes.map(l => ({ ...l, tokenId: n.tokenId })))
+        .find(l => l.vaultId === vault.vaultId)
+      const side = lane?.side
+
+      views[vault.vaultId] = {
         sharePriceYes: usdcStringToNumber(vault.pools.sharePriceYes),
         sharePriceNo: usdcStringToNumber(vault.pools.sharePriceNo),
         multiplier: vaultMultiplier(vault, side),
+        odds: vault.odds,
+        poolYes: usdcStringToNumber(vault.pools.yesUSDC),
+        poolNo: usdcStringToNumber(vault.pools.noUSDC),
+        poolTotal: usdcStringToNumber(vault.pools.totalUSDC),
+        ...(vault.steward.severity !== undefined ? { severity: vault.steward.severity } : {}),
         ...(lane && side ? { fundedSide: side } : {}),
         ...(lane && side
           ? {
@@ -110,19 +138,29 @@ export function panelToVaults(panel: OptionsPanel, streamId?: string): OptionsVa
     }
   }
 
-  return vaults
+  return views
 }
 
-export function panelToFlow(panel: OptionsPanel): FlowState {
+/** Pick the on-chain stream pointer for a stream/market from the board (A4). */
+export function panelToStream(panel: OptionsPanel, streamId?: string): StreamPointer | undefined {
+  for (const market of marketsForStream(panel, streamId)) {
+    if (market.stream) {
+      return { status: market.stream.status, scheme: market.stream.scheme, id: market.stream.id }
+    }
+  }
+  return undefined
+}
+
+export function panelToFlow(panel: OptionsPanel, chain: OptionsChainKind): FlowState {
   const lvst = panel.lvst
-  const balance = lvstStringToNumber(lvst.balanceLVST)
-  const staked = lvstStringToNumber(lvst.stakedLVST)
+  const balance = lvstStringToNumber(lvst.balanceLVST, chain)
+  const staked = lvstStringToNumber(lvst.stakedLVST, chain)
   return {
     balance,
     staked,
     pendingDividends: usdcStringToNumber(lvst.pendingDividendsUSDC),
     totalEarned: lvst.totalEarnedLVST
-      ? lvstStringToNumber(lvst.totalEarnedLVST)
+      ? lvstStringToNumber(lvst.totalEarnedLVST, chain)
       : balance + staked,
     apy: 14.2,
   }
@@ -143,15 +181,19 @@ export function panelToPositions(panel: OptionsPanel, streamId?: string): Positi
       const vault = vaultById.get(lane.vaultId)
       if (!vault) continue
       const streamRate = chainRateToUsdPerMin(lane.rate)
+      const currentValue = lane.claimableUSDC ? usdcStringToNumber(lane.claimableUSDC) : 0
+      const streamed = streamRate
       positions.push({
         vaultId: lane.vaultId,
         option: vault.question,
         side: lane.side,
-        streamed: streamRate,
+        streamed,
         streamRate,
         shares: shareStringToNumber(lane.sharesAccrued),
-        currentValue: lane.claimableUSDC ? usdcStringToNumber(lane.claimableUSDC) : 0,
-        pnl: 0,
+        currentValue,
+        // Unrealized P&L proxy: claimable value now minus what has been streamed in (per-minute rate
+        // basis). Display-only; replace with options' projectSessionPnl when it's exported.
+        pnl: currentValue - streamed,
         resolved: vault.status === 'resolved',
         ...(lane.won !== undefined ? { won: lane.won } : {}),
         ...(lane.claimableUSDC ? { payout: usdcStringToNumber(lane.claimableUSDC) } : {}),

@@ -6,12 +6,12 @@ import { panelToFlow } from '#/utils/options'
 
 export function useFlow() {
   const optionsEnabled = isOptionsModeEnabled()
-  const { board, isConnected } = useOptionsContext()
+  const { board, isConnected, chain } = useOptionsContext()
   const [flow, setFlow] = useState<FlowState>(mockFlow)
   const [claiming, setClaiming] = useState(false)
 
   const liveFlow = optionsEnabled && isConnected && board
-    ? panelToFlow(board.panel)
+    ? panelToFlow(board.panel, chain)
     : optionsEnabled
       ? { balance: 0, staked: 0, pendingDividends: 0, totalEarned: 0, apy: 0 }
       : flow

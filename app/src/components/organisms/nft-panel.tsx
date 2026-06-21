@@ -6,6 +6,13 @@ import { isOptionsModeEnabled } from '#/utils/env'
 import { isValidRecipientAddress, type OptionsChainKind } from '#/utils/chain'
 import { useOptionsContext } from '#/providers/options-provider'
 import { OptionsActionButton } from '#/components/atoms/options-action-button'
+import { usdcStringToNumber } from '#/utils/options'
+import { formatUSDC, formatCountdown } from '#/utils/format'
+
+// The setLanes top-up arg shape (SetLanesInput) is not yet published by options, so the button stays
+// gated. Once options surfaces a `setLanes` function descriptor with its inputSchema, this disabled
+// placeholder is replaced by the real action.
+const SETLANES_GATED_REASON = 'Top-up unavailable — pending options setLanes arg shape'
 
 function invalidAddressFn(): OptionsFunctionView {
   return { name: '', scope: '', label: '', disabled: true, disabledReason: 'Enter a valid address' }
@@ -146,7 +153,22 @@ function NftRow({
         owner {nft.owner}
       </div>
 
+      {/* A3: shared Drips balance + runway readout (EVM only; both fields absent on Sui). */}
+      {chain === 'evm' && nft.balanceUSDC !== undefined && (
+        <RunwayReadout balanceUSDC={nft.balanceUSDC} runwayEndMs={nft.runwayEndMs} />
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div style={{ flex: 1, fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Top up lane funding</div>
+          <OptionsActionButton
+            label="Top up"
+            fn={{ name: '', scope: '', label: '', disabled: true, disabledReason: SETLANES_GATED_REASON }}
+            onAction={async () => {}}
+            variant="ghost"
+            compact
+          />
+        </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <input
             value={transferTo}
@@ -179,6 +201,30 @@ function NftRow({
           />
         </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function RunwayReadout({ balanceUSDC, runwayEndMs }: { balanceUSDC: string; runwayEndMs?: number }) {
+  const balance = usdcStringToNumber(balanceUSDC)
+  const msLeft = runwayEndMs !== undefined ? Math.max(0, runwayEndMs - Date.now()) : undefined
+  const depleted = runwayEndMs !== undefined && msLeft === 0
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+      background: 'rgba(0,200,255,0.04)', border: '1px solid rgba(0,200,255,0.1)',
+      borderRadius: 8, padding: '7px 10px', marginBottom: 10,
+    }}>
+      <div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.06em' }}>BALANCE</div>
+        <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: '#00c8ff' }}>{formatUSDC(balance)}</div>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.06em' }}>RUNWAY</div>
+        <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: depleted ? '#ff2d78' : 'rgba(255,255,255,0.75)' }}>
+          {msLeft === undefined ? '—' : depleted ? 'depleted' : formatCountdown(msLeft)}
+        </div>
       </div>
     </div>
   )

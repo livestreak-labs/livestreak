@@ -1,4 +1,7 @@
-import type { OptionsVaultSide } from '@livestreak/options'
+import type { OptionsVaultPanel, OptionsVaultSide } from '@livestreak/options'
+
+/** Authoritative per-side odds from the options board (one formula for YES & NO). */
+export type VaultOdds = OptionsVaultPanel['odds']
 
 export interface WSFrame {
   frame: number
@@ -46,13 +49,21 @@ export interface Position {
 
 export interface VaultView {
   multiplier?: number
+  /** Authoritative per-side odds object from the board; render these, never recompute from pools. */
+  odds?: VaultOdds
+  /** Contracts-blessed hot severity tier: 0 = Warm, 1 = Hot, 2 = Critical. */
+  severity?: number
   sharePriceYes?: number
   sharePriceNo?: number
+  /** Full-precision USDC pool amounts (floats); replaces the whole-dollar-rounded `OptionsVault.pools`. */
+  poolYes?: number
+  poolNo?: number
+  poolTotal?: number
   fundedSide?: OptionsVaultSide
   userPosition?: { side: OptionsVaultSide; streamed: number; shares: number; currentValue: number }
   userWon?: boolean
   payout?: number
-  flowReceived?: number
+  lvstReceived?: number
   createdMinute?: number
 }
 

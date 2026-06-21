@@ -14,8 +14,10 @@ import { useWebSocket } from '#/hooks/use-websocket.ts'
 import { useFlow } from '#/hooks/use-flow.ts'
 import { useWalletContext } from '#/providers/wallet-provider.tsx'
 import { useOptionsContext } from '#/providers/options-provider.tsx'
+import { useHostStream } from '#/hooks/use-host-stream.ts'
 import { isOptionsModeEnabled } from '#/utils/env.ts'
-import { DEFAULT_FUND_DURATION_MIN } from '#/utils/options'
+import { DEFAULT_FUND_DURATION_MIN, panelToStream } from '#/utils/options'
+import { resolveStreamMedia } from '#/utils/stream'
 
 interface StreamLayoutProps {
   streamTitle: string
@@ -30,10 +32,17 @@ export function StreamLayout({ streamTitle, category, totalPooled, streamId }: S
   const { frame, events } = useWebSocket()
   const { legacyWallet } = useWalletContext()
   const { flow, stake, unstake, claimDividends, claiming } = useFlow()
-  const { fundStream, isConnected: optionsConnected } = useOptionsContext()
+  const { board, fundStream, isConnected: optionsConnected } = useOptionsContext()
   const optionsEnabled = isOptionsModeEnabled()
   const { notifications, push, dismiss } = useWinNotifications()
   const [selectedVaultId, setSelectedVaultId] = useState<string | null>(null)
+
+  // A4: drive the player off the on-chain stream pointer (status + scheme/id) and the host watch URL.
+  const hostStream = useHostStream(streamId)
+  const streamPointer = optionsEnabled && optionsConnected && board
+    ? panelToStream(board.panel, streamId)
+    : undefined
+  const streamMedia = resolveStreamMedia(streamPointer, hostStream.stream?.watchUrl)
 
   const floatingVaults = vaults.filter(v => v.status === 'open' || v.status === 'hot')
 
@@ -52,17 +61,18 @@ export function StreamLayout({ streamTitle, category, totalPooled, streamId }: S
     if (optionsEnabled && optionsConnected) {
       try {
         const txId = await fundStream(vaultId, side, rate, durationMinutes)
-        push({ type: 'stream', rate, side, option: `${vault?.question ?? vaultId} · ${txId.slice(0, 10)}…` })
+        push({ type: 'stream', rate, side, option: vault?.question ?? vaultId, txId })
       } catch (err) {
         push({
           type: 'stream',
           rate,
           side,
-          option: err instanceof Error ? err.message : 'Fund failed',
+          option: 'Stream failed',
+          subtitle: err instanceof Error ? err.message : 'Fund failed',
         })
       }
     } else {
-      push({ type: 'stream', rate, side, option: vault?.question ?? vaultId })
+      push({ type: 'stream', rate, side, option: vault?.question ?? vaultId, mock: true })
     }
 
     setSelectedVaultId(null)
@@ -94,7 +104,7 @@ export function StreamLayout({ streamTitle, category, totalPooled, streamId }: S
             </div>
             <span className="display" style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.02em' }}>LiveStreak</span>
           </Link>
-          <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '1px 5px' }}>ALPHA</span>
+          <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, padding: '1px 5px' }}>BETA</span>
           <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
           <span style={{
             fontSize: 10, fontWeight: 600, color: getCategoryColor(category),
@@ -114,7 +124,7 @@ export function StreamLayout({ streamTitle, category, totalPooled, streamId }: S
       <div className="stream-split" style={{ flex: 1, display: 'flex', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
         {/* LEFT — Video (60%) */}
         <div className="stream-video-pane" style={{ flex: '3 1 60%', minWidth: 0, position: 'relative', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-          <VideoPlayer streamTitle={streamTitle} />
+          <VideoPlayer streamTitle={streamTitle} media={streamMedia} ready={hostStream.ready} />
 
           {/* NikoNiko floating cards */}
           <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 10 }}>

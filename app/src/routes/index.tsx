@@ -143,7 +143,7 @@ function HomePage() {
               <span className="mono" style={{ fontSize: 11, fontWeight: 600, color: vault.outcome === 'yes' ? '#00ff87' : '#ff2d78', marginLeft: 8 }}>
                 {vault.outcome.toUpperCase()}
               </span>
-              <span className="mono" style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginLeft: 4 }}>${vault.totalPool}</span>
+              <span className="mono" style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginLeft: 4 }}>{formatUSDCFull(vault.totalPool)}</span>
             </div>
           ))}
         </div>
@@ -250,7 +250,7 @@ function LiveVaultCard({ vault, index }: { vault: HomepageLiveVaultCard; index: 
         <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>Pool</span>
-            <span className="mono" style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>${vault.totalPool}</span>
+            <span className="mono" style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{formatUSDCFull(vault.totalPool)}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <Clock size={10} color="rgba(255,255,255,0.2)" />

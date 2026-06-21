@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { OptionsVault } from '@livestreak/options'
-import { mockVaultViews } from '#/utils/mock'
+import { useVaultView } from '#/hooks/use-vault-views'
 import { formatMultiplier } from '#/utils/format'
 
 interface Props {
@@ -22,9 +22,9 @@ const VERTICAL_WOBBLE = 0.4
  * Clicking opens the vault detail in the right panel.
  */
 export function NikoNikoCard({ vault, index, total, onClickCard }: Props) {
-  const view = mockVaultViews[vault.vaultId] ?? {}
-  const yesTotal = Number(vault.pools.yes)
-  const noTotal = Number(vault.pools.no)
+  const view = useVaultView(vault.vaultId)
+  const yesTotal = view.poolYes ?? Number(vault.pools.yes)
+  const noTotal = view.poolNo ?? Number(vault.pools.no)
   const multiplier = view.multiplier ?? (yesTotal > 0 ? (yesTotal + noTotal) / yesTotal : 1)
   const ref = useRef<HTMLDivElement>(null)
   const posRef = useRef({ x: 0, y: 0, dx: -DRIFT_SPEED, dy: 0 })

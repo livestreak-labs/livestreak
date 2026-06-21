@@ -3,19 +3,21 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Clock, Fire, CheckCircle, XCircle, CaretDown, TrendUp, Users } from '@phosphor-icons/react'
 import { StreamSlider, mapAccrualPreview } from '#/components/molecules/stream-slider'
 import { formatUSDC, formatCountdown, formatMultiplier, formatMinute, calcPoolPct } from '#/utils/format'
-import { mockVaultViews, type VaultView } from '#/utils/mock'
+import type { VaultView } from '#/types/demo'
 import type { OptionsVault, OptionsFunctionView } from '@livestreak/options'
 import { isOptionsModeEnabled } from '#/utils/env'
 import { useOptionsContext } from '#/providers/options-provider'
 import { OptionsActionButton } from '#/components/atoms/options-action-button'
 import { useVaultFundingControls } from '#/hooks/use-vault-funding-controls'
+import { useVaultView } from '#/hooks/use-vault-views'
 import { useAccrualPreview } from '#/hooks/use-accrual-preview'
 
 export function VaultCard({ vault, index = 0 }: { vault: OptionsVault; index?: number }) {
-  const view = mockVaultViews[vault.vaultId] ?? {}
+  const view = useVaultView(vault.vaultId)
   const hotUntil = vault.steward.hotUntilMs ?? null
-  const yesTotal = Number(vault.pools.yes)
-  const noTotal = Number(vault.pools.no)
+  // Full-precision USDC pools from the board (A1); fall back to the rounded mock pools in mock mode.
+  const yesTotal = view.poolYes ?? Number(vault.pools.yes)
+  const noTotal = view.poolNo ?? Number(vault.pools.no)
   const optionsEnabled = isOptionsModeEnabled()
   const options = useOptionsContext()
   const useOptions = optionsEnabled && options.isConnected
@@ -57,7 +59,10 @@ export function VaultCard({ vault, index = 0 }: { vault: OptionsVault; index?: n
   else if (isLoss) cardStyle = { borderColor: 'rgba(255,255,255,0.04)', opacity: 0.7 }
   else if (isOpen && hasPos) cardStyle = { borderColor: 'rgba(0,255,135,0.2)' }
 
-  const noMultiplier = yesTotal > 0 ? (noTotal + yesTotal) / noTotal : 1
+  // A2: authoritative per-side odds from the board (one formula for YES & NO); recompute only as a
+  // mock-mode fallback.
+  const yesMultiplier = view.odds?.yesMultiplier ?? view.multiplier ?? 1
+  const noMultiplier = view.odds?.noMultiplier ?? (yesTotal > 0 ? (noTotal + yesTotal) / noTotal : 1)
 
   return (
     <motion.div
@@ -101,7 +106,7 @@ export function VaultCard({ vault, index = 0 }: { vault: OptionsVault; index?: n
               )}
             </div>
           </div>
-          <StatusBadge vault={vault} hotMs={hotMs} expiryMs={expiryMs} />
+          <StatusBadge vault={vault} view={view} hotMs={hotMs} expiryMs={expiryMs} />
         </div>
 
         {/* Row 2: YES / NO buttons */}
@@ -121,7 +126,7 @@ export function VaultCard({ vault, index = 0 }: { vault: OptionsVault; index?: n
               transition: 'background 0.15s, border-color 0.15s, box-shadow 0.15s',
             }}>
               <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', color: '#00ff87' }}>YES</span>
-              <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'rgba(0,255,135,0.6)' }}>+{formatMultiplier(view.multiplier ?? 1)}</span>
+              <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'rgba(0,255,135,0.6)' }}>+{formatMultiplier(yesMultiplier)}</span>
             </button>
             <button className="vault-bet-no" onClick={() => setExpanded(true)} style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -161,7 +166,7 @@ export function VaultCard({ vault, index = 0 }: { vault: OptionsVault; index?: n
           )}
           {isLoss && (
             <LossState
-              flowReceived={view.flowReceived ?? 0}
+              lvstReceived={view.lvstReceived ?? 0}
               side={side ?? 'yes'}
               useOptions={useOptions}
               claimLossFn={useOptions && side ? options.findFunction('claimLossLvst', fn => fn.target?.vaultId === vault.vaultId && fn.target?.side === side && fn.target?.kind === 'vault') : undefined}
@@ -227,8 +232,7 @@ export function VaultCard({ vault, index = 0 }: { vault: OptionsVault; index?: n
   )
 }
 
-function StatusBadge({ vault, hotMs, expiryMs }: { vault: OptionsVault; hotMs: number; expiryMs: number }) {
-  const view = mockVaultViews[vault.vaultId] ?? {}
+function StatusBadge({ vault, view, hotMs, expiryMs }: { vault: OptionsVault; view: VaultView; hotMs: number; expiryMs: number }) {
   if (vault.status === 'hot') return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       <div className="broadcast-corners broadcast-corners-pink" style={{
@@ -237,7 +241,7 @@ function StatusBadge({ vault, hotMs, expiryMs }: { vault: OptionsVault; hotMs: n
         borderRadius: 5, padding: '2px 8px', overflow: 'visible',
       }}>
         <Fire size={10} color="#ff2d78" />
-        <span className="display" style={{ fontSize: 10, fontWeight: 700, color: '#ff2d78', letterSpacing: '0.06em' }}>HOT</span>
+        <span className="display" style={{ fontSize: 10, fontWeight: 700, color: '#ff2d78', letterSpacing: '0.06em' }}>{severityLabel(view.severity)}</span>
       </div>
       <span className="mono" style={{ fontSize: 10, color: '#ff7a00', textShadow: '0 0 8px rgba(255,122,0,0.3)' }}>{formatCountdown(hotMs)}</span>
     </div>
@@ -301,8 +305,8 @@ function WinState({ payout, useOptions, withdrawFn, onClaimWin }: {
   )
 }
 
-function LossState({ flowReceived, side, useOptions, claimLossFn, onClaimLoss }: {
-  flowReceived: number
+function LossState({ lvstReceived, side, useOptions, claimLossFn, onClaimLoss }: {
+  lvstReceived: number
   side: 'yes' | 'no'
   useOptions: boolean
   claimLossFn?: OptionsFunctionView
@@ -317,7 +321,7 @@ function LossState({ flowReceived, side, useOptions, claimLossFn, onClaimLoss }:
     }}>
       <div>
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 1 }}>LOSERS BECOME OWNERS</div>
-        <span className="mono" style={{ fontSize: 13, fontWeight: 600, color: '#00c8ff' }}>+{flowReceived.toLocaleString()} $LVST</span>
+        <span className="mono" style={{ fontSize: 13, fontWeight: 600, color: '#00c8ff' }}>+{lvstReceived.toLocaleString()} $LVST</span>
       </div>
       {useOptions ? (
         <OptionsActionButton label="Claim LVST" fn={claimLossFn} onAction={onClaimLoss} variant="red" compact />
@@ -329,14 +333,16 @@ function LossState({ flowReceived, side, useOptions, claimLossFn, onClaimLoss }:
 }
 
 function ExpandedDetails({ vault, poolPct, view }: { vault: OptionsVault; poolPct: number; view: VaultView }) {
-  const yesTotal = Number(vault.pools.yes)
-  const noTotal = Number(vault.pools.no)
-  const yesOdds = noTotal > 0 ? (noTotal + yesTotal) / yesTotal : 0
-  const noOdds = yesTotal > 0 ? (noTotal + yesTotal) / noTotal : 0
+  const yesTotal = view.poolYes ?? Number(vault.pools.yes)
+  const noTotal = view.poolNo ?? Number(vault.pools.no)
+  const total = view.poolTotal ?? noTotal + yesTotal
+  // A2: authoritative odds; recompute only as mock-mode fallback.
+  const yesOdds = view.odds?.yesMultiplier ?? (yesTotal > 0 ? (noTotal + yesTotal) / yesTotal : 0)
+  const noOdds = view.odds?.noMultiplier ?? (noTotal > 0 ? (noTotal + yesTotal) / noTotal : 0)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-        <Mini label="Total pool" value={`$${(noTotal + yesTotal).toFixed(0)}`} />
+        <Mini label="Total pool" value={formatUSDC(total)} />
         <Mini label="YES odds" value={`${yesOdds.toFixed(2)}x`} accent="#00ff87" />
         <Mini label="NO odds" value={`${noOdds.toFixed(2)}x`} accent="#ff2d78" />
       </div>
@@ -377,6 +383,12 @@ function ExpandedDetails({ vault, poolPct, view }: { vault: OptionsVault; poolPc
       </div>
     </div>
   )
+}
+
+function severityLabel(severity?: number): string {
+  if (severity === 0) return 'WARM'
+  if (severity === 2) return 'CRITICAL'
+  return 'HOT'
 }
 
 function Mini({ label, value, accent }: { label: string; value: string; accent?: string }) {

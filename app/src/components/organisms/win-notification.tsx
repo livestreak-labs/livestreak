@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CheckCircle, TrendUp } from '@phosphor-icons/react'
 
-interface WinToast { id: string; type: 'win' | 'loss' | 'stream'; amount?: number; flowReceived?: number; rate?: number; side?: 'yes' | 'no'; option: string }
+interface WinToast { id: string; type: 'win' | 'loss' | 'stream'; amount?: number; lvstReceived?: number; rate?: number; side?: 'yes' | 'no'; option: string; mock?: boolean; txId?: string; subtitle?: string }
 interface Props { notifications: WinToast[]; onDismiss: (id: string) => void }
 
 export function WinNotification({ notifications, onDismiss }: Props) {
@@ -16,7 +16,8 @@ export function WinNotification({ notifications, onDismiss }: Props) {
 }
 
 function Toast({ toast, onDismiss }: { toast: WinToast; onDismiss: () => void }) {
-  useEffect(() => { const t = setTimeout(onDismiss, 5000); return () => clearTimeout(t) }, [onDismiss])
+  // Auto-dismiss is owned by useWinNotifications.push (A6) so the 3s board tick can't reset a
+  // per-render timer here; click still dismisses immediately.
   const isWin = toast.type === 'win'
   const isStream = toast.type === 'stream'
   const accent = isWin ? '#ffd553' : '#00c8ff'
@@ -62,11 +63,18 @@ function Toast({ toast, onDismiss }: { toast: WinToast; onDismiss: () => void })
             <div className="display" style={{ fontSize: 15, fontWeight: 600, color: '#00c8ff', letterSpacing: '0.02em' }}>
               Streaming ${toast.rate?.toFixed(2)}/min → {toast.side?.toUpperCase()} on {toast.option}
             </div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>Mock commit — funds will flow when connected</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>
+              {toast.subtitle
+                ?? (toast.mock
+                  ? 'Mock commit — funds will flow when connected'
+                  : toast.txId
+                    ? `Submitted · ${toast.txId.slice(0, 10)}…`
+                    : 'Submitted on-chain')}
+            </div>
           </>
         ) : (
           <>
-            <div className="display" style={{ fontSize: 15, fontWeight: 600, color: '#00c8ff', letterSpacing: '0.02em' }}>You received {toast.flowReceived?.toLocaleString()} $LVST</div>
+            <div className="display" style={{ fontSize: 15, fontWeight: 600, color: '#00c8ff', letterSpacing: '0.02em' }}>You received {toast.lvstReceived?.toLocaleString()} $LVST</div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>Losers become owners — stake to earn</div>
           </>
         )}
@@ -77,10 +85,15 @@ function Toast({ toast, onDismiss }: { toast: WinToast; onDismiss: () => void })
 
 export function useWinNotifications() {
   const [notifications, setNotifications] = useState<WinToast[]>([])
-  function push(toast: Omit<WinToast, 'id'>) {
+  // Stable identities so consumer effect deps (e.g. handleStream) don't churn on the 3s board tick.
+  const dismiss = useCallback((id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id))
+  }, [])
+  const push = useCallback((toast: Omit<WinToast, 'id'>) => {
     const id = Math.random().toString(36).slice(2)
     setNotifications(prev => [...prev, { ...toast, id }])
-  }
-  function dismiss(id: string) { setNotifications(prev => prev.filter(n => n.id !== id)) }
+    // Own the toast lifetime where it's created — survives parent re-renders (A6).
+    setTimeout(() => dismiss(id), 5000)
+  }, [dismiss])
   return { notifications, push, dismiss }
 }

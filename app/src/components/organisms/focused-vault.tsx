@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Clock, Fire, X } from '@phosphor-icons/react'
 import { StreamSlider, mapAccrualPreview } from '#/components/molecules/stream-slider'
-import { formatCountdown, formatMultiplier, calcPoolPct } from '#/utils/format'
-import { mockVaultViews } from '#/utils/mock'
+import { formatCountdown, formatMultiplier, formatUSDC, calcPoolPct } from '#/utils/format'
 import type { OptionsVault } from '@livestreak/options'
 import { DEFAULT_FUND_DURATION_MIN, fundCommitmentUsd } from '#/utils/options'
 import { useVaultFundingControls } from '#/hooks/use-vault-funding-controls'
+import { useVaultView } from '#/hooks/use-vault-views'
 import { useAccrualPreview } from '#/hooks/use-accrual-preview'
 
 interface Props {
@@ -16,10 +16,10 @@ interface Props {
 }
 
 export function FocusedVault({ vault, onDismiss, onStream }: Props) {
-  const view = mockVaultViews[vault.vaultId] ?? {}
+  const view = useVaultView(vault.vaultId)
   const hotUntil = vault.steward.hotUntilMs ?? null
-  const yesTotal = Number(vault.pools.yes)
-  const noTotal = Number(vault.pools.no)
+  const yesTotal = view.poolYes ?? Number(vault.pools.yes)
+  const noTotal = view.poolNo ?? Number(vault.pools.no)
   const userPosition = view.userPosition
   const funding = useVaultFundingControls(vault.vaultId)
   const [hotMs, setHotMs] = useState(hotUntil ? Math.max(0, hotUntil - Date.now()) : 0)
@@ -56,9 +56,10 @@ export function FocusedVault({ vault, onDismiss, onStream }: Props) {
 
   const poolPct = calcPoolPct(noTotal, yesTotal)
   const isHot = vault.status === 'hot'
-  const totalPool = noTotal + yesTotal
-  const yesOdds = yesTotal > 0 ? totalPool / yesTotal : 0
-  const noOdds = noTotal > 0 ? totalPool / noTotal : 0
+  const totalPool = view.poolTotal ?? noTotal + yesTotal
+  // A2: authoritative odds; recompute only as mock-mode fallback.
+  const yesOdds = view.odds?.yesMultiplier ?? (yesTotal > 0 ? totalPool / yesTotal : 0)
+  const noOdds = view.odds?.noMultiplier ?? (noTotal > 0 ? totalPool / noTotal : 0)
   const hasPos = !!userPosition
 
   return (
@@ -94,7 +95,7 @@ export function FocusedVault({ vault, onDismiss, onStream }: Props) {
                 <span className="mono" style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>{formatCountdown(expiryMs)}</span>
               </div>
             )}
-            <span className="mono" style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>${totalPool.toFixed(0)} pooled</span>
+            <span className="mono" style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>{formatUSDC(totalPool)} pooled</span>
           </div>
         </div>
         <button
@@ -119,7 +120,7 @@ export function FocusedVault({ vault, onDismiss, onStream }: Props) {
           border: `1px solid ${hasPos && userPosition?.side === 'yes' ? 'rgba(0,255,135,0.3)' : 'rgba(0,255,135,0.12)'}`,
         }}>
           <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: '#00ff87' }}>{formatMultiplier(yesOdds)}</span>
-          <span className="mono" style={{ fontSize: 9, letterSpacing: '0.08em', color: 'rgba(0,255,135,0.6)' }}>YES · ${yesTotal.toFixed(0)}</span>
+          <span className="mono" style={{ fontSize: 9, letterSpacing: '0.08em', color: 'rgba(0,255,135,0.6)' }}>YES · {formatUSDC(yesTotal)}</span>
         </div>
         <div style={{
           flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
@@ -128,7 +129,7 @@ export function FocusedVault({ vault, onDismiss, onStream }: Props) {
           border: `1px solid ${hasPos && userPosition?.side === 'no' ? 'rgba(255,45,120,0.3)' : 'rgba(255,45,120,0.12)'}`,
         }}>
           <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: '#ff2d78' }}>{formatMultiplier(noOdds)}</span>
-          <span className="mono" style={{ fontSize: 9, letterSpacing: '0.08em', color: 'rgba(255,45,120,0.6)' }}>NO · ${noTotal.toFixed(0)}</span>
+          <span className="mono" style={{ fontSize: 9, letterSpacing: '0.08em', color: 'rgba(255,45,120,0.6)' }}>NO · {formatUSDC(noTotal)}</span>
         </div>
       </div>
 

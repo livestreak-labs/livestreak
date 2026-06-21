@@ -18,7 +18,6 @@ export function useStreamMeta(routeId: string): StreamMeta {
           id: market.marketId,
           title: market.title,
           category: market.category ?? 'Tech',
-          viewers: 0,
           activeVaults: market.totals.activeVaults,
           totalPooled: usdcStringToNumber(market.totals.totalPooledUSDC),
           elapsed: '',
