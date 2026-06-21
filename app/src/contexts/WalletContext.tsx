@@ -1,12 +1,10 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
-import { useStealthWallet } from '#/hooks/useStealthWallet.ts'
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
 import { mockWallet, type WalletState } from '#/data/mock.ts'
-import { type Address } from 'viem'
-
-/* ─── Context shape ─── */
+import { useOptionsContext } from '#/contexts/OptionsContext.tsx'
+import { isOptionsModeEnabled } from '#/config/optionsMode.ts'
+import type { Address } from 'viem'
 
 interface WalletContextValue {
-  // Smart wallet (@livestreak/wallet, password-derived ERC-4337 Safe)
   address: Address | null
   isConnected: boolean
   isLoading: boolean
@@ -14,42 +12,59 @@ interface WalletContextValue {
   usdcBalance: bigint
   connect: (password: string) => Promise<void>
   disconnect: () => void
-  sendUserOperation: (calls: unknown[]) => Promise<string>
-  // Legacy mock wallet (for components that still consume WalletState)
   legacyWallet: WalletState
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null)
 
-/* ─── Provider ─── */
-
 export function WalletProvider({ children }: { children: ReactNode }) {
-  const wallet = useStealthWallet()
+  const options = useOptionsContext()
+  const optionsEnabled = isOptionsModeEnabled()
+  const [mockConnected, setMockConnected] = useState(false)
 
-  // Bridge live wallet state into the legacy WalletState format so
-  // existing components (BalanceBar, etc.) keep working without changes.
-  const legacyWallet: WalletState = useMemo(() => ({
-    address: wallet.address
-      ? `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`
-      : mockWallet.address,
-    usdcBalance: wallet.isConnected
-      ? Number(wallet.usdcBalance) / 1e6  // ERC-20 USDC is 6 decimals
-      : mockWallet.usdcBalance,
-    connected: wallet.isConnected,
-    sessionKeySigned: wallet.isConnected,
-  }), [wallet.address, wallet.isConnected, wallet.usdcBalance])
+  const legacyWallet: WalletState = useMemo(() => {
+    if (optionsEnabled && options.isConnected && options.address) {
+      return {
+        address: `${options.address.slice(0, 6)}...${options.address.slice(-4)}`,
+        usdcBalance: options.usdcBalance,
+        connected: true,
+        sessionKeySigned: true,
+      }
+    }
+    if (!optionsEnabled && mockConnected) {
+      return { ...mockWallet, connected: true, sessionKeySigned: true }
+    }
+    return mockWallet
+  }, [optionsEnabled, options.isConnected, options.address, options.usdcBalance, mockConnected])
+
+  const connect = async (password: string) => {
+    if (optionsEnabled) {
+      await options.connect(password)
+      return
+    }
+    if (password.trim()) setMockConnected(true)
+  }
+
+  const disconnect = () => {
+    if (optionsEnabled) {
+      options.disconnect()
+      return
+    }
+    setMockConnected(false)
+  }
 
   const value: WalletContextValue = useMemo(() => ({
-    address: wallet.address,
-    isConnected: wallet.isConnected,
-    isLoading: wallet.isLoading,
-    error: wallet.error,
-    usdcBalance: wallet.usdcBalance,
-    connect: wallet.connect,
-    disconnect: wallet.disconnect,
-    sendUserOperation: wallet.sendUserOperation,
+    address: optionsEnabled && options.isConnected ? options.address : null,
+    isConnected: optionsEnabled ? options.isConnected : mockConnected,
+    isLoading: optionsEnabled ? options.isLoading : false,
+    error: optionsEnabled ? options.error : null,
+    usdcBalance: optionsEnabled && options.isConnected
+      ? BigInt(Math.round(options.usdcBalance * 1_000_000))
+      : 0n,
+    connect,
+    disconnect,
     legacyWallet,
-  }), [wallet, legacyWallet])
+  }), [optionsEnabled, options, mockConnected, legacyWallet])
 
   return (
     <WalletContext.Provider value={value}>
@@ -57,8 +72,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     </WalletContext.Provider>
   )
 }
-
-/* ─── Consumer hook ─── */
 
 export function useWalletContext(): WalletContextValue {
   const ctx = useContext(WalletContext)

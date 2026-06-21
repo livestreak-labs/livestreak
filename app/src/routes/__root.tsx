@@ -1,6 +1,7 @@
 import { HeadContent, Scripts, createRootRoute, Outlet, Link, useRouterState } from '@tanstack/react-router'
 import { MotionConfig } from 'framer-motion'
 import appCss from '../styles.css?url'
+import { OptionsProvider } from '#/contexts/OptionsContext.tsx'
 import { WalletProvider } from '#/contexts/WalletContext.tsx'
 import { ConnectButton } from '#/components/wallet/ConnectButton.tsx'
 
@@ -56,13 +57,16 @@ function RootComponent() {
 
   if (isStreamPage) {
     return (
-      <WalletProvider>
-        <Outlet />
-      </WalletProvider>
+      <OptionsProvider>
+        <WalletProvider>
+          <Outlet />
+        </WalletProvider>
+      </OptionsProvider>
     )
   }
 
   return (
+    <OptionsProvider>
     <WalletProvider>
     <div style={{
       display: 'flex',
@@ -132,5 +136,6 @@ function RootComponent() {
       </main>
     </div>
     </WalletProvider>
+    </OptionsProvider>
   )
 }

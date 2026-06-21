@@ -9,22 +9,28 @@ import { NikoNikoCard } from '#/components/video/NikoNikoCard.tsx'
 import { VaultList } from '#/components/predictions/VaultList.tsx'
 import { ConnectButton } from '#/components/wallet/ConnectButton.tsx'
 import { useVaults } from '#/hooks/useVaults.ts'
+import { usePositions } from '#/hooks/usePositions.ts'
 import { useWebSocket } from '#/hooks/useWebSocket.ts'
 import { useFlow } from '#/hooks/useFlow.ts'
 import { useWalletContext } from '#/contexts/WalletContext.tsx'
-import { mockPositions } from '#/data/mock.ts'
+import { useOptionsContext } from '#/contexts/OptionsContext.tsx'
+import { isOptionsModeEnabled } from '#/config/optionsMode.ts'
 
 interface StreamLayoutProps {
   streamTitle: string
   category: string
   totalPooled: number
+  streamId: string
 }
 
-export function StreamLayout({ streamTitle, category, totalPooled }: StreamLayoutProps) {
-  const vaults = useVaults()
+export function StreamLayout({ streamTitle, category, totalPooled, streamId }: StreamLayoutProps) {
+  const vaults = useVaults(streamId)
+  const positions = usePositions(streamId)
   const { frame, events } = useWebSocket()
   const { legacyWallet } = useWalletContext()
   const { flow, stake, unstake, claimDividends, claiming } = useFlow()
+  const { fundStream, isConnected: optionsConnected } = useOptionsContext()
+  const optionsEnabled = isOptionsModeEnabled()
   const { notifications, push, dismiss } = useWinNotifications()
   const [selectedVaultId, setSelectedVaultId] = useState<string | null>(null)
 
@@ -34,12 +40,27 @@ export function StreamLayout({ streamTitle, category, totalPooled }: StreamLayou
     setSelectedVaultId(prev => prev === vaultId ? null : vaultId)
   }, [])
 
-  const handleStream = useCallback((vaultId: string, side: 'yes' | 'no', rate: number) => {
-    // mock commit — Tier 2 swaps this for options writer.fund(vaultId, side, rate)
+  const handleStream = useCallback(async (vaultId: string, side: 'yes' | 'no', rate: number) => {
     const vault = vaults.find(v => v.id === vaultId)
-    push({ type: 'stream', rate, side, option: vault?.option ?? vaultId })
+
+    if (optionsEnabled && optionsConnected) {
+      try {
+        const txId = await fundStream(vaultId, side, rate)
+        push({ type: 'stream', rate, side, option: `${vault?.option ?? vaultId} · ${txId.slice(0, 10)}…` })
+      } catch (err) {
+        push({
+          type: 'stream',
+          rate,
+          side,
+          option: err instanceof Error ? err.message : 'Fund failed',
+        })
+      }
+    } else {
+      push({ type: 'stream', rate, side, option: vault?.option ?? vaultId })
+    }
+
     setSelectedVaultId(null)
-  }, [vaults, push])
+  }, [vaults, push, optionsEnabled, optionsConnected, fundStream])
 
   return (
     <div style={{
@@ -101,7 +122,7 @@ export function StreamLayout({ streamTitle, category, totalPooled }: StreamLayou
 
         {/* RIGHT — Predictions (40%) */}
         <div className="stream-predictions-pane" style={{ flex: '2 1 40%', minWidth: 0, display: 'flex', flexDirection: 'column', background: 'rgba(7,7,15,0.98)', overflow: 'hidden' }}>
-          <VaultList vaults={vaults} events={events} positions={mockPositions} selectedVaultId={selectedVaultId} onDismissVault={() => setSelectedVaultId(null)} onStream={handleStream} />
+          <VaultList vaults={vaults} events={events} positions={positions} selectedVaultId={selectedVaultId} onDismissVault={() => setSelectedVaultId(null)} onStream={handleStream} />
         </div>
       </div>
 

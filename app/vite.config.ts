@@ -110,7 +110,7 @@ const config = defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['@livestreak/wallet'],
+    include: ['@livestreak/options'],
   },
   plugins: [
     nodePolyfillShimResolver(),
