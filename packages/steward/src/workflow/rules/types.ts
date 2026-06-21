@@ -1,4 +1,4 @@
-import type { StewardFindingKind, StewardFindingSeverity } from "../model/finding.js";
+import type { StewardFindingKind, StewardFindingSeverity } from "../../model/finding.js";
 
 // --- exports ---
 

@@ -1,5 +1,5 @@
-import type { StewardDecision } from "../model/decision.js";
-import type { StewardFinding } from "../model/finding.js";
+import type { StewardDecision } from "../../model/decision.js";
+import type { StewardFinding } from "../../model/finding.js";
 import type { StewardDecisionMapping, StewardDecisionPolicy } from "./types.js";
 
 // --- exports ---

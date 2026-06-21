@@ -2,8 +2,8 @@ import type {
   StewardActionPlan,
   StewardContractCall,
   StewardHostAction
-} from "../model/action-plan.js";
-import type { StewardDecision } from "../model/decision.js";
+} from "../../model/action-plan.js";
+import type { StewardDecision } from "../../model/decision.js";
 import type { StewardActionContext } from "./types.js";
 
 // --- exports ---

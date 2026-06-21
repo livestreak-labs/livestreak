@@ -1,6 +1,6 @@
 import type { StewardFact } from "../facts/fact.js";
-import type { StewardFinding } from "../model/finding.js";
-import type { StewardSubject } from "../model/subject.js";
+import type { StewardFinding } from "../../model/finding.js";
+import type { StewardSubject } from "../../model/subject.js";
 import type { StewardRuleCondition, StewardRuleset } from "./types.js";
 
 // --- exports ---

@@ -1,4 +1,4 @@
-import type { StewardSubject } from "../model/subject.js";
+import type { StewardSubject } from "../../model/subject.js";
 import type { TeeAttestationRef } from "./tee.js";
 
 // --- exports ---

@@ -2,7 +2,7 @@ import type { StewardActionPlan } from "../model/action-plan.js";
 import type { StewardDecision } from "../model/decision.js";
 import type { StewardFinding } from "../model/finding.js";
 import type { StewardSubject } from "../model/subject.js";
-import type { StewardStateSnapshot } from "../panel/types.js";
+import type { StewardStateSnapshot } from "../bridge/panel/types.js";
 
 // --- exports ---
 
@@ -28,14 +28,15 @@ export const createStewardRuntimeStore = (runtimeId: string): StewardRuntimeStor
 // --- helpers ---
 
 class StewardRuntimeStoreInMemory implements StewardRuntimeStore {
+  private revision = 0;
   private snapshot: StewardStateSnapshot;
 
   constructor(private readonly runtimeId: string) {
     this.snapshot = {
       runtimeId,
+      revision: 0,
       watchedSubjects: [],
-      latestFindings: [],
-      completedActionPlans: []
+      latestFindings: []
     };
   }
 
@@ -49,8 +50,7 @@ class StewardRuntimeStoreInMemory implements StewardRuntimeStore {
         : { latestDecisions: [...this.snapshot.latestDecisions] }),
       ...(this.snapshot.pendingActionPlans === undefined
         ? {}
-        : { pendingActionPlans: [...this.snapshot.pendingActionPlans] }),
-      completedActionPlans: [...(this.snapshot.completedActionPlans ?? [])]
+        : { pendingActionPlans: [...this.snapshot.pendingActionPlans] })
     };
   }
 
@@ -60,22 +60,39 @@ class StewardRuntimeStoreInMemory implements StewardRuntimeStore {
     readonly latestDecisions: readonly StewardDecision[];
     readonly pendingActionPlans: readonly StewardActionPlan[];
   }): void {
+    this.revision += 1;
     this.snapshot = {
       runtimeId: this.runtimeId,
+      revision: this.revision,
       watchedSubjects: [...input.watchedSubjects],
       latestFindings: [...input.latestFindings],
       latestDecisions: [...input.latestDecisions],
       pendingActionPlans: [...input.pendingActionPlans],
-      completedActionPlans: [...(this.snapshot.completedActionPlans ?? [])],
-      updatedAtMs: Date.now(),
-      ...(this.snapshot.lastError === undefined ? {} : { lastError: this.snapshot.lastError })
+      updatedAtMs: Date.now()
     };
   }
 
   setLastError(error: StewardRuntimeLastError | undefined): void {
+    if (error === undefined) {
+      if (this.snapshot.lastError === undefined) {
+        return;
+      }
+
+      this.revision += 1;
+      const { lastError: _removed, ...rest } = this.snapshot;
+      this.snapshot = {
+        ...rest,
+        revision: this.revision,
+        updatedAtMs: Date.now()
+      };
+      return;
+    }
+
+    this.revision += 1;
     this.snapshot = {
       ...this.snapshot,
-      ...(error === undefined ? {} : { lastError: error.details ?? error.message }),
+      revision: this.revision,
+      lastError: error.details ?? error.message,
       updatedAtMs: Date.now()
     };
   }
