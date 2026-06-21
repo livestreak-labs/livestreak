@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { encodeCreateVaultCall, sideToSeedEnum } from "../src/edges/vault.js";
+import { encodeCreateVaultCall, sideToSeedEnum } from "../src/adapters/onchain.js";
 import { encodeFunctionData } from "viem";
 import { vaultDriverAbi } from "@livestreak/contracts/evm/abis";
 

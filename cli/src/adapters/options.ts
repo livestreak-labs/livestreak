@@ -13,7 +13,7 @@ import {
   type UserAddress
 } from "@livestreak/options";
 import type { WalletInit } from "@livestreak/schema";
-import { optionsOperatorCaller } from "../gateway/options-caller.js";
+import { localOperatorCaller } from "../gateway/caller.js";
 import type { LivestreakInitDoc } from "../prefs/init-doc.js";
 
 export interface CreateOptionsEdgeInput {
@@ -69,7 +69,7 @@ export const createOptionsEdge = (input: CreateOptionsEdgeInput): OptionsEdge =>
   });
 
   const bridge = createOptionsBridge({ runtime });
-  const caller = optionsOperatorCaller();
+  const caller = localOperatorCaller();
 
   return {
     runtime,

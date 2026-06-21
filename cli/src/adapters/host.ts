@@ -1,4 +1,5 @@
 import type {
+  AaCapabilityDescriptor,
   ContentPersistence,
   HostProviderDescriptor,
   StorePointer
@@ -7,6 +8,7 @@ import type {
 export interface HostClient {
   readonly baseUrl: string;
   getDescriptor(): Promise<HostProviderDescriptor>;
+  getAaDescriptor(): Promise<AaCapabilityDescriptor>;
   health(): Promise<{ ok: boolean }>;
   uploadBlob(
     bytes: Uint8Array,
@@ -39,6 +41,8 @@ export const createHostClient = (
     baseUrl: normalized,
 
     getDescriptor: () => requestJson<HostProviderDescriptor>("/descriptor"),
+
+    getAaDescriptor: () => requestJson<AaCapabilityDescriptor>("/aa/descriptor"),
 
     health: async () => {
       const result = await requestJson<{ status?: string }>("/health");

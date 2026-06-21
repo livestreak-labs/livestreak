@@ -11,11 +11,9 @@ import {
   type UnstakeLvstInput,
   type WithdrawInput
 } from "@livestreak/options";
-import { ensureErc20Approval } from "../chains/evm-tx.js";
-import { resolveOperatorContext } from "./context.js";
-import { createOptionsEdge } from "../edges/options.js";
-import { operatorCreateVault } from "../edges/vault.js";
-import { routeClaimAction } from "./claim-routing.js";
+import { ensureErc20Approval } from "../adapters/onchain.js";
+import { resolveOperatorContext } from "../gateway/operator.js";
+import { createOptionsEdge } from "../adapters/options.js";
 import {
   configOpt,
   marketOpt,
@@ -25,12 +23,14 @@ import {
   readCommandConfig,
   resolveTokenArg,
   tokenOpt
-} from "./cli-args.js";
+} from "./args.js";
 import {
   renderOptionsBoard,
-  renderTxResult,
-  renderVaultCreateResult
+  renderTxResult
 } from "../render/output.js";
+
+export const routeClaimAction = (loss: boolean): "withdraw" | "claimLossLvst" =>
+  loss ? "claimLossLvst" : "withdraw";
 
 export const runVaults = async (input: {
   readonly configPath?: string;
@@ -50,40 +50,6 @@ export const runVaults = async (input: {
   await edge.refresh();
   const board = await edge.readBoard();
   return renderOptionsBoard(board);
-};
-
-export const runVaultCreate = async (input: {
-  readonly configPath?: string;
-  readonly password?: string;
-  readonly marketId: string;
-  readonly question: string;
-  readonly side: string;
-  readonly rate: string;
-  readonly deposit: string;
-}): Promise<string> => {
-  const ctx = await resolveOperatorContext(input);
-  const side = validateOptionsVaultSide(input.side);
-  const usdc = await createOptionsEdge({
-    doc: ctx.doc,
-    walletInit: ctx.walletInit,
-    seed: ctx.seed,
-    userAddress: ctx.userAddress,
-    marketId: asMarketId(input.marketId)
-  }).chain.reader.readUsdcAddress();
-
-  const result = await operatorCreateVault({
-    account: ctx.account,
-    publicClient: ctx.publicClient,
-    vaultDriverAddress: ctx.doc.options.vaultDriver,
-    usdcAddress: usdc,
-    marketId: asMarketId(input.marketId),
-    question: input.question,
-    side,
-    rate: parseBigIntArg(input.rate, "rate"),
-    deposit: parseBigIntArg(input.deposit, "deposit")
-  });
-
-  return renderVaultCreateResult(result);
 };
 
 export const runFund = async (input: {
@@ -232,36 +198,6 @@ export const vaultsCommand = Command.make(
     }).pipe(Effect.flatMap((output) => Console.log(output)))
 );
 
-const vaultCreateCommand = Command.make(
-  "create",
-  {
-    market: Options.text("market"),
-    question: Options.text("question"),
-    side: Options.text("side"),
-    rate: Options.text("rate"),
-    deposit: Options.text("deposit"),
-    config: configOpt,
-    password: passwordOpt
-  },
-  ({ market, question, side, rate, deposit, config, password }) =>
-    Effect.tryPromise({
-      try: () =>
-        runVaultCreate({
-          marketId: market,
-          question,
-          side,
-          rate,
-          deposit,
-          ...readCommandConfig(config, password)
-        }),
-      catch: (error) => (error instanceof Error ? error : new Error(String(error)))
-    }).pipe(Effect.flatMap((output) => Console.log(output)))
-);
-
-export const vaultCommand = Command.make("vault", {}).pipe(
-  Command.withSubcommands([vaultCreateCommand])
-);
-
 export const fundCommand = Command.make(
   "fund",
   {
@@ -354,9 +290,8 @@ export const dividendsCommand = Command.make(
     }).pipe(Effect.flatMap((output) => Console.log(output)))
 );
 
-export const optionsCommands = [
+export const vaultConsumerCommands = [
   vaultsCommand,
-  vaultCommand,
   fundCommand,
   claimCommand,
   stakeCommand,

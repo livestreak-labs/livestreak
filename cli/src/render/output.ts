@@ -1,5 +1,4 @@
-import type { OnChainStreamState } from "../edges/market.js";
-import type { OperatorCreateVaultResult } from "../edges/vault.js";
+import type { OnChainStreamState, OperatorCreateVaultResult } from "../adapters/onchain.js";
 import type { OptionsBoard } from "@livestreak/options";
 
 export interface NftMintRenderInput {
