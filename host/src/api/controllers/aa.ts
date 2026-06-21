@@ -1,9 +1,12 @@
-import type { AaCapabilityDescriptor } from "@livestreak/host";
+import type { AaCapabilityDescriptor, SuiSponsorshipDescriptor } from "@livestreak/host";
 import type { AaChainConfig } from "../../services/aa/chains.js";
 import type { Hex } from "viem";
 import type { AaRouteDeps } from "../../deps.js";
 import { proxyBundlerRpc } from "../../services/aa/bundler.js";
 import type { PackedUserOp } from "../../services/aa/paymaster.js";
+import { handleSuiSponsor } from "../../services/aa/sui-sponsor.js";
+import { sendRouteResult } from "../middleware/respond.js";
+import type { NextFunction, Request, Response } from "express";
 
 // --- exports ---
 
@@ -68,6 +71,26 @@ export const createAaController = (deps: AaRouteDeps) => ({
     } catch (error) {
       res.status(500).json(jsonRpcError(-32000, `Paymaster error: ${String(error)}`, id));
     }
+  },
+
+  suiSponsor: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (!deps.suiGasStation.configured) {
+      res.status(503).json({
+        error: {
+          message: "Sui gas station is not configured",
+          metadata: { retryable: false }
+        }
+      });
+      return;
+    }
+
+    sendRouteResult(
+      res,
+      await handleSuiSponsor(req.body, {
+        sponsor: (input) => deps.suiGasStation.sponsor(input)
+      }),
+      next
+    );
   }
 });
 
@@ -84,8 +107,24 @@ const buildAaDescriptor = (deps: AaRouteDeps): AaCapabilityDescriptor => ({
     safeModule: chain.safeModule,
     bundlerPath: `/aa/bundler/${chain.routeKey}`,
     rpcUrl: chain.rpcUrl
-  }))
+  })),
+  ...(buildSuiSponsorshipDescriptor(deps) === undefined
+    ? {}
+    : { suiSponsorship: buildSuiSponsorshipDescriptor(deps) })
 });
+
+const buildSuiSponsorshipDescriptor = (deps: AaRouteDeps): SuiSponsorshipDescriptor | undefined => {
+  if (!deps.suiGasStation.configured || !deps.suiGasStation.advertise) {
+    return undefined;
+  }
+
+  return {
+    gasStationPath: deps.suiGasStation.gasStationPath,
+    ...(deps.suiGasStation.sponsorAddress === null
+      ? {}
+      : { sponsorAddress: deps.suiGasStation.sponsorAddress })
+  };
+};
 
 interface JsonRpcRequestBody {
   readonly jsonrpc?: string;

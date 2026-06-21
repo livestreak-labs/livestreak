@@ -1,7 +1,7 @@
 import express, { type Express } from "express";
 import { bootstrapAaFromConfig, readAaServerConfig } from "./services/aa/chains.js";
 import { bootstrapHostServerConfig, defaultHostServerConfig, isModuleEnabled } from "./config/host.js";
-import { createHostRouteDeps, type HostRouteDeps } from "./deps.js";
+import { bootstrapHostRouteDeps, createHostRouteDeps, type HostRouteDeps } from "./deps.js";
 import {
   errorHandler,
   malformedJsonHandler,
@@ -16,7 +16,7 @@ import { createMemoryRouter } from "./api/routes/memory.js";
 
 // --- exports ---
 
-export { createHostRouteDeps, type HostRouteDeps } from "./deps.js";
+export { createHostRouteDeps, bootstrapHostRouteDeps, type HostRouteDeps } from "./deps.js";
 export { bootstrapHostServerConfig } from "./config/host.js";
 
 export const createApp = (deps: HostRouteDeps): Express => {
@@ -63,7 +63,7 @@ export const bootstrapHostServer = async (
   const resolved = await bootstrapHostServerConfig(config);
   const aa = readAaServerConfig(resolved);
   await bootstrapAaFromConfig(aa);
-  const deps = createHostRouteDeps(resolved);
+  const deps = await bootstrapHostRouteDeps(resolved);
   const app = createApp(deps);
   return { config: resolved, deps, app };
 };

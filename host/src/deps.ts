@@ -1,6 +1,13 @@
+import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
+import type { SuiGasCoinRef } from "@livestreak/wallet";
 import { defaultHostServerConfig, type HostServerConfig } from "./config/host.js";
 import { readAaServerConfig, buildPaymasterSigners, type AaServerConfig } from "./services/aa/chains.js";
 import type { PaymasterSigner } from "./services/aa/paymaster.js";
+import {
+  createSuiGasStation,
+  type SuiGasStationService
+} from "./services/aa/sui-gas-station.js";
+import { readSuiGasStationRuntimeConfig } from "./services/aa/sui-sponsor.js";
 import { createDiscoveryStore } from "./services/discovery.js";
 import { createEvidenceStore } from "./services/media/evidence.js";
 import { createManifestStore } from "./services/media/manifest.js";
@@ -17,10 +24,14 @@ export interface AaRouteDeps {
   readonly config: HostServerConfig;
   readonly aa: AaServerConfig;
   readonly paymasterSigners: Map<string, PaymasterSigner>;
+  readonly suiGasStation: SuiGasStationService;
 }
 
 export interface CreateAaRouteDepsOptions {
   readonly paymasterSigners?: Map<string, PaymasterSigner>;
+  readonly suiGasStation?: SuiGasStationService;
+  readonly suiClient?: SuiJsonRpcClient;
+  readonly suiInitialCoins?: readonly SuiGasCoinRef[];
 }
 
 export const createAaRouteDeps = (
@@ -29,8 +40,51 @@ export const createAaRouteDeps = (
 ): AaRouteDeps => ({
   config,
   aa: readAaServerConfig(config),
-  paymasterSigners: options.paymasterSigners ?? buildPaymasterSigners(readAaServerConfig(config))
+  paymasterSigners: options.paymasterSigners ?? buildPaymasterSigners(readAaServerConfig(config)),
+  suiGasStation: options.suiGasStation ?? createSuiGasStation({ config: null })
 });
+
+export const bootstrapAaRouteDeps = async (
+  config: HostServerConfig,
+  options: CreateAaRouteDepsOptions = {}
+): Promise<AaRouteDeps> => {
+  const suiGasStation = await buildSuiGasStation(config, options);
+  const deps = createAaRouteDeps(config, { ...options, suiGasStation });
+
+  if (deps.suiGasStation.configured) {
+    try {
+      await deps.suiGasStation.bootstrap();
+    } catch (error) {
+      console.warn(`[aa]: Sui gas station bootstrap skipped: ${String(error)}`);
+    }
+  }
+
+  return deps;
+};
+
+export const bootstrapHostRouteDeps = async (
+  config: HostServerConfig = defaultHostServerConfig(),
+  options: CreateHostRouteDepsOptions = {}
+): Promise<HostRouteDeps> => {
+  const aa = await bootstrapAaRouteDeps(config, options);
+  const resolved = options.walrusResolved ?? config.resolvedWalrus;
+  const ops = options.memoryOps ?? createMemWalAccountOperations();
+  const walrus = buildWalrusDeps(config, resolved, ops);
+
+  return {
+    config,
+    media: {
+      sessions: createSessionStore(),
+      manifests: createManifestStore(),
+      evidence: createEvidenceStore(config.cacheQuotaBytes)
+    },
+    discovery: {
+      store: createDiscoveryStore()
+    },
+    walrus,
+    aa
+  };
+};
 
 export interface HostRouteDeps {
   readonly config: HostServerConfig;
@@ -93,6 +147,30 @@ export const createHostRouteDeps = (
 
 // --- helpers ---
 
+const buildSuiGasStation = async (
+  config: HostServerConfig,
+  options: CreateAaRouteDepsOptions
+): Promise<SuiGasStationService> => {
+  if (options.suiGasStation !== undefined) {
+    return options.suiGasStation;
+  }
+
+  const runtime = await readSuiGasStationRuntimeConfig(config).catch(() => null);
+  if (runtime === null) {
+    return createSuiGasStation({ config: null });
+  }
+
+  const client = options.suiClient ?? new SuiJsonRpcClient({
+    url: runtime.rpcUrl,
+    network: readSuiNetwork()
+  });
+  return createSuiGasStation({
+    config: runtime,
+    client,
+    ...(options.suiInitialCoins === undefined ? {} : { initialCoins: options.suiInitialCoins })
+  });
+};
+
 const buildWalrusDeps = (
   config: HostServerConfig,
   resolved: ResolvedWalrus | null,
@@ -139,4 +217,13 @@ const buildWalrusDeps = (
       })
     }
   };
+};
+
+const readSuiNetwork = (): "mainnet" | "testnet" | "devnet" | "localnet" => {
+  const value = process.env.LIVESTREAK_SUI_NETWORK ?? process.env.SUI_NETWORK ?? "localnet";
+  if (value === "mainnet" || value === "testnet" || value === "devnet" || value === "localnet") {
+    return value;
+  }
+
+  return "localnet";
 };
