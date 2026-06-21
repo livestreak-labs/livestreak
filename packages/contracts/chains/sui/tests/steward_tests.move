@@ -248,3 +248,45 @@ fun test_set_market_steward_requires_registration() {
     clock::destroy_for_testing(clock);
     ts::end(scenario);
 }
+
+// ─── Gap 3: steward_registry::hot_reason_hash ────────────────────────────────
+
+/// hot_reason_hash accessor returns exactly the bytes supplied to trigger_hot.
+#[test]
+fun test_hot_reason_hash_accessor() {
+    let mut scenario = ts::begin(wire::admin());
+    let mut clock = wire::new_clock(&mut scenario, wire::admin(), wire::start_secs());
+    let (_, vault_m) = setup_steward_fixture(&mut scenario, &clock);
+    let expected_hash = b"0xdeadbeef";
+
+    ts::next_tx(&mut scenario, wire::steward_a());
+    {
+        let mut steward_reg = ts::take_shared<StewardRegistry>(&scenario);
+        let vault_registry = ts::take_shared<VaultRegistry<TEST_USDC>>(&scenario);
+        let ctx = ts::ctx(&mut scenario);
+        steward_registry::trigger_hot(
+            &mut steward_reg,
+            &vault_registry,
+            vault_m,
+            1,
+            wire::start_secs() + 3600,
+            expected_hash,
+            ctx,
+        );
+        ts::return_shared(steward_reg);
+        ts::return_shared(vault_registry);
+    };
+
+    ts::next_tx(&mut scenario, wire::admin());
+    {
+        let steward_reg = ts::take_shared<StewardRegistry>(&scenario);
+        let hot_opt = steward_registry::hot_state(&steward_reg, &vault_m);
+        assert!(option::is_some(&hot_opt), 0);
+        let state = option::borrow(&hot_opt);
+        assert!(steward_registry::hot_reason_hash(state) == expected_hash, 1);
+        ts::return_shared(steward_reg);
+    };
+
+    clock::destroy_for_testing(clock);
+    ts::end(scenario);
+}

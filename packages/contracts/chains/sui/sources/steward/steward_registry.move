@@ -125,6 +125,10 @@ public fun hot_severity(state: &HotState): u8 {
     state.severity
 }
 
+public fun hot_reason_hash(state: &HotState): vector<u8> {
+    state.reason_hash
+}
+
 public fun dispute_active(state: &DisputeState): bool {
     state.active
 }
