@@ -55,9 +55,18 @@ See [architecture.md](./architecture.md) and [flow.md](./flow.md).
 
 ---
 
+## Slice 5 — createVault retry-safety + cross-runtime doc
+
+- [x] `confirmCreateVault(userOpHash)` on `BookmakerChainWriter` (EVM + fake + Sui stub)
+- [x] Receipt-timeout carries `userOpHash`; idempotency store tracks pending hashes
+- [x] `createVaultOnce` never blind-resubmits a pending key — confirm first
+- [x] Tests: timeout+recover, pending-then-pending, pre-hash retry, concurrency
+- [x] `docs/flow.md` cross-runtime limitation documented
+
+---
+
 ## Follow-ups
 
-- [ ] **Residual:** receipt poll timeout after on-chain inclusion — re-check userOp receipt before retry send
 - [ ] **UNHANDLED:** insufficient USDC balance preflight
 - [ ] **UNHANDLED:** unknown market on-chain gate in `originateVault`
 - [ ] Richer host discovery HTTP error mapping

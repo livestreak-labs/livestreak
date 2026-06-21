@@ -1,3 +1,5 @@
+// --- exports ---
+
 export type { ValidationFailure, ValidationResult, ValidationSuccess } from "./result.js";
 export { validationFailure, validationSuccess } from "./result.js";
 export { validateBookmakerDecision } from "./decision.js";

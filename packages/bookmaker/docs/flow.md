@@ -43,11 +43,11 @@ observation events
 | Decision | Cross-market similarity result | Yes — skip `market_mismatch` |
 | Decision | Steward warnings | Yes — skip |
 | Execute | Retry / replay / concurrent duplicate create | Yes — `runtime.createVaultOnce` + shared `idempotencyStore` (originate + bridge) |
+| Execute | UserOp included but receipt poll times out | Yes — pending `userOpHash` recorded; retry calls `confirmCreateVault` (never blind-resubmit) |
 | Execute | Unknown `marketId` on-chain | **UNHANDLED** — reverts at `VaultDriver.createVault` |
 | Execute | Insufficient USDC balance | **UNHANDLED** — ERC20 transfer reverts |
 | Execute | Insufficient allowance | Partial — writer auto-approves up to deposit |
-| Execute | UserOp send / paymaster failure | Partial — classified `LiveStreakRuntimeError`; key released |
-| Execute | UserOp included but receipt poll times out | **Residual risk** — reported as failure, key released; retry may double-create unless receipt is re-checked for the recorded userOp hash before re-sending |
+| Execute | UserOp send / paymaster failure | Partial — classified `LiveStreakRuntimeError`; key released when no hash |
 | Execute | Receipt missing `VaultCreated` | Yes — `LiveStreakRuntimeError` |
 | Execute | Sui chain | Yes — stub throws `LiveStreakConfigError` |
 | Bridge | Missing scope | Yes — `LiveStreakCapabilityError` |
@@ -58,8 +58,8 @@ observation events
 
 ## Idempotency layers
 
-1. **Within-runtime (deterministic):** `idempotencyKeyFromDraft` / `idempotencyKeyFromCreateIntent` hash vault-defining fields. `BookmakerRuntime.createVaultOnce` validates intent, computes key, runs `idempotencyStore.run(key, exec)` — the only path to `chain.writer.createVault`. Originate passes `guardedCreateVault: runtime.createVaultOnce`; bridge `callAction("createVault")` calls the same method.
-2. **Cross-runtime (best-effort):** host similarity candidates may carry `vaultKey`; exact match → `joinVault` before fuzzy scoring.
+1. **Within-runtime (deterministic):** `idempotencyKeyFromDraft` / `idempotencyKeyFromCreateIntent` hash vault-defining fields. `BookmakerRuntime.createVaultOnce` validates intent, computes key, and enforces at-most-one submit per key: settled → cached; pending `userOpHash` → `confirmCreateVault` (never blind-resubmit); new → `createVault`. Receipt-timeout records the hash as pending. Originate passes `guardedCreateVault: runtime.createVaultOnce`; bridge `callAction("createVault")` calls the same method.
+2. **Cross-runtime (best-effort, v0 single-runtime):** host similarity candidates may carry `vaultKey`; exact match → `joinVault` before fuzzy scoring. v0 assumes one bookmaker runtime per `marketId`. Concurrent creation across separate runtimes is **not** fully closable off-chain — on-chain `vaultId` is non-deterministic (no vaultKey uniqueness constraint); a durable fix would require on-chain enforcement (future concern, not a v0 gap).
 
 ## Multichain layout
 

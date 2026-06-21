@@ -4,10 +4,13 @@ import { LiveStreakConfigError, LiveStreakRuntimeError } from "@livestreak/core"
 import { createWalletManager, type EvmErc4337WalletConfig } from "@livestreak/wallet";
 import { encodeFunctionData, type Abi } from "viem";
 
+import { receiptTimeoutError } from "../create-vault-recovery.js";
 import type {
   BookmakerChainConfig,
   BookmakerChainWriter,
-  CreateVaultInput
+  CreateVaultInput,
+  CreateVaultResult,
+  TxId
 } from "../types.js";
 import { asTxId } from "../types.js";
 import { DEFAULT_ABIS } from "./abis.js";
@@ -30,6 +33,12 @@ export const createEvmBookmakerWriter = (config: BookmakerChainConfig): Bookmake
   const evmConfig = config.walletInit.config as EvmErc4337WalletConfig;
   const addresses = validateBookmakerContractAddresses(config.addresses);
   const abis = DEFAULT_ABIS;
+
+  const openReadOnlyAccount = async (): Promise<ReadOnlyAccount> => {
+    const manager = createWalletManager("evm", config.seed, evmConfig);
+    const account = await manager.getAccount();
+    return account.toReadOnlyAccount();
+  };
 
   return {
     createVault: async (input: CreateVaultInput) => {
@@ -63,17 +72,17 @@ export const createEvmBookmakerWriter = (config: BookmakerChainConfig): Bookmake
 
       await pollUntilUserOperationIncluded(readOnly, sendResult.hash);
 
-      const receipt = await readOnly.getTransactionReceipt(sendResult.hash);
-      if (receipt === null || receipt === undefined) {
+      const resolved = await resolveCreateVaultFromUserOp(readOnly, sendResult.hash);
+      if (resolved === undefined) {
         throw receiptFailure(`Transaction receipt missing for ${sendResult.hash}`);
       }
 
-      const vaultId = parseVaultCreatedFromLogs(receipt.logs);
+      return resolved;
+    },
 
-      return {
-        txId: asTxId(sendResult.hash),
-        vaultId
-      };
+    confirmCreateVault: async (userOpHash: TxId) => {
+      const readOnly = await openReadOnlyAccount();
+      return resolveCreateVaultFromUserOp(readOnly, userOpHash);
     }
   };
 };
@@ -94,6 +103,31 @@ type WritableAccount = {
     readonly value: bigint;
   }) => Promise<{ hash: string }>;
   readonly toReadOnlyAccount: () => Promise<ReadOnlyAccount>;
+};
+
+const resolveCreateVaultFromUserOp = async (
+  readOnly: ReadOnlyAccount,
+  userOpHash: string
+): Promise<CreateVaultResult | undefined> => {
+  const userOpReceipt = await readOnly.getUserOperationReceipt(userOpHash);
+
+  if (userOpReceipt === null || userOpReceipt === undefined) {
+    return undefined;
+  }
+
+  assertUserOperationSucceeded(userOpReceipt);
+
+  const receipt = await readOnly.getTransactionReceipt(userOpHash);
+  if (receipt === null || receipt === undefined) {
+    return undefined;
+  }
+
+  const vaultId = parseVaultCreatedFromLogs(receipt.logs);
+
+  return {
+    txId: asTxId(userOpHash),
+    vaultId
+  };
 };
 
 const ensureUsdcAllowance = async (
@@ -146,7 +180,7 @@ const pollUntilUserOperationIncluded = async (
     await sleep(delayMs);
   }
 
-  throw receiptFailure(`Timed out waiting for UserOperation receipt for ${userOpHash}`);
+  throw receiptTimeoutError(userOpHash);
 };
 
 const assertUserOperationSucceeded = (receipt: unknown): void => {

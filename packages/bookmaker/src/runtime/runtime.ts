@@ -45,6 +45,7 @@ class BookmakerRuntimeFacade implements BookmakerRuntime {
   readonly idempotencyStore: IdempotencyStore;
   private readonly store: BookmakerRuntimeStore;
   private readonly subscriptions = createSnapshotSubscriptionRegistry();
+  // Open per-runtime scratch space for bridge/edge callers — not vault idempotency state.
   private readonly memory = new Map<string, unknown>();
   private readonly memoryWatchers = new Map<string, Set<(value: unknown) => void>>();
 
