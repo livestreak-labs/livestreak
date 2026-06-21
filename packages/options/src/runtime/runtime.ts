@@ -13,6 +13,7 @@ import {
   type OptionsAccrualPreview,
   type PreviewAccrualInput
 } from "../model/math/accrual.js";
+import type { FundStreamInput, TxId } from "../chains/types.js";
 import type { OptionsStreamState } from "../model/stream.js";
 import { projectOptionsPanel } from "../bridge/panel/project.js";
 import type { OptionsPanel } from "../bridge/panel/types.js";
@@ -42,6 +43,7 @@ export interface OptionsRuntime {
   readPnl: (investedUSDC?: bigint) => Promise<OptionsSessionPnlView>;
   readStreamState: (marketId: MarketId) => Promise<OptionsStreamState>;
   previewAccrual: (input: PreviewAccrualInput) => Promise<OptionsAccrualPreview>;
+  fundStream: (input: FundStreamInput) => Promise<TxId>;
   refresh: () => Promise<OptionsRuntimeState>;
   refreshMarket: (marketId: MarketId) => Promise<OptionsRuntimeState>;
   refreshVault: (vaultId: VaultId) => Promise<OptionsRuntimeState>;
@@ -61,6 +63,7 @@ export const createOptionsRuntime = (input: OptionsRuntimeInput): OptionsRuntime
 class OptionsRuntimeFacade implements OptionsRuntime {
   readonly config: OptionsRuntimeConfig;
   readonly chain: OptionsChain;
+  private readonly autoAdvanceOverflow: boolean;
   private readonly store: OptionsRuntimeStore;
   private readonly boardSubscriptions = createBoardSubscriptionRegistry();
   private readonly listeners = new Set<(state: OptionsRuntimeState) => void>();
@@ -72,6 +75,7 @@ class OptionsRuntimeFacade implements OptionsRuntime {
     this.config = validateOptionsRuntimeConfig(input.config);
     this.store = createOptionsRuntimeStore(this.config.runtimeId);
     this.chain = input.chain ?? createOptionsChain(input.chainConfig);
+    this.autoAdvanceOverflow = input.chainConfig.autoAdvanceOverflow === true;
   }
 
   readSnapshot(): OptionsRuntimeState {
@@ -115,6 +119,33 @@ class OptionsRuntimeFacade implements OptionsRuntime {
       horizonSec: input.horizonSec,
       resolvedAtMs: vault.timing.resolvedAtMs
     });
+  }
+
+  async fundStream(input: FundStreamInput): Promise<TxId> {
+    const { reader, writer } = this.chain;
+
+    if (this.autoAdvanceOverflow !== true) {
+      return writer.fund(input);
+    }
+
+    const pending = await reader.readPendingBoundaries(input.vaultId, input.side);
+
+    if (pending <= 64n) {
+      return writer.fund(input);
+    }
+
+    // Rare backlog: drain (pending/64 - 1) full advance rounds before fund; cap loop count.
+    let pre = (pending + 63n) / 64n - 1n;
+    const MAX_PRE = 64n;
+    if (pre > MAX_PRE) {
+      pre = MAX_PRE;
+    }
+
+    for (let index = 0n; index < pre; index += 1n) {
+      await writer.advance({ vaultId: input.vaultId, side: input.side });
+    }
+
+    return writer.fund(input);
   }
 
   async refresh(): Promise<OptionsRuntimeState> {

@@ -578,6 +578,100 @@ describe("options bridge", () => {
   });
 });
 
+describe("autoAdvanceOverflow fund path", () => {
+  const fundArgs = {
+    tokenId: asTokenId(1n),
+    vaultId: asVaultId("vault_01"),
+    side: "yes" as const,
+    rate: 10_000n,
+    deposit: 1_000_000n
+  };
+
+  const overflowRuntime = (input: {
+    readonly autoAdvance?: boolean;
+    readonly pending?: bigint;
+  }) => {
+    const writer = createFakeChainWriter();
+    const rt = createOptionsRuntime({
+      config: {
+        runtimeId: "bridge_overflow",
+        user: fixtureUser(),
+        marketIds: [asMarketId("market_01")]
+      },
+      chainConfig: {
+        ...createFakeChainConfig(fixtureSeed()),
+        ...(input.autoAdvance === true ? { autoAdvanceOverflow: true } : {})
+      },
+      chain: {
+        reader: createFakeOptionsReader({
+          ...fixtureSeed(),
+          pendingBoundaries:
+            input.pending === undefined
+              ? {}
+              : { "vault_01:yes": input.pending }
+        }),
+        writer
+      }
+    });
+
+    return { rt, writer, bridge: createOptionsBridge({ runtime: rt }) };
+  };
+
+  it("issues one fund and zero advances when the flag is off", async () => {
+    const { bridge, writer } = overflowRuntime({ pending: 200n });
+
+    await bridge.callAction(grantedCaller, {
+      scope: bridgeActionScope,
+      action: "fund",
+      args: fundArgs
+    });
+
+    expect(writer.requests).toHaveLength(1);
+    expect(writer.requests[0]?.action).toBe("fund");
+  });
+
+  it("issues one fund and zero advances when pending is within one fund tx", async () => {
+    const { bridge, writer } = overflowRuntime({ autoAdvance: true, pending: 64n });
+
+    await bridge.callAction(grantedCaller, {
+      scope: bridgeActionScope,
+      action: "fund",
+      args: fundArgs
+    });
+
+    expect(writer.requests).toHaveLength(1);
+    expect(writer.requests[0]?.action).toBe("fund");
+  });
+
+  it("advances pre-fund rounds when pending exceeds one fund tx", async () => {
+    const { bridge, writer } = overflowRuntime({ autoAdvance: true, pending: 200n });
+
+    await bridge.callAction(grantedCaller, {
+      scope: bridgeActionScope,
+      action: "fund",
+      args: fundArgs
+    });
+
+    expect(writer.requests).toHaveLength(4);
+    expect(writer.requests.slice(0, 3).every((request) => request.action === "advance")).toBe(true);
+    expect(writer.requests[3]?.action).toBe("fund");
+  });
+
+  it("caps pre-fund advances at MAX_PRE", async () => {
+    const { bridge, writer } = overflowRuntime({ autoAdvance: true, pending: 10_000n });
+
+    await bridge.callAction(grantedCaller, {
+      scope: bridgeActionScope,
+      action: "fund",
+      args: fundArgs
+    });
+
+    expect(writer.requests).toHaveLength(65);
+    expect(writer.requests.slice(0, 64).every((request) => request.action === "advance")).toBe(true);
+    expect(writer.requests[64]?.action).toBe("fund");
+  });
+});
+
 function findFunction(
   controls: OptionsControlsView,
   name: string,
