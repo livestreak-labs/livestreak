@@ -13,3 +13,4 @@ export type {
 export { createIdempotencyStore } from "./idempotency.js";
 export type { CreateVaultOnceResult } from "./create-vault-once.js";
 export { createVaultOnce } from "./create-vault-once.js";
+export { validateBookmakerRuntimeConfig } from "./validate.js";

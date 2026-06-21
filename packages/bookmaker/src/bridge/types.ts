@@ -43,7 +43,7 @@ export interface BookmakerBridge {
   readonly readBoard: (
     caller: BridgeCaller,
     nowMs: number
-  ) => Promise<import("../model/panel.js").BookmakerPanelView>;
+  ) => Promise<import("../model/watch-source.js").BookmakerPanelView>;
   readonly readControls: (
     caller: BridgeCaller,
     nowMs: number
@@ -55,7 +55,7 @@ export interface BookmakerBridge {
   ) => Promise<import("../chains/types.js").TxId>;
   readonly subscribeBoard: (
     caller: BridgeCaller,
-    listener: (board: import("../model/panel.js").BookmakerPanelView) => void,
+    listener: (board: import("../model/watch-source.js").BookmakerPanelView) => void,
     nowMs: number
   ) => () => void;
 }

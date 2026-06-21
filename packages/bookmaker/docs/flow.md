@@ -6,10 +6,10 @@ End-to-end vault origination inside `@livestreak/bookmaker`. Bookmaker holds the
 
 ```text
 observation events
-  → detectOpportunity (detection/)
-  → buildVaultDraft (draft/) — derives seedRate = creatorStake / windowSeconds
-  → findSimilar via POST /discovery/find (similarity/)
-  → chooseVaultAction (decision/) — exact vaultKey join + fuzzy policy
+  → detectOpportunity (pipeline/detection/)
+  → buildVaultDraft (pipeline/draft/) — derives seedRate = creatorStake / windowSeconds
+  → findSimilar via POST /discovery/find (pipeline/similarity/)
+  → chooseVaultAction (pipeline/decision/) — exact vaultKey join + fuzzy policy
   → originateVault (flows/) — guardedCreateVault → runtime.createVaultOnce → chains.writer.createVault(intent)
   → VaultCreated event → vaultId
   → runtime.publishSnapshot + bridge panel projection

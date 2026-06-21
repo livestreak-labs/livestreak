@@ -4,7 +4,7 @@ import { LiveStreakRuntimeError } from "@livestreak/core";
 import {
   createVaultUnconfirmedError,
   receiptTimeoutError
-} from "../../src/chains/create-vault-recovery.js";
+} from "../../src/chains/evm/create-vault-recovery.js";
 import { asTxId, asVaultId } from "../../src/chains/types.js";
 import { createVaultOnce } from "../../src/runtime/create-vault-once.js";
 import { createIdempotencyStore } from "../../src/runtime/idempotency.js";

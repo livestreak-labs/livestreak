@@ -1,19 +1,19 @@
 import { LiveStreakConfigError } from "@livestreak/core";
 
 import type { BookmakerMarketContext } from "../model/market-context.js";
-import type { BookmakerDetectionEvaluation } from "../detection/types.js";
-import type { BookmakerVaultPolicy } from "../decision/choose.js";
-import { chooseVaultAction } from "../decision/choose.js";
-import { buildVaultDraft } from "../draft/build.js";
+import type { BookmakerDetectionEvaluation } from "../pipeline/detection/types.js";
+import type { BookmakerVaultPolicy } from "../pipeline/decision/choose.js";
+import { chooseVaultAction } from "../pipeline/decision/choose.js";
+import { buildVaultDraft } from "../pipeline/draft/build.js";
 import type { BookmakerDecision } from "../model/decision.js";
 import type { Detection } from "../model/detection.js";
 import type { VaultDraft } from "../model/vault-draft.js";
 import { buildCreateVaultIntent, type CreateVaultIntent } from "../model/write-intent.js";
 import type { SimilarityResult } from "../model/similarity.js";
-import type { BookmakerSimilarityClient } from "../similarity/client.js";
-import { findSimilar } from "../similarity/find.js";
+import type { BookmakerSimilarityClient } from "../pipeline/similarity/client.js";
+import { findSimilar } from "../pipeline/similarity/find.js";
 import type { CreateVaultOnceResult } from "../runtime/create-vault-once.js";
-import { validateVaultDraftForCreate } from "../validate/vault-draft.js";
+import { validateVaultDraftForCreate } from "../model/validate.js";
 
 // --- exports ---
 

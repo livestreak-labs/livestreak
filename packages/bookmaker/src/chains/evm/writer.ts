@@ -4,7 +4,7 @@ import { LiveStreakConfigError, LiveStreakRuntimeError } from "@livestreak/core"
 import { createWalletManager, type EvmErc4337WalletConfig } from "@livestreak/wallet";
 import { encodeFunctionData, type Abi } from "viem";
 
-import { receiptTimeoutError } from "../create-vault-recovery.js";
+import { receiptTimeoutError } from "./create-vault-recovery.js";
 import type {
   BookmakerChainConfig,
   BookmakerChainWriter,

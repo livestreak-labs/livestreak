@@ -65,6 +65,25 @@ See [architecture.md](./architecture.md) and [flow.md](./flow.md).
 
 ---
 
+## Slice 6 — region barrel alignment
+
+- [x] Region `index.ts` files reordered to match options convention (exports only, no logic)
+
+---
+
+## Slice 7 — observe-style 6-region layout
+
+- [x] Top-level `src/` is exactly: `model`, `pipeline`, `chains`, `flows`, `runtime`, `bridge`, `index.ts`
+- [x] Pipeline stages grouped under `pipeline/` (`observation`, `detection`, `draft`, `similarity`, `decision`)
+- [x] Model validators collapsed to `model/validate.ts`; runtime config validator in `runtime/validate.ts`
+- [x] `BookmakerPanelView` + watch refs live in `model/watch-source.ts`; projection stays in `bridge/panel/`
+- [x] `create-vault-recovery.ts` under `chains/evm/`
+- [x] Tests relocated: `test/model/validate-*.ts`, `test/runtime/validate-runtime-config.test.ts`
+- [x] `docs/architecture.md` + `docs/flow.md` updated
+- [x] 117 tests green; public API membership unchanged
+
+---
+
 ## Follow-ups
 
 - [ ] **UNHANDLED:** insufficient USDC balance preflight

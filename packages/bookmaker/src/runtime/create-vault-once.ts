@@ -3,11 +3,11 @@ import { LiveStreakConfigError } from "@livestreak/core";
 import type { BookmakerChain, CreateVaultResult } from "../chains/types.js";
 import { idempotencyKeyFromCreateIntent } from "../model/idempotency.js";
 import type { CreateVaultIntent } from "../model/write-intent.js";
-import { validateCreateVaultIntent } from "../validate/write-intent.js";
+import { validateCreateVaultIntent } from "../model/validate.js";
 import {
   createVaultUnconfirmedError,
   readReceiptTimeoutUserOpHash
-} from "../chains/create-vault-recovery.js";
+} from "../chains/evm/create-vault-recovery.js";
 import type { IdempotencyStore } from "./idempotency.js";
 
 // --- exports ---

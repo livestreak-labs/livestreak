@@ -4,7 +4,7 @@ import { LiveStreakConfigError } from "@livestreak/core";
 
 import type { TxId } from "../chains/types.js";
 import type { CreateVaultIntent } from "../model/write-intent.js";
-import { validateCreateVaultIntent } from "../validate/write-intent.js";
+import { validateCreateVaultIntent } from "../model/validate.js";
 import { authorizeBridgeCaller } from "./scope.js";
 import type {
   BookmakerBridge,

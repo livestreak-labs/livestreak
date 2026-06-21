@@ -1,4 +1,4 @@
 // --- exports ---
 
-export type { BookmakerPanelSnapshot } from "./types.js";
+export type { BookmakerPanelSnapshot, BookmakerPanelView } from "./types.js";
 export { projectBookmakerPanel } from "./project.js";
