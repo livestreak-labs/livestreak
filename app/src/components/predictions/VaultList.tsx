@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FocusedVault } from '#/components/predictions/FocusedVault'
 import { ActivityFeed } from '#/components/feed/ActivityFeed'
 import { MyPositions } from '#/components/predictions/MyPositions'
+import { NftPanel } from '#/components/wallet/NftPanel'
 import type { Vault, WSEvent, Position } from '#/data/mock'
 
 type Tab = 'feed' | 'mine'
@@ -44,7 +45,8 @@ export function VaultList({ vaults, events, positions, selectedVaultId, onDismis
             </motion.div>
           )}
           {tab === 'mine' && (
-            <motion.div key="mine" initial={{ opacity: 0, transform: 'translateX(8px)' }} animate={{ opacity: 1, transform: 'translateX(0px)' }} exit={{ opacity: 0, transform: 'translateX(-8px)', transition: { duration: 0.1 } }} transition={{ duration: 0.15 }} style={{ height: '100%', overflow: 'hidden' }}>
+            <motion.div key="mine" initial={{ opacity: 0, transform: 'translateX(8px)' }} animate={{ opacity: 1, transform: 'translateX(0px)' }} exit={{ opacity: 0, transform: 'translateX(-8px)', transition: { duration: 0.1 } }} transition={{ duration: 0.15 }} style={{ height: '100%', overflowY: 'auto' }}>
+              <NftPanel />
               <MyPositions positions={positions} vaults={vaults} onSelectVault={() => { /* scroll up to focused vault handled by parent */ }} />
             </motion.div>
           )}

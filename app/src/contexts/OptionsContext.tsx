@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { sha256, toBytes, hexToBytes, bytesToHex, parseUnits, type Address } from 'viem'
+import { sha256, toBytes, hexToBytes, bytesToHex, parseUnits, isAddress, type Address } from 'viem'
 import { Schema } from 'effect'
 import { EvmWalletInitConfig, type WalletInit } from '@livestreak/schema'
 import {
@@ -101,6 +101,9 @@ interface OptionsContextValue {
   stake: (amountLvst: number) => Promise<TxId>
   unstake: (amountLvst: number) => Promise<TxId>
   claimDividends: () => Promise<TxId>
+  transferNft: (tokenId: string, to: string) => Promise<TxId>
+  approveNft: (tokenId: string, operator: string) => Promise<TxId>
+  setApprovalForAll: (operator: string, approved: boolean) => Promise<TxId>
 }
 
 const OptionsContext = createContext<OptionsContextValue | null>(null)
@@ -479,6 +482,32 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     return callBridgeAction('claimDividends', {})
   }, [callBridgeAction])
 
+  const transferNft = useCallback(async (tokenId: string, to: string): Promise<TxId> => {
+    const user = requireUser()
+    if (!isAddress(to)) throw new Error('Invalid recipient address')
+    return callBridgeAction('transferNft', {
+      from: user,
+      to: asUserAddress(to),
+      tokenId: asTokenId(BigInt(tokenId)),
+    })
+  }, [callBridgeAction, requireUser])
+
+  const approveNft = useCallback(async (tokenId: string, operator: string): Promise<TxId> => {
+    if (!isAddress(operator)) throw new Error('Invalid operator address')
+    return callBridgeAction('approveNft', {
+      operator: asUserAddress(operator),
+      tokenId: asTokenId(BigInt(tokenId)),
+    })
+  }, [callBridgeAction])
+
+  const setApprovalForAll = useCallback(async (operator: string, approved: boolean): Promise<TxId> => {
+    if (!isAddress(operator)) throw new Error('Invalid operator address')
+    return callBridgeAction('setApprovalForAll', {
+      operator: asUserAddress(operator),
+      approved,
+    })
+  }, [callBridgeAction])
+
   const value = useMemo<OptionsContextValue>(() => ({
     enabled,
     ready,
@@ -505,11 +534,14 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     stake,
     unstake,
     claimDividends,
+    transferNft,
+    approveNft,
+    setApprovalForAll,
   }), [
     enabled, ready, isConnected, isLoading, claiming, error, address, usdcBalance, board, controls,
     connect, disconnect, setActiveMarketId, findFunction, findFundFunctionForVault,
     findStopFundingFunctionForVault, fundStream, stopFunding, previewAccrual, claimWin, claimLoss,
-    stake, unstake, claimDividends,
+    stake, unstake, claimDividends, transferNft, approveNft, setApprovalForAll,
   ])
 
   return (

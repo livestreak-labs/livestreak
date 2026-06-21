@@ -166,21 +166,6 @@ export function VaultCard({ vault, index = 0 }: { vault: Vault; index?: number }
           )}
         </AnimatePresence>
 
-        {/* Hot exit burn */}
-        {isHot && vault.exitBurn && (
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            background: 'rgba(255,45,120,0.06)', border: '1px solid rgba(255,45,120,0.15)',
-            borderRadius: 6, padding: '5px 10px', marginBottom: 4, marginTop: 4,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Fire size={11} color="#ff2d78" />
-              <span style={{ fontSize: 10, color: '#ff2d78', fontWeight: 600 }}>EXIT BURN</span>
-            </div>
-            <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: '#ff7a00' }}>{vault.exitBurn}%</span>
-          </div>
-        )}
-
         {/* Expand toggle */}
         <button onClick={() => setExpanded(e => !e)} style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,

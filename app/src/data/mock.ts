@@ -18,7 +18,6 @@ export interface Vault {
   userWon?: boolean
   payout?: number
   flowReceived?: number
-  exitBurn?: number
   createdMinute?: number
 }
 

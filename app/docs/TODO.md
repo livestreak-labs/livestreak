@@ -56,20 +56,20 @@ Conform outward: consume `createOptionsBridge({ runtime })` only (`readBoard`/`r
       **no hot UI added** (dormant mock UI only). Off-mode all routes HTTP 200 (one-time cold-start 500 was a Vite
       optimizeDeps race, self-healed — not a code regression).
 
-### Slice 3 — Funding UX: fund-gating (R10) + share-cost/accrual preview (R11) — ACTIVE (prompt written)
-options shipped BOTH; **verified present in source** (ahead of the inbox note that said R11 "coming"):
-- [ ] **Fund gating (R10):** gate the STREAM/fund CTA on the matched `fund` function `fn.disabled`/`disabledReason`
-      (one lane per vault — funding the 2nd side reverts on-chain). Show the funded side + a Stop affordance via
-      `stopFunding` (`target.side` = active lane; `StopFundingInput { tokenId, vaultId, side }`). `project.ts:283-316`.
-- [ ] **Share-cost preview (R11):** show `pools.sharePriceYes/No` ("cost of newer shares") near the slider; live
-      projection via `bridge.previewAccrual({ vaultId, side, rate, horizonSec? })` →
-      `{ sharePriceUSDC, sharesPerSec, projectedShares, valueUSDC }`. **ZERO app-side curve math.**
-      `panel/types.ts:43-49`, `bridge/bridge.ts:73`, `runtime.ts:108`.
+### Slice 3 — Funding UX: fund-gating (R10) + share-cost/accrual preview (R11) — DONE 2026-06-21 (verified)
+- [x] **Fund gating (R10):** `useVaultFundingControls` reads `fund`/`stopFunding` from `functions[]`; FocusedVault `canStream`
+      requires `!selectedFundFn.disabled` so a funded vault cannot fire a revert; slider locks + shows Stop (`stopFunding`).
+- [x] **Share-cost (R11):** adapter maps `pools.sharePriceYes/No` (÷1e6); slider shows "Next share ~$X USDC";
+      `useAccrualPreview` debounces `bridge.previewAccrual` (250ms). Share scale grounded `SHARE_SCALE=1e6`.
+- Verified by master prompter: check exit 0 (re-run); lint/build/test green; audits clean (no curve math/wallet/deep-imports);
+      off-mode `/`+`/stream` HTTP 200 (independently re-curled). Collapsed-card YES/NO buttons only `setExpanded` (harmless).
 
-### Slice 4 — NFT transfer panel + exit-burn badge removal
-- [ ] NFT transfer panel (`transferNft`/`approveNft`/`setApprovalForAll` via `functions[]`, `target.kind==='nft'`).
-- [ ] Remove the dead "EXIT BURN %" badge (no on-chain source, **permanent**): drop mock `exitBurn: 20` + the badge
-      blocks in `VaultCard`/`FocusedVault`. Per `from-contracts__disable-exit-burn.md` + `from-options__new-capabilities.md`.
+### Slice 4 — NFT transfer panel + exit-burn badge removal — ACTIVE (prompt written)
+- [ ] NFT transfer panel: list `panel.nfts[]` (tokenId/marketId/laneCount/owner/approved/isOperator); transfer/approve/
+      setApprovalForAll via `functions[]` (`target.kind==='nft'` + global), inputs `TransferNftInput {from,to,tokenId}`/
+      `ApproveNftInput {operator,tokenId}`/`SetApprovalForAllInput {operator,approved}`; viem `isAddress` validation.
+- [ ] Remove dead "EXIT BURN %" badge (permanent, no on-chain source): drop mock `exitBurn` + badge blocks in
+      `VaultCard`/`FocusedVault`. Per `from-contracts__disable-exit-burn.md` + `from-options__new-capabilities.md`.
 
 ### Slice 5 — Sui — blocked (options `chains/sui` throws; host AA is EVM-only).
 
