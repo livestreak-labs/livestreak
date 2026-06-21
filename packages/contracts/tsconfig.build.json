@@ -17,6 +17,10 @@
     "chains/evm/types.ts",
     "chains/evm/generated/abis.ts",
     "chains/sui/index.ts",
+    "chains/sui/types.ts",
+    "chains/sui/addresses.ts",
+    "chains/sui/package.ts",
+    "chains/sui/client.ts",
     "chains/solana/index.ts"
   ],
   "exclude": ["chains/evm/lib/**", "chains/evm/out/**", "chains/evm/cache/**"]
