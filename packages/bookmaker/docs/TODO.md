@@ -38,6 +38,15 @@ See [architecture.md](./architecture.md) and [flow.md](./flow.md).
 
 ---
 
+## Slice 3 — encode unit tests + on-chain createVault proof
+
+- [x] `test/chains/evm/encode.test.ts` — coercion layer (side, marketId, deposit, seedRate)
+- [x] `test/e2e/create-vault.e2e.ts` + `npm run e2e:chain` (opt-in; not in `npm test`)
+- [x] `e2e:chain` run against live anvil + deploy + host (see `docs/flow.md`)
+- [x] `parseVaultCreatedFromLogs` filters by `vaultDriver` address (Vault + VaultDriver share topic0)
+
+---
+
 ## Follow-ups
 
 - [ ] **Residual:** receipt poll timeout after on-chain inclusion — re-check userOp receipt before retry send

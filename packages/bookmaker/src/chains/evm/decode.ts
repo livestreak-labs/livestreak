@@ -7,10 +7,17 @@ import { vaultDriverAbi } from "@livestreak/contracts/evm/abis";
 
 import { asVaultId, type VaultId } from "../types.js";
 
-export const parseVaultCreatedFromLogs = (logs: readonly unknown[]): VaultId => {
+export const parseVaultCreatedFromLogs = (
+  logs: readonly unknown[],
+  vaultDriverAddress: `0x${string}`
+): VaultId => {
+  const driverLogs = (logs as Log[]).filter(
+    (log) => log.address?.toLowerCase() === vaultDriverAddress.toLowerCase()
+  );
+
   const decoded = parseEventLogs({
     abi: vaultDriverAbi as Abi,
-    logs: logs as Log[],
+    logs: driverLogs,
     eventName: "VaultCreated"
   });
 

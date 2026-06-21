@@ -77,3 +77,24 @@ bridge/     outward door — panel + scoped callAction
 ## Errors
 
 All thrown errors in `src/` use `@livestreak/core` types (`LiveStreakConfigError`, `LiveStreakRuntimeError`, `LiveStreakCapabilityError`). No raw `Error` in library code.
+
+## On-chain proof (opt-in)
+
+Fast unit tests use a fake chain. The real executor path — `createWalletManager → USDC allowance → encode → AA send → poll → parse VaultCreated` — is covered by:
+
+- `test/chains/evm/encode.test.ts` — pure coercion (`sideToSolidityValue`, deposit/rate bounds, bytes32 marketId)
+- `test/e2e/create-vault.e2e.ts` — live stack proof via `npm run e2e:chain`
+
+```text
+anvil --port 8545 --block-time 1
+cd packages/contracts && npm run deploy -- --name localhost --force
+cd host && LIVESTREAK_AA_RPC_URL=http://127.0.0.1:8545 \
+  LIVESTREAK_AA_ENTRY_POINT=0x0000000071727De22E5E9d8BAf0edAc6f37da032 \
+  LIVESTREAK_AA_PAYMASTER_ADDRESS=<from localhost.json scopes.paymaster> \
+  LIVESTREAK_AA_ALLOW_DEV_KEY=1 npm run dev
+cd packages/bookmaker && npm run e2e:chain
+```
+
+Host `deploy-env` reads flat snapshot fields; `localhost.json` nests under `scopes` — set AA env explicitly (or use `LIVESTREAK_AA_CHAINS_FILE`) so embedded Alto starts.
+
+The e2e script mints USDC to the bookmaker Safe, registers a market, runs `chain.writer.createVault`, and asserts the returned `vaultId` matches the `VaultCreated` event and `Vault.vaultExists`.
