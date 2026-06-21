@@ -43,7 +43,15 @@ See [architecture.md](./architecture.md) and [flow.md](./flow.md).
 - [x] `test/chains/evm/encode.test.ts` — coercion layer (side, marketId, deposit, seedRate)
 - [x] `test/e2e/create-vault.e2e.ts` + `npm run e2e:chain` (opt-in; not in `npm test`)
 - [x] `e2e:chain` run against live anvil + deploy + host (see `docs/flow.md`)
-- [x] `parseVaultCreatedFromLogs` filters by `vaultDriver` address (Vault + VaultDriver share topic0)
+
+---
+
+## Slice 4 — adopt contracts VaultCreated fix (drop emitter filter)
+
+- [x] Inner `Vault.VaultCreated` renamed → `VaultOpened` in `@livestreak/contracts` (`7461f19`)
+- [x] `parseVaultCreatedFromLogs(logs)` — no `vaultDriverAddress` filter; topic0 unique to driver
+- [x] Regression test: driver `VaultCreated` + inner `VaultOpened` → correct `vaultId`
+- [x] E2e re-run without emitter filter
 
 ---
 

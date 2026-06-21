@@ -108,11 +108,9 @@ describe("parseVaultCreatedFromLogs core errors", () => {
   it("throws LiveStreakRuntimeError when no VaultCreated log is present", async () => {
     const { parseVaultCreatedFromLogs } = await import("../../src/chains/evm/decode.js");
 
-    expect(() =>
-      parseVaultCreatedFromLogs([], "0x0000000000000000000000000000000000000001")
-    ).toThrow(LiveStreakRuntimeError);
+    expect(() => parseVaultCreatedFromLogs([])).toThrow(LiveStreakRuntimeError);
     try {
-      parseVaultCreatedFromLogs([], "0x0000000000000000000000000000000000000001");
+      parseVaultCreatedFromLogs([]);
     } catch (error) {
       expect(isLiveStreakError(error)).toBe(true);
       expect(error).toBeInstanceOf(LiveStreakRuntimeError);

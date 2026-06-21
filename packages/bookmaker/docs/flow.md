@@ -72,7 +72,7 @@ bridge/     outward door — panel + scoped callAction
 
 ## Contract truth
 
-`VaultDriver.createVault(marketId, question, seedSide, rate, deposit)` via `vaultDriverAbi` from `@livestreak/contracts`. `vaultId` is read from the `VaultCreated` event — never precomputed.
+`VaultDriver.createVault(marketId, question, seedSide, rate, deposit)` via `vaultDriverAbi` from `@livestreak/contracts`. `vaultId` is read from the `VaultCreated` event on the driver — never precomputed. The inner `Vault` contract emits `VaultOpened` (post-`7461f19`), so `VaultCreated` topic0 is unique to `VaultDriver` and decode needs no emitter filter.
 
 ## Errors
 

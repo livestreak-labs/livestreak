@@ -68,7 +68,7 @@ export const createEvmBookmakerWriter = (config: BookmakerChainConfig): Bookmake
         throw receiptFailure(`Transaction receipt missing for ${sendResult.hash}`);
       }
 
-      const vaultId = parseVaultCreatedFromLogs(receipt.logs, addresses.vaultDriver);
+      const vaultId = parseVaultCreatedFromLogs(receipt.logs);
 
       return {
         txId: asTxId(sendResult.hash),

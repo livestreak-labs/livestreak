@@ -296,7 +296,7 @@ async function main() {
   assert(typeof txHash === "string" && txHash.startsWith("0x"), "UserOp receipt includes transactionHash");
 
   const createReceipt = await pub.waitForTransactionReceipt({ hash: txHash });
-  const eventVaultId = parseVaultCreatedFromLogs(createReceipt.logs, wire.vaultDriver);
+  const eventVaultId = parseVaultCreatedFromLogs(createReceipt.logs);
   assert(
     eventVaultId.toLowerCase() === result.vaultId.toLowerCase(),
     "returned vaultId equals VaultCreated event vaultId"
