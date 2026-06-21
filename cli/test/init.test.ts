@@ -55,12 +55,15 @@ const SAMPLE_DEPLOY = {
 };
 
 // /aa/descriptor advertises the bundler path under the host's routeKey ("local"), not the chainId.
+// Mirrors what the host actually emits (HOST.H5): a BARE top-level `paymasterPath`
+// for back-compat AND a per-chain `chains[].paymasterPath` scoped to the routeKey.
+// The CLI must build paymasterUrl from the per-chain field, not the bare top-level one.
 const aaDescriptorBody = {
   version: "0.1.0",
   hostId: "host_dev",
   sponsorshipMode: "sponsored",
   supportedOperations: [],
-  paymasterPath: "/aa/paymaster/local",
+  paymasterPath: "/aa/paymaster",
   chains: [
     {
       chainId: 31337,
@@ -68,6 +71,7 @@ const aaDescriptorBody = {
       entryPoint: "0x0000000071727de22e5e9d8baf0edac6f37da032",
       safeModule: "0x7240e794b12f848dea622a0da206d1b7d71d56bd",
       bundlerPath: "/aa/bundler/local",
+      paymasterPath: "/aa/paymaster/local",
       rpcUrl: "http://127.0.0.1:8545"
     }
   ]

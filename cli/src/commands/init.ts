@@ -203,7 +203,11 @@ export const runInit = async (input: RunInitInput): Promise<LivestreakInitDoc> =
     );
   }
   const bundlerUrl = `${hostUrl}${aaChain.bundlerPath}`;
-  const paymasterUrl = `${hostUrl}${aaDescriptor.paymasterPath}`;
+  // HOST.H5: the paymaster route is per-chain (`/aa/paymaster/:routeKey`), symmetric with
+  // bundlerPath. Read the per-chain `chains[].paymasterPath`; fall back to the top-level
+  // `paymasterPath` only for older hosts that don't yet emit the per-chain field.
+  const perChainPaymasterPath = (aaChain as { paymasterPath?: string }).paymasterPath;
+  const paymasterUrl = `${hostUrl}${perChainPaymasterPath ?? aaDescriptor.paymasterPath}`;
 
   // walrus.network: --network flag wins; otherwise read the main /descriptor.
   let walrusNetwork = input.network;

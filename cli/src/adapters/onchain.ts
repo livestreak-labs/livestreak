@@ -6,24 +6,20 @@
 
 import {
   marketDriverAbi,
-  marketRegistryAbi,
-  vaultDriverAbi
+  marketRegistryAbi
 } from "@livestreak/contracts/evm/abis";
 import type { PointerScheme, StorePointer } from "@livestreak/host";
 import {
   asMarketId,
   asTokenId,
   asUserAddress,
-  asVaultId,
-  validateOptionsVaultSide,
   type MarketId,
-  type OptionsVaultSide,
-  type TokenId,
-  type VaultId
+  type TokenId
 } from "@livestreak/options";
 import type { EvmWalletInitConfig, WalletInit } from "@livestreak/schema";
 import {
   createWalletManager,
+  pollUntilUserOperationIncluded,
   type EvmErc4337WalletConfig,
   type WalletAccountEvmErc4337
 } from "@livestreak/wallet";
@@ -80,39 +76,8 @@ export const createCreatorWallet = async (
 };
 
 // ── UserOperation polling + tx helpers ──────────────────────────────────────
-
-export const pollUntilUserOperationIncluded = async (
-  readOnly: { getUserOperationReceipt: (hash: string) => Promise<unknown> },
-  userOpHash: string,
-  maxAttempts = 40,
-  delayMs = 50
-): Promise<unknown> => {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const receipt = await readOnly.getUserOperationReceipt(userOpHash);
-    if (receipt !== null && receipt !== undefined) {
-      assertUserOperationSucceeded(receipt);
-      return receipt;
-    }
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-  }
-
-  throw new Error(`Timed out waiting for UserOperation receipt for ${userOpHash}`);
-};
-
-const assertUserOperationSucceeded = (receipt: unknown): void => {
-  if (typeof receipt !== "object" || receipt === null) {
-    throw new Error("UserOperation receipt payload is not an object");
-  }
-
-  const success = (receipt as Record<string, unknown>)["success"];
-  if (typeof success !== "boolean") {
-    throw new Error("UserOperation receipt is missing success");
-  }
-
-  if (success === false) {
-    throw new Error("UserOperation included but reverted");
-  }
-};
+// POLL: the local 2s poller is gone — chain writes use the shared, hex/number-safe
+// `pollUntilUserOperationIncluded` from @livestreak/wallet (60s budget + backoff).
 
 export const readUserOpTransactionHash = (receipt: unknown): `0x${string}` => {
   if (typeof receipt !== "object" || receipt === null) {
@@ -352,113 +317,7 @@ export const encodeGoLive = (
     args: [marketId, scheme, id]
   });
 
-// ── createVault (TEMP: migrates to @livestreak/bookmaker) ───────────────────
-
-export interface OperatorCreateVaultInput {
-  readonly account: WalletAccountEvmErc4337;
-  readonly publicClient: PublicClient;
-  readonly vaultDriverAddress: `0x${string}`;
-  readonly usdcAddress: `0x${string}`;
-  readonly marketId: MarketId;
-  readonly question: string;
-  readonly side: OptionsVaultSide;
-  readonly rate: bigint;
-  readonly deposit: bigint;
-}
-
-export interface OperatorCreateVaultResult {
-  readonly vaultId: VaultId;
-  readonly approveTx?: string;
-  readonly createTx: string;
-}
-
-export const sideToSeedEnum = (side: OptionsVaultSide): 0 | 1 =>
-  validateOptionsVaultSide(side) === "yes" ? 0 : 1;
-
-export const encodeCreateVaultCall = (
-  marketId: `0x${string}`,
-  question: string,
-  side: OptionsVaultSide,
-  rate: bigint,
-  deposit: bigint
-) => ({
-  marketId,
-  question,
-  seedSide: sideToSeedEnum(side),
-  rate,
-  deposit
-});
-
-export const parseVaultCreatedId = (
-  logs: readonly unknown[],
-  vaultDriverAddress: `0x${string}`
-): VaultId => {
-  const events = parseEventLogs({
-    abi: vaultDriverAbi,
-    logs: logs as never,
-    eventName: "VaultCreated"
-  }).filter((event) => event.address.toLowerCase() === vaultDriverAddress.toLowerCase());
-
-  if (events.length === 0) {
-    throw new Error("VaultCreated event not found in transaction receipt");
-  }
-
-  const vaultId = events[0]?.args.vaultId;
-  if (typeof vaultId !== "string") {
-    throw new Error("VaultCreated event is missing vaultId");
-  }
-
-  return asVaultId(vaultId);
-};
-
-export const operatorCreateVault = async (
-  input: OperatorCreateVaultInput
-): Promise<OperatorCreateVaultResult> => {
-  if (input.question.trim().length === 0) {
-    throw new Error("Vault question must be non-empty");
-  }
-
-  if (input.rate <= 0n) {
-    throw new Error("Vault seed rate must be > 0");
-  }
-
-  if (input.deposit <= 0n) {
-    throw new Error("Vault seed deposit must be > 0");
-  }
-
-  const side = validateOptionsVaultSide(input.side);
-  const approveTx = await ensureErc20Approval(
-    input.account,
-    input.publicClient,
-    input.usdcAddress,
-    input.vaultDriverAddress,
-    input.deposit
-  );
-
-  const { userOpHash, userOpReceipt } = await sendContractCall(
-    input.account,
-    input.vaultDriverAddress,
-    vaultDriverAbi,
-    "createVault",
-    [
-      input.marketId,
-      input.question,
-      sideToSeedEnum(side),
-      input.rate,
-      input.deposit
-    ]
-  );
-
-  const txHash = readUserOpTransactionHash(userOpReceipt);
-  const receipt = await input.publicClient.waitForTransactionReceipt({ hash: txHash });
-  const vaultId = parseVaultCreatedId(receipt.logs, input.vaultDriverAddress);
-
-  return {
-    vaultId,
-    ...(approveTx === undefined ? {} : { approveTx }),
-    createTx: userOpHash
-  };
-};
+// createVault migrated to @livestreak/bookmaker (createVaultOnce); see adapters/bookmaker.ts.
 
 // ── mint (TEMP: migrates to @livestreak/options) ─────────────────────────────
 
