@@ -13,6 +13,7 @@ import { nftCommands } from "./commands/nft.js";
 import { remoteCommands } from "./commands/remote.js";
 import { stewardCommands } from "./commands/steward.js";
 import { settleCommands } from "./commands/settle.js";
+import { streamCommands } from "./commands/stream.js";
 
 const root = Command.make("livestreak", {}, () => Effect.void).pipe(
   Command.withSubcommands([
@@ -26,7 +27,8 @@ const root = Command.make("livestreak", {}, () => Effect.void).pipe(
     ...nftCommands,
     ...remoteCommands,
     ...stewardCommands,
-    ...settleCommands
+    ...settleCommands,
+    ...streamCommands
   ])
 );
 

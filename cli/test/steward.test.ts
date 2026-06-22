@@ -6,6 +6,7 @@ import {
   encodeResolveVaultCall,
   outcomeToSolidityValue,
   parseOutcomeArg,
+  resolveStewardKey,
   resolveVaultEvm
 } from "../src/adapters/steward.js";
 
@@ -51,23 +52,35 @@ describe("steward resolve — calldata", () => {
   });
 });
 
-describe("steward resolve — EVM dispatch", () => {
-  it("sends resolveVault to the steward registry via the operator wallet and returns the hash", async () => {
-    const sendTransaction = vi.fn(async () => ({ hash: "0xdeadbeef" }));
-    const account = {
-      sendTransaction,
-      toReadOnlyAccount: vi.fn(async () => ({}))
-    } as never;
+describe("steward resolve — EVM dispatch (signs as the steward identity)", () => {
+  it("signs resolveVault to the steward registry via the injected steward signer and returns the hash", async () => {
+    const resolve = vi.fn(async () => "0xdeadbeef");
+    const signer = { resolve };
 
-    const tx = await resolveVaultEvm({ account, stewardRegistry, vaultId, outcome: "yes" });
+    const tx = await resolveVaultEvm({ signer, stewardRegistry, vaultId, outcome: "yes" });
 
     expect(tx).toBe("0xdeadbeef");
-    expect(sendTransaction).toHaveBeenCalledTimes(1);
-    const call = sendTransaction.mock.calls[0][0] as { to: string; data: string; value: bigint };
-    expect(call.to).toBe(stewardRegistry);
-    expect(call.value).toBe(0n);
+    expect(resolve).toHaveBeenCalledTimes(1);
+    const call = resolve.mock.calls[0][0] as { stewardRegistry: string; data: string };
+    expect(call.stewardRegistry).toBe(stewardRegistry);
     const decoded = decodeFunctionData({ abi: stewardRegistryAbi, data: call.data as `0x${string}` });
     expect(decoded.functionName).toBe("resolveVault");
     expect(decoded.args?.[1]).toBe(1);
+  });
+});
+
+describe("steward resolve — key sourcing (no baked secrets)", () => {
+  it("prefers LIVESTREAK_STEWARD_KEY and falls back to the public anvil key only on 31337", async () => {
+    const prev = process.env["LIVESTREAK_STEWARD_KEY"];
+    delete process.env["LIVESTREAK_STEWARD_KEY"];
+    expect(resolveStewardKey(31337)).toMatch(/^0x[0-9a-f]{64}$/i);
+    expect(() => resolveStewardKey(1)).toThrow(/steward key required/i);
+    process.env["LIVESTREAK_STEWARD_KEY"] = "abc123";
+    expect(resolveStewardKey(1)).toBe("0xabc123");
+    if (prev === undefined) {
+      delete process.env["LIVESTREAK_STEWARD_KEY"];
+    } else {
+      process.env["LIVESTREAK_STEWARD_KEY"] = prev;
+    }
   });
 });

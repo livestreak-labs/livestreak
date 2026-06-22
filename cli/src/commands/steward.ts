@@ -1,8 +1,15 @@
 import { Command, Options } from "@effect/cli";
 import { Console, Effect } from "effect";
-import { resolveOperatorContext } from "../gateway/operator.js";
+import { resolveKeystore } from "../gateway/operator.js";
 import { parseVaultId, configOpt, passwordOpt, readCommandConfig } from "./args.js";
-import { parseOutcomeArg, resolveVaultEvm, type VaultOutcome } from "../adapters/steward.js";
+import {
+  createEoaStewardSigner,
+  parseOutcomeArg,
+  resolveStewardKey,
+  resolveVaultEvm,
+  type VaultOutcome
+} from "../adapters/steward.js";
+import { describeChainError } from "../adapters/revert.js";
 import { renderTxResult } from "../render/output.js";
 
 // `steward resolve` — the steward (operator/dev key) resolves a vault so the loop can settle.
@@ -20,16 +27,26 @@ export const runStewardResolve = async (input: {
   const vaultId = parseVaultId(input.vault);
   const outcome: VaultOutcome = parseOutcomeArg(input.outcome);
 
-  const ctx = await resolveOperatorContext(input);
-
-  const tx = await resolveVaultEvm({
-    account: ctx.account,
-    stewardRegistry: ctx.doc.options.stewardRegistry,
-    vaultId: vaultId as `0x${string}`,
-    outcome
+  // KEYSTORE-thin: resolve only needs the doc/addresses; the steward signs as its OWN EOA identity,
+  // not the operator Safe (see adapters/steward.ts) — so no AA `account` is constructed here.
+  const { doc } = await resolveKeystore(input);
+  const signer = createEoaStewardSigner({
+    rpcUrl: doc.chain.rpc,
+    chainId: doc.chain.chainId,
+    privateKey: resolveStewardKey(doc.chain.chainId)
   });
 
-  return renderTxResult("steward resolve", { vault: vaultId, outcome, tx });
+  try {
+    const tx = await resolveVaultEvm({
+      signer,
+      stewardRegistry: doc.options.stewardRegistry,
+      vaultId: vaultId as `0x${string}`,
+      outcome
+    });
+    return renderTxResult("steward resolve", { vault: vaultId, outcome, tx });
+  } catch (error) {
+    throw new Error(`steward resolve failed: ${describeChainError(error)}`);
+  }
 };
 
 const stewardResolveCommand = Command.make(

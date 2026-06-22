@@ -1,15 +1,26 @@
-// Steward resolution edge. The keynote loop SETTLES only once a steward resolves a vault, and the
-// CLI's steward identity is the operator/dev key. Resolution lands on the steward registry's
-// `resolveVault(vaultId, outcome)` — there is no options/steward *bridge* action for it today (the
-// options bridge only carries post-resolution settlement: withdraw / claimLossLvst), so the CLI
-// drives it through the operator AA wallet, mirroring the existing goLive/setEnded edge in
-// adapters/onchain.ts. Dispatch is per-chain (EVM today; Sui pending the CLI Sui operator leg — see
-// scope-e2e-agent.md §A/§F). Outcome encoding matches the on-chain `Vault.Outcome` enum on BOTH
-// chains: { Pending: 0, Yes: 1, No: 2 } (EVM Vault.sol) === { OUTCOME_YES: 1, OUTCOME_NO: 2 } (Sui).
+// Steward resolution edge. The keynote loop SETTLES only once a steward resolves a vault, and on-chain
+// the `defaultSteward` is the dev-key EOA (anvil acct 0, 0xf39F…) — NOT the operator's AA Safe. The
+// prior edge signed `resolveVault` through the operator AA wallet (0x6083…), so the registry's
+// `onlyMarketSteward` guard always reverted ("not market steward") [e2e bug #1].
+//
+// FIX (permutation (a) — sign as the steward's OWN identity, the most faithful): the steward is a
+// distinct privileged signer the CLI provides, so we sign `resolveVault(vaultId, outcome)` from the
+// steward EOA via a plain viem WalletClient (NOT the AA bundler path). This also satisfies #12 for
+// resolve: the writer owns its own wallet built from the provided steward key — the CLI only holds
+// the keystore and hands the package/edge an identity, it does not reuse the operator Safe here.
+//
+// Dispatch is per-chain (EVM today; Sui pending the CLI Sui operator leg — see scope-e2e-agent.md
+// §A/§F). Outcome encoding matches the on-chain `Vault.Outcome` enum on BOTH chains:
+// { Pending: 0, Yes: 1, No: 2 } (EVM Vault.sol) === { OUTCOME_YES: 1, OUTCOME_NO: 2 } (Sui).
 
 import { stewardRegistryAbi } from "@livestreak/contracts/evm/abis";
-import { pollUntilUserOperationIncluded, type WalletAccountEvmErc4337 } from "@livestreak/wallet";
-import { encodeFunctionData } from "viem";
+import {
+  createWalletClient,
+  encodeFunctionData,
+  http,
+  type Hex
+} from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 
 export type VaultOutcome = "yes" | "no";
 
@@ -40,9 +51,63 @@ export const encodeResolveVaultCall = (
     args: [vaultId, outcomeToSolidityValue(outcome)]
   });
 
+/**
+ * Signs + lands a `resolveVault` calldata blob from the STEWARD identity, returning the tx hash.
+ * Injectable so the EOA viem path can be swapped for a fake in tests (and a Sui signer later).
+ */
+export interface StewardSigner {
+  resolve(input: {
+    readonly stewardRegistry: `0x${string}`;
+    readonly data: `0x${string}`;
+  }): Promise<string>;
+}
+
+/** The well-known anvil acct-0 key (public, deterministic) — the localnet deployer == defaultSteward.
+ * NOT a secret; used ONLY as the dev default on chainId 31337 so the e2e harness resolves out of the
+ * box. Real chains MUST supply LIVESTREAK_STEWARD_KEY. */
+const ANVIL_DEV_STEWARD_KEY =
+  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as const;
+
+/** Resolve the steward EOA private key without baking a secret: env first, dev-chain fallback last. */
+export const resolveStewardKey = (chainId: number): Hex => {
+  const fromEnv = process.env["LIVESTREAK_STEWARD_KEY"];
+  if (fromEnv !== undefined && fromEnv.trim().length > 0) {
+    const k = fromEnv.trim();
+    return (k.startsWith("0x") ? k : `0x${k}`) as Hex;
+  }
+  if (chainId === 31337) {
+    return ANVIL_DEV_STEWARD_KEY;
+  }
+  throw new Error(
+    "steward key required: set LIVESTREAK_STEWARD_KEY to the defaultSteward EOA private key " +
+      `(no dev fallback for chainId ${chainId})`
+  );
+};
+
+/** Build a viem-EOA steward signer that owns its own wallet (the steward's identity, not the Safe). */
+export const createEoaStewardSigner = (input: {
+  readonly rpcUrl: string;
+  readonly chainId: number;
+  readonly privateKey: Hex;
+}): StewardSigner => {
+  const account = privateKeyToAccount(input.privateKey);
+  const chain = {
+    id: input.chainId,
+    name: "livestreak",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: { default: { http: [input.rpcUrl] } }
+  } as const;
+  const wallet = createWalletClient({ account, chain, transport: http(input.rpcUrl) });
+
+  return {
+    resolve: async ({ stewardRegistry, data }) =>
+      wallet.sendTransaction({ to: stewardRegistry, data, value: 0n })
+  };
+};
+
 export interface ResolveVaultEvmInput {
-  /** Operator/dev AA wallet — the steward identity on EVM. */
-  readonly account: WalletAccountEvmErc4337;
+  /** Steward identity signer (EOA on EVM today). */
+  readonly signer: StewardSigner;
   /** Steward registry contract address (from livestreak.json options.stewardRegistry). */
   readonly stewardRegistry: `0x${string}`;
   readonly vaultId: `0x${string}`;
@@ -50,19 +115,9 @@ export interface ResolveVaultEvmInput {
 }
 
 /**
- * Resolve a vault on EVM by sending `resolveVault` to the steward registry via the operator AA
- * wallet, then waiting for the userOp to land. Returns the userOp hash.
+ * Resolve a vault on EVM by signing `resolveVault` from the steward EOA and returning the tx hash.
  */
 export const resolveVaultEvm = async (input: ResolveVaultEvmInput): Promise<string> => {
   const data = encodeResolveVaultCall(input.vaultId, input.outcome);
-
-  const sendResult = await input.account.sendTransaction({
-    to: input.stewardRegistry,
-    data,
-    value: 0n
-  });
-
-  const readOnly = await input.account.toReadOnlyAccount();
-  await pollUntilUserOperationIncluded(readOnly, sendResult.hash);
-  return sendResult.hash;
+  return input.signer.resolve({ stewardRegistry: input.stewardRegistry, data });
 };
