@@ -52,7 +52,14 @@ const evmWalletMocks = vi.hoisted(() => {
 vi.mock("@livestreak/wallet", () => ({
   createWalletManager: () => ({
     getAccount: async () => evmWalletMocks.account
-  })
+  }),
+  // The market registrar now delegates inclusion polling to the shared wallet poller.
+  // Mirror its real contract: read the receipt once and resolve with it (the fake
+  // readOnly returns a successful receipt), so the registrar's Effect succeeds.
+  pollUntilUserOperationIncluded: async (
+    readOnly: { getUserOperationReceipt: (hash: string) => Promise<unknown> },
+    hash: string
+  ) => readOnly.getUserOperationReceipt(hash)
 }));
 
 const minimalEvmConfig = (): ObserveRunMarketConfig => ({
