@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FocusedVault } from '#/components/organisms/focused-vault'
+import { VaultCard } from '#/components/molecules/vault-card'
 import { ActivityFeed } from '#/components/organisms/activity-feed'
 import { MyPositions } from '#/components/organisms/my-positions'
 import { NftPanel } from '#/components/organisms/nft-panel'
@@ -29,6 +30,9 @@ export function VaultList({ vaults, events, positions, selectedVaultId, onDismis
   const mintFn = (isOptionsModeEnabled() && options.isConnected)
     ? options.findFunction('mint', fn => fn.target?.kind === 'market')
     : undefined
+
+  // D: bettable vaults rendered as the single funding-flow cards (fund-*/vault-card-* test-ids).
+  const bettableVaults = vaults.filter(v => v.status === 'open' || v.status === 'hot')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -64,6 +68,16 @@ export function VaultList({ vaults, events, positions, selectedVaultId, onDismis
                 </div>
               )}
               <NftPanel />
+              {bettableVaults.length > 0 && (
+                <div style={{ padding: '14px 10px 4px' }}>
+                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.25)', padding: '0 4px 10px' }}>
+                    BACK A VAULT
+                  </div>
+                  {bettableVaults.map((v, i) => (
+                    <VaultCard key={v.vaultId} vault={v} index={i} onStream={onStream} />
+                  ))}
+                </div>
+              )}
               <MyPositions positions={positions} vaults={vaults} onSelectVault={() => { /* scroll up to focused vault handled by parent */ }} />
             </motion.div>
           )}

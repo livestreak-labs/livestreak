@@ -5,6 +5,7 @@ import { StreamSlider, mapAccrualPreview } from '#/components/molecules/stream-s
 import { formatUSDC, formatCountdown, formatMultiplier, formatMinute, calcPoolPct } from '#/utils/format'
 import type { VaultView } from '#/types/demo'
 import type { OptionsVault, OptionsFunctionView } from '@livestreak/options'
+import { DEFAULT_FUND_DURATION_MIN, fundCommitmentUsd } from '#/utils/options'
 import { isOptionsModeEnabled } from '#/utils/env'
 import { useOptionsContext } from '#/providers/options-provider'
 import { OptionsActionButton } from '#/components/atoms/options-action-button'
@@ -12,7 +13,13 @@ import { useVaultFundingControls } from '#/hooks/use-vault-funding-controls'
 import { useVaultView } from '#/hooks/use-vault-views'
 import { useAccrualPreview } from '#/hooks/use-accrual-preview'
 
-export function VaultCard({ vault, index = 0 }: { vault: OptionsVault; index?: number }) {
+export function VaultCard({ vault, index = 0, onStream }: {
+  vault: OptionsVault
+  index?: number
+  /** Single funding flow commit (D): same handler as the floating-card path — mint-if-needed → fund
+   *  in live mode, mock notification in demo. */
+  onStream?: (vaultId: string, side: 'yes' | 'no', rate: number, durationMinutes?: number) => void
+}) {
   const view = useVaultView(vault.vaultId)
   const hotUntil = vault.steward.hotUntilMs ?? null
   // Full-precision USDC pools from the board (A1); fall back to the rounded mock pools in mock mode.
@@ -26,6 +33,19 @@ export function VaultCard({ vault, index = 0 }: { vault: OptionsVault; index?: n
   const [expanded, setExpanded] = useState(false)
   const [streamSide, setStreamSide] = useState<'yes' | 'no' | null>(null)
   const [streamRate, setStreamRate] = useState(0)
+  const [fundDurationMin] = useState(DEFAULT_FUND_DURATION_MIN)
+  const [fundBusy, setFundBusy] = useState(false)
+  const [fundError, setFundError] = useState<string | null>(null)
+  // D: the market NFT may not exist yet — the single flow mints it on first fund, so a connected user
+  // can still initiate. When not using options (demo) the commit goes through the mock handler.
+  const needsMint = useOptions && !funding.hasNft
+  const canCommit = !!streamSide
+    && streamRate >= 0.01
+    && !fundBusy
+    && (!useOptions || needsMint || (
+      (streamSide === 'yes' ? funding.fundYes : funding.fundNo) !== undefined
+      && !(streamSide === 'yes' ? funding.fundYes : funding.fundNo)!.disabled
+    ))
   const { preview, loading: previewLoading } = useAccrualPreview(
     vault.vaultId,
     expanded ? streamSide : null,
@@ -223,6 +243,48 @@ export function VaultCard({ vault, index = 0 }: { vault: OptionsVault; index?: n
                     showPreview={funding.useOptions}
                     onStream={(nextSide, nextRate) => { setStreamSide(nextSide); setStreamRate(nextRate) }}
                   />
+                  {streamSide && streamRate > 0.01 && (
+                    <p className="mono" style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', margin: '8px 0 0' }}>
+                      Funding ${fundCommitmentUsd(streamRate, fundDurationMin).toFixed(2)} over {fundDurationMin} min
+                    </p>
+                  )}
+                  <button
+                    data-testid={`fund-submit-${vault.vaultId}`}
+                    disabled={!canCommit}
+                    onClick={async () => {
+                      if (!streamSide || !onStream) return
+                      setFundError(null)
+                      setFundBusy(true)
+                      try {
+                        await onStream(vault.vaultId, streamSide, streamRate, fundDurationMin)
+                      } catch (err) {
+                        setFundError(err instanceof Error ? err.message : 'Fund failed')
+                      } finally {
+                        setFundBusy(false)
+                      }
+                    }}
+                    style={{
+                      width: '100%', marginTop: 10, padding: '9px 0',
+                      fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-display)',
+                      letterSpacing: '0.04em', borderRadius: 7, border: 'none',
+                      cursor: canCommit ? 'pointer' : 'default',
+                      background: streamSide === 'yes' ? '#00ff87' : streamSide === 'no' ? '#ff2d78' : 'rgba(255,255,255,0.06)',
+                      color: streamSide ? '#000' : 'rgba(255,255,255,0.25)',
+                      opacity: canCommit ? 1 : 0.45,
+                      transition: 'background 0.2s, color 0.2s, opacity 0.2s',
+                    }}
+                  >
+                    {fundBusy
+                      ? '...'
+                      : !streamSide
+                        ? 'DRAG TO CHOOSE A SIDE'
+                        : needsMint
+                          ? `BACK VAULT → ${streamSide.toUpperCase()}`
+                          : `STREAM → ${streamSide.toUpperCase()}`}
+                  </button>
+                  {fundError && (
+                    <p style={{ fontSize: 9, color: '#ff7a00', margin: '6px 0 0' }}>{fundError}</p>
+                  )}
                 </div>
               )}
               <ExpandedDetails vault={vault} poolPct={poolPct} view={view} />
