@@ -22,7 +22,20 @@ import {
   type RemoteStatus,
   type RemoteTransport,
 } from '#/utils/remote-transport'
+import { HostWssTransport } from '#/utils/host-wss-transport'
 import { demoMockSeed } from '#/utils/remote-mock-seed'
+
+// Default transport selection: the REAL HostWssTransport when a host origin is configured
+// (`VITE_REMOTE_HOST_URL`), otherwise the in-process LocalMockTransport for dev/keynote demos.
+function defaultTransport(): RemoteTransport {
+  const hostUrl =
+    (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+      ?.VITE_REMOTE_HOST_URL
+  if (hostUrl !== undefined && hostUrl.length > 0) {
+    return new HostWssTransport({ hostBaseUrl: hostUrl })
+  }
+  return new LocalMockTransport(demoMockSeed)
+}
 
 export interface RemoteContextValue {
   readonly session: string
@@ -51,9 +64,7 @@ interface Props {
 }
 
 export function RemoteProvider({ session, transport, children }: Props) {
-  const transportRef = useRef<RemoteTransport>(
-    transport ?? new LocalMockTransport(demoMockSeed)
-  )
+  const transportRef = useRef<RemoteTransport>(transport ?? defaultTransport())
 
   const [status, setStatus] = useState<RemoteStatus>(transportRef.current.status)
   const [error, setError] = useState<string | undefined>(undefined)
