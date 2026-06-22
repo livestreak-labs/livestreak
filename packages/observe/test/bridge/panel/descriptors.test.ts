@@ -30,7 +30,8 @@ describe("projectObserveDescriptors — canonical FunctionDescriptors", () => {
       (descriptor) => descriptor.name === "setPresentation"
     );
 
-    expect(setPresentation?.scope).toBe("system:pause:setPresentation");
+    // Scope-unification (wave 5): descriptors emit the uniform granular console scope.
+    expect(setPresentation?.scope).toBe("bridge:action:setPresentation");
     expect(setPresentation?.inputSchema?.type).toBe("object");
     const whilePaused = setPresentation?.inputSchema?.properties?.find(
       (entry) => entry.name === "whilePaused"

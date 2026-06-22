@@ -27,9 +27,9 @@ export interface CreateOptionsEdgeInput {
   readonly marketId?: MarketId;
 }
 
-// The options bridge `mint`/`mintWithSalt` actions return `{txId, tokenId}` (options chains/types
-// MintResult — not re-exported from the package root, so we describe the runtime shape locally and
-// stringify both fields). Lets the CLI drop the TEMP onchain `operatorMintNft` for the plain path.
+// The options bridge `mint`/`mintWithSalt` actions return a `MintResult {txId, tokenId}`; the CLI
+// stringifies both for rendering/persistence. Lets the CLI route ALL mints through the bridge (no
+// onchain TEMP).
 export interface MintOutcome {
   readonly txId: string;
   readonly tokenId: string;
@@ -46,6 +46,11 @@ export interface OptionsEdge {
   describeFunctions(): Promise<readonly FunctionDescriptor[]>;
   callAction(action: string, args: unknown): Promise<string>;
   mint(args: { readonly marketId: MarketId; readonly to: UserAddress }): Promise<MintOutcome>;
+  mintWithSalt(args: {
+    readonly marketId: MarketId;
+    readonly salt: bigint;
+    readonly to: UserAddress;
+  }): Promise<MintOutcome>;
   subscribeBoard(listener: (board: OptionsBoard) => void): () => void;
   refresh(): Promise<void>;
 }
@@ -86,6 +91,16 @@ export const createOptionsEdge = (input: CreateOptionsEdgeInput): OptionsEdge =>
   const bridge = createOptionsBridge({ runtime });
   const caller = localOperatorCaller();
 
+  // mint / mintWithSalt both return a MintResult {txId, tokenId}; stringify for the CLI.
+  const runMint = async (action: "mint" | "mintWithSalt", args: unknown): Promise<MintOutcome> => {
+    const envelope: CallActionEnvelope = { scope: bridgeActionScope, action, args };
+    const result = (await bridge.callAction(caller, envelope)) as {
+      readonly txId: unknown;
+      readonly tokenId: unknown;
+    };
+    return { txId: String(result.txId), tokenId: String(result.tokenId) };
+  };
+
   return {
     runtime,
     bridge,
@@ -114,18 +129,9 @@ export const createOptionsEdge = (input: CreateOptionsEdgeInput): OptionsEdge =>
       return String(txId);
     },
 
-    mint: async (args) => {
-      const envelope: CallActionEnvelope = {
-        scope: bridgeActionScope,
-        action: "mint",
-        args
-      };
-      const result = (await bridge.callAction(caller, envelope)) as {
-        readonly txId: unknown;
-        readonly tokenId: unknown;
-      };
-      return { txId: String(result.txId), tokenId: String(result.tokenId) };
-    },
+    mint: (args) => runMint("mint", args),
+
+    mintWithSalt: (args) => runMint("mintWithSalt", args),
 
     subscribeBoard: (listener) => bridge.subscribeBoard(caller, listener),
 

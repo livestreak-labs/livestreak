@@ -27,7 +27,9 @@ const createVaultDescriptor = (panel: BookmakerPanelView): FunctionDescriptor =>
   return {
     name: "createVault",
     label: "Create vault",
-    scope: bridgeActionScope as CapabilityScope,
+    // Console scope-unification (wave 5): emit the granular `bridge:action:createVault` so the host
+    // authorizes it directly (the coarse `bridge:action` over-granted under the depth-guarded matcher).
+    scope: `${bridgeActionScope}:createVault` as CapabilityScope,
     target: { kind: "vault", ...(hasMarket ? { marketId: panel.marketId } : {}) },
     disabled: !hasMarket,
     ...(hasMarket ? {} : { disabledReason: "No market context" }),

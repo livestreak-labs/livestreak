@@ -7,7 +7,6 @@ import {
   type SetApprovalForAllInput,
   type TransferNftInput
 } from "@livestreak/options";
-import { operatorMintNft } from "../adapters/onchain.js";
 import { resolveOperatorContext } from "../gateway/operator.js";
 import { createOptionsEdge } from "../adapters/options.js";
 import { defaultInitDocPath, saveInitDoc } from "../prefs/init-doc.js";
@@ -21,6 +20,22 @@ import {
 } from "./args.js";
 import { renderNftMintResult, renderTxResult } from "../render/output.js";
 
+const MAX_UINT64 = (1n << 64n) - 1n;
+
+// Parse the --salt flag (decimal or 0x-hex) into a uint64 bigint for MarketDriver.mintWithSalt.
+export const parseUint64Salt = (value: string): bigint => {
+  let parsed: bigint;
+  try {
+    parsed = BigInt(value);
+  } catch {
+    throw new Error("salt must be a non-negative integer (decimal or 0x-hex)");
+  }
+  if (parsed < 0n || parsed > MAX_UINT64) {
+    throw new Error("salt must fit uint64 (0 .. 2^64-1)");
+  }
+  return parsed;
+};
+
 export const runNftMint = async (input: {
   readonly configPath?: string;
   readonly password?: string;
@@ -32,38 +47,21 @@ export const runNftMint = async (input: {
   const ctx = await resolveOperatorContext({ ...input, configPath });
   const marketId = parseMarketIdArg(input.market);
 
-  let tokenId: string;
-  let tx: string;
-  if (input.salt !== undefined) {
-    // TEMP (salt path only): the options bridge `mintWithSalt` validates/encodes salt as bytes32,
-    // but the contract's `mintWithSalt(bytes32,uint64,address)` takes a uint64 salt — so the bridge
-    // salt path is broken against the live ABI. Keep the edge-side uint64 mint here until options
-    // reconciles the salt type. See context/temp-convo/options/inbox/from-cli__reconcile-mintwithsalt-salt.md.
-    const result = await operatorMintNft({
-      account: ctx.account,
-      publicClient: ctx.publicClient,
-      marketDriverAddress: ctx.doc.options.marketDriver,
-      marketId: asMarketId(marketId),
-      salt: input.salt,
-      ...(input.to !== undefined ? { to: input.to as `0x${string}` } : {})
-    });
-    tokenId = result.tokenId.toString();
-    tx = result.tx;
-  } else {
-    // Plain mint now routes through the options bridge (G2: returns {txId, tokenId}).
-    const edge = createOptionsEdge({
-      doc: ctx.doc,
-      walletInit: ctx.walletInit,
-      seed: ctx.seed,
-      userAddress: ctx.userAddress
-    });
-    const result = await edge.mint({
-      marketId: asMarketId(marketId),
-      to: asUserAddress(input.to ?? ctx.userAddress)
-    });
-    tokenId = result.tokenId;
-    tx = result.txId;
-  }
+  // All mints (plain + deterministic-salt) route through the options bridge, which returns
+  // {txId, tokenId}. Salt is a uint64 (the options mintWithSalt salt type was reconciled in wave 5).
+  const edge = createOptionsEdge({
+    doc: ctx.doc,
+    walletInit: ctx.walletInit,
+    seed: ctx.seed,
+    userAddress: ctx.userAddress
+  });
+  const to = asUserAddress(input.to ?? ctx.userAddress);
+  const result =
+    input.salt !== undefined
+      ? await edge.mintWithSalt({ marketId: asMarketId(marketId), salt: parseUint64Salt(input.salt), to })
+      : await edge.mint({ marketId: asMarketId(marketId), to });
+  const tokenId = result.tokenId;
+  const tx = result.txId;
 
   await saveInitDoc(configPath, {
     ...ctx.doc,

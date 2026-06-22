@@ -1,25 +1,15 @@
-// Project a package's FunctionDescriptor[] into the Remote Bridge Console catalog.
+// Filter a package's FunctionDescriptor[] down to the functions a session's scopes authorize.
 //
-// Two steps: (1) NORMALIZE each write function's package-internal scope (e.g. options'
-// `options:vault:fund`) to the uniform console scope `bridge:action:<name>` so console authz is
-// package-agnostic; (2) FILTER to the functions the session's scopes authorize, using the canonical
-// depth-guarded matcher. The host re-filters server-side too (defense in depth), but normalizing +
-// filtering here keeps the wire payload minimal and the console honest.
+// Console scope-unification (wave 5): package descriptor projections now emit the uniform granular
+// console scope `bridge:action:<name>` DIRECTLY (projectOptions/observe/bookmakerDescriptors), so the
+// gateway no longer NORMALIZES package-internal scopes at the boundary — it only FILTERS, using the
+// canonical depth-guarded matcher, the same scope string the host relay authorizes against (defense in
+// depth: the host re-filters server-side too).
 
-import {
-  bridgeActionScope,
-  scopeMatchesGrant,
-  type CapabilityScope,
-  type FunctionDescriptor
-} from "@livestreak/schema";
-
-export const consoleScopeForFunction = (fn: FunctionDescriptor): CapabilityScope =>
-  `${bridgeActionScope}:${fn.name}` as CapabilityScope;
+import { scopeMatchesGrant, type CapabilityScope, type FunctionDescriptor } from "@livestreak/schema";
 
 export const projectConsoleFunctions = (
   raw: readonly FunctionDescriptor[],
   sessionScopes: readonly CapabilityScope[]
 ): readonly FunctionDescriptor[] =>
-  raw
-    .map((fn) => ({ ...fn, scope: consoleScopeForFunction(fn) }))
-    .filter((fn) => sessionScopes.some((granted) => scopeMatchesGrant(granted, fn.scope)));
+  raw.filter((fn) => sessionScopes.some((granted) => scopeMatchesGrant(granted, fn.scope)));

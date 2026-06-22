@@ -11,6 +11,7 @@
 // has no bigint; the writer parses them back via requirePositiveBigInt at call time).
 
 import type { CapabilityScope, FunctionDescriptor, JsonSchema } from "@livestreak/schema";
+import { bridgeActionScope } from "@livestreak/schema";
 
 import type { OptionsFunctionView, OptionsPanel } from "./types.js";
 import { projectOptionsFunctions } from "./project.js";
@@ -20,15 +21,10 @@ import { projectOptionsFunctions } from "./project.js";
 export const projectOptionsDescriptors = (panel: OptionsPanel): readonly FunctionDescriptor[] => {
   const descriptors: FunctionDescriptor[] = [];
 
+  // project.ts' functions[] now emits BOTH `mint` and `mintWithSalt` (wave 5), so the descriptor
+  // projection is a straight map — no special-casing.
   for (const view of projectOptionsFunctions(panel)) {
     descriptors.push(toDescriptor(view));
-
-    // G2/G3 (wave 2): options ships `mint` AND `mintWithSalt`, but project.ts' functions[] only emits
-    // `mint`. mintWithSalt shares mint's gating (same market, same "already entered" disable), so the
-    // console gets a deterministic-salt variant beside every mint.
-    if (view.name === "mint") {
-      descriptors.push(toMintWithSaltDescriptor(view));
-    }
   }
 
   return descriptors;
@@ -42,24 +38,16 @@ const toDescriptor = (view: OptionsFunctionView): FunctionDescriptor => {
   return {
     name: view.name,
     label: view.label,
-    scope: view.scope as CapabilityScope,
+    // Console scope-unification (wave 5): emit the uniform granular console scope `bridge:action:<name>`
+    // directly so the host authorizes the projected scope with NO downstream scope normalization. The
+    // package-internal `view.scope` (options:<kind>:<name>) stays in the legacy functions[] catalog.
+    scope: `${bridgeActionScope}:${view.name}` as CapabilityScope,
     ...(view.target === undefined ? {} : { target: view.target }),
     disabled: view.disabled,
     ...(view.disabledReason === undefined ? {} : { disabledReason: view.disabledReason }),
     ...(inputSchema === undefined ? {} : { inputSchema })
   };
 };
-
-const toMintWithSaltDescriptor = (mintView: OptionsFunctionView): FunctionDescriptor => ({
-  name: "mintWithSalt",
-  label: "Enter market (deterministic)",
-  // Scope mirrors CATALOG's `options:<targetKind>:<name>` convention (project.ts) for the new action.
-  scope: "options:market:mintWithSalt" as CapabilityScope,
-  ...(mintView.target === undefined ? {} : { target: mintView.target }),
-  disabled: mintView.disabled,
-  ...(mintView.disabledReason === undefined ? {} : { disabledReason: mintView.disabledReason }),
-  inputSchema: OPTIONS_INPUT_SCHEMAS.mintWithSalt
-});
 
 // --- schema builders (canonical JsonSchema) ---
 

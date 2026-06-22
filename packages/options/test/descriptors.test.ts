@@ -74,14 +74,17 @@ describe("projectOptionsDescriptors — canonical FunctionDescriptors", () => {
     expect(salt?.value.type).toBe("integer");
   });
 
-  it("preserves per-function scope and disabled state from the projection", async () => {
+  it("emits the unified granular console scope bridge:action:<name> and disabled state", async () => {
     const descriptors = await buildDescriptors();
     const setApprovalForAll = byName(descriptors, "setApprovalForAll");
 
-    expect(setApprovalForAll?.scope).toBe("options:nft:setApprovalForAll");
+    // Scope-unification (wave 5): the console scope is uniform + granular, not options:<kind>:<name>.
+    expect(setApprovalForAll?.scope).toBe("bridge:action:setApprovalForAll");
+    expect(byName(descriptors, "fund")?.scope).toBe("bridge:action:fund");
+    expect(byName(descriptors, "mintWithSalt")?.scope).toBe("bridge:action:mintWithSalt");
     for (const descriptor of descriptors) {
       expect(typeof descriptor.disabled).toBe("boolean");
-      expect(descriptor.scope.length).toBeGreaterThan(0);
+      expect(descriptor.scope.startsWith("bridge:action:")).toBe(true);
     }
   });
 });

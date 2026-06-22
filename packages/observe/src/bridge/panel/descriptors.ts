@@ -11,6 +11,7 @@
 // JSON-serializable canonical object for WSS leg B.
 
 import type { FunctionDescriptor, JsonSchema, CapabilityScope } from "@livestreak/schema";
+import { bridgeActionScope } from "@livestreak/schema";
 
 import type { JsonSchema as ObserveJsonSchema } from "#run/control/catalog.js";
 import type { ControlFunctionView, ControlsView } from "./types.js";
@@ -34,7 +35,10 @@ export const projectObserveDescriptors = (controls: ControlsView): readonly Func
 const toDescriptor = (fn: ControlFunctionView, cellKind: string): FunctionDescriptor => ({
   name: fn.name,
   label: fn.label ?? fn.name,
-  scope: fn.scope as CapabilityScope,
+  // Console scope-unification (wave 5): emit the uniform granular console scope `bridge:action:<name>`
+  // so the host authorizes the projected scope directly with no downstream scope normalization. The
+  // package-internal `fn.scope` stays on the control catalog for local use.
+  scope: `${bridgeActionScope}:${fn.name}` as CapabilityScope,
   // observe cells are the descriptor target (kind is widened `string` in the canonical type, which
   // explicitly admits observe cell-kinds).
   target: { kind: cellKind },

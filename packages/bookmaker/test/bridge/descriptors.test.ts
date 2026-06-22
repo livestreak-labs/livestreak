@@ -39,10 +39,10 @@ describe("projectBookmakerDescriptors — canonical FunctionDescriptors", () => 
     expect(prop("seedRate")?.type).toBe("string");
   });
 
-  it("targets the active market and uses the canonical bridge:action scope", () => {
+  it("targets the active market and uses the granular bridge:action:createVault scope", () => {
     const [descriptor] = projectBookmakerDescriptors(panelWith("market-1"));
 
-    expect(descriptor?.scope).toBe("bridge:action");
+    expect(descriptor?.scope).toBe("bridge:action:createVault");
     expect(descriptor?.target).toEqual({ kind: "vault", marketId: "market-1" });
     expect(descriptor?.disabled).toBe(false);
   });
