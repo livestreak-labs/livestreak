@@ -36,6 +36,13 @@ import {
 export interface LocalSinkConfig {
   /** Local SDP signaling channel (sink emits offer, consumer answers). */
   readonly signaling: SinkSignalingChannel;
+  /**
+   * Stream/market id this sink publishes (issue 7: per-stream feed). When set,
+   * the control cell and feed are scoped to this id so each stream gets ITS own
+   * feed rather than one global static asset. Optional for back-compat with the
+   * in-process verify path.
+   */
+  readonly streamId?: string;
   /** Optional override of the WebRTC peer factory (tests inject a loopback). */
   readonly peerConnectionFactory?: RtcPeerConnectionFactory;
   /** Data channel label; defaults to `livestreak-video`. */
@@ -227,7 +234,7 @@ const describeLocalSinkCell = (
   context: DescribeControlContext
 ): ControlCellDefinition => {
   const nowMs = context.nowMs ?? Date.now();
-  const instanceId = context.instanceId ?? "local-preview";
+  const instanceId = context.instanceId ?? config.streamId ?? "local-preview";
 
   return {
     id: `sink:${instanceId}`,
@@ -239,7 +246,7 @@ const describeLocalSinkCell = (
         channelLabel: config.channelLabel ?? defaultChannelLabel,
         subscribe: ["publish.video.rendered"]
       },
-      readonly: {},
+      readonly: config.streamId === undefined ? {} : { streamId: config.streamId },
       functions: []
     }
   };
