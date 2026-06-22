@@ -1,5 +1,9 @@
 /** Homepage card shapes (demo fixture or derived from options panel). */
 
+/** Chain tag carried through from the host catalog so the homepage can scope rails by the
+ *  active chain. Optional because the demo fixture predates the tag (it is never chain-filtered). */
+export type HomepageChain = 'evm' | 'sui'
+
 export interface HomepageStreamCard {
   id: string
   marketId: string
@@ -9,6 +13,7 @@ export interface HomepageStreamCard {
   totalPooled: number
   elapsed: string
   isLive: boolean
+  chain?: HomepageChain
 }
 
 export interface HomepageLiveVaultCard {
@@ -20,6 +25,7 @@ export interface HomepageLiveVaultCard {
   totalPool: number
   status: 'open' | 'hot'
   expiresInSec: number
+  chain?: HomepageChain
 }
 
 export interface HomepageLifetimeVault {
@@ -29,6 +35,7 @@ export interface HomepageLifetimeVault {
   outcome: 'yes' | 'no'
   totalPool: number
   resolvedAtMs: number
+  chain?: HomepageChain
 }
 
 export interface HomepageProtocolStats {

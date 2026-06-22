@@ -73,6 +73,7 @@ export function hostHomepageToCards(d: HostHomepageData): HomepageData {
       totalPooled: s.totalPooled ?? 0,
       elapsed: s.elapsed ?? '',
       isLive: s.isLive,
+      ...(s.chain ? { chain: s.chain } : {}),
     })),
     liveVaults: d.liveVaults.map(v => ({
       vaultId: v.id,
@@ -83,6 +84,7 @@ export function hostHomepageToCards(d: HostHomepageData): HomepageData {
       totalPool: v.totalPool,
       status: v.status,
       expiresInSec: v.expiresIn,
+      ...(v.chain ? { chain: v.chain } : {}),
     })),
     lifetimeVaults: d.lifetimeVaults.map(v => ({
       vaultId: v.id,
@@ -91,6 +93,7 @@ export function hostHomepageToCards(d: HostHomepageData): HomepageData {
       outcome: v.outcome,
       totalPool: v.totalPool,
       resolvedAtMs: Date.now() - v.resolvedAgoMs,
+      ...(v.chain ? { chain: v.chain } : {}),
     })),
     protocolStats: {
       totalVaults: d.protocolStats.totalVaults,
