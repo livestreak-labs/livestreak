@@ -12,7 +12,9 @@ export const passwordOpt = Options.text("password").pipe(Options.optional);
 export const marketOpt = Options.text("market").pipe(Options.optional);
 
 export const tokenOpt = Options.text("token").pipe(
-  Options.withDescription("Position NFT token id (defaults to run.tokenId in livestreak.json)"),
+  Options.withDescription(
+    "Position NFT token id (defaults to run.tokenId; settle discovers it on-chain if omitted)"
+  ),
   Options.optional
 );
 
