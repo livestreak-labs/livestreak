@@ -27,6 +27,25 @@ export interface MappedMarket {
 
 const usdc = (value: bigint): number => Number(value) / USDC_SCALE;
 
+// SINGLE source of truth for "a vault's pooled USDC". Both the live path (`mapMarket`,
+// served at /catalog/full) and the DB read-model path (`snapshotToRows` -> `vaultRowToLiveRaw`,
+// served at /homepage + /stream) derive a vault's pool through THIS function, reading the same
+// on-chain `getVaultPools` (yes/no) totals the per-stream board read uses. Routing every pool
+// read through one cent-rounded formula means the homepage vault card and the per-stream pool
+// can never drift to different numbers for the same snapshot. (pass-3 S2/A7.)
+export const vaultPoolUsdc = (yes: bigint, no: bigint): number =>
+  Math.round(usdc(yes + no) * 100) / 100;
+
+// Parse a base-unit USDC string (DB row column) back to bigint; malformed text -> 0n so one
+// bad row never NaNs the whole rail.
+const toBaseUnits = (text: string): bigint => {
+  try {
+    return BigInt(text);
+  } catch {
+    return 0n;
+  }
+};
+
 const isOpen = (vault: OptionsVault): boolean =>
   vault.status === "open" || vault.status === "hot";
 
@@ -83,7 +102,7 @@ export const mapMarket = (
   const lifetimeVaults: HomepageLifetimeVaultRaw[] = [];
 
   for (const vault of snap.vaults) {
-    const pool = usdc(vault.pools.yes + vault.pools.no);
+    const pool = vaultPoolUsdc(vault.pools.yes, vault.pools.no);
     totalVolume += pool;
 
     if (isOpen(vault)) {
@@ -220,7 +239,10 @@ export const snapshotToRows = (
   for (const vault of snap.vaults) {
     const yesPool = vault.pools.yes;
     const noPool = vault.pools.no;
-    totalPooled += usdc(yesPool + noPool);
+    // Market total is the sum of the SAME per-vault pool figure the homepage rail shows
+    // (`vaultPoolUsdc`), so `/stream.totalPooled` + `protocolStats.totalVolume` and the
+    // per-vault `liveVaults[].totalPool` agree by construction.
+    totalPooled += vaultPoolUsdc(yesPool, noPool);
     const resolved =
       vault.status === "resolved" && (vault.outcome === "yes" || vault.outcome === "no");
     if (vault.status === "open" || vault.status === "hot") activeVaults += 1;
@@ -313,7 +335,7 @@ export const vaultRowToLiveRaw = (
     streamTitle,
     option: v.question,
     multiplier: multiplierFromPools(yes, no),
-    totalPool: Math.round((yes + no) * 100) / 100,
+    totalPool: vaultPoolUsdc(toBaseUnits(v.yes_pool), toBaseUnits(v.no_pool)),
     status: v.status === "hot" ? "hot" : "open",
     expiresIn: Math.max(0, Math.floor((v.expires_at_ms - nowMs) / 1000)),
     chain: v.chain
@@ -334,7 +356,7 @@ export const resolutionRowToLifetime = (
     option: question,
     streamTitle,
     outcome: r.outcome === "no" ? "no" : "yes",
-    totalPool: Math.round((yes + no) * 100) / 100,
+    totalPool: vaultPoolUsdc(toBaseUnits(r.yes_total), toBaseUnits(r.no_total)),
     resolvedAgoMs: Math.max(0, nowMs - r.resolved_at),
     yesTotal: yes,
     noTotal: no,
