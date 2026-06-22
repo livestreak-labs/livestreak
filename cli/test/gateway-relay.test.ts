@@ -1,10 +1,9 @@
-import { bridgeActionScope } from "@livestreak/schema";
+import { bridgeActionScope, type HostCallFrame } from "@livestreak/schema";
 import { describe, expect, it, vi } from "vitest";
 import { assertNoSeedInFrame, createRelay, type DispatchFn } from "../src/gateway/relay.js";
 import { SessionRegistry } from "../src/gateway/session.js";
-import type { CallFrame } from "../src/gateway/protocol.js";
 
-const callFrame = (sessionId: string, action: string, args: unknown = {}): CallFrame => ({
+const callFrame = (sessionId: string, action: string, args: unknown = {}): HostCallFrame => ({
   type: "call",
   callId: `call-${action}`,
   sessionId,
@@ -34,7 +33,7 @@ describe("gateway/relay", () => {
 
     const result = await relay.handleCall(callFrame(rec.sessionId, "withdraw"));
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/not granted/);
+    expect(result.error?.message).toMatch(/not granted/);
     expect(dispatch).not.toHaveBeenCalled();
   });
 
@@ -46,7 +45,7 @@ describe("gateway/relay", () => {
 
     const result = await relay.handleCall(callFrame(rec.sessionId, "fund", { deposit: "500" }));
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/spend cap exceeded/);
+    expect(result.error?.message).toMatch(/spend cap exceeded/);
     expect(dispatch).not.toHaveBeenCalled();
   });
 
@@ -70,7 +69,7 @@ describe("gateway/relay", () => {
     });
     const result = await relay.handleCall(callFrame(rec.sessionId, "fund"));
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/exceeds balance/);
+    expect(result.error?.message).toMatch(/exceeds balance/);
   });
 
   it("seed-safety guard rejects any outbound frame containing seed material", () => {

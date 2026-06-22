@@ -3,8 +3,12 @@
 // the OWNING package's bridge WITH the unlocked seed, and return a `call_result`. The seed lives only
 // inside the dispatch closure (which holds the seed-bound bridge); it never enters a frame or a log.
 
-import type { BridgeCaller, CallActionEnvelope } from "@livestreak/schema";
-import type { CallFrame, CallResultFrame } from "./protocol.js";
+import type {
+  BridgeCaller,
+  CallActionEnvelope,
+  CallResultFrame,
+  HostCallFrame
+} from "@livestreak/schema";
 import type { SessionRegistry } from "./session.js";
 
 // Abstracts the package bridge call so the relay never imports chain/seed code directly. The daemon
@@ -21,23 +25,23 @@ export interface RelayDeps {
 }
 
 export interface Relay {
-  handleCall(frame: CallFrame): Promise<CallResultFrame>;
+  handleCall(frame: HostCallFrame): Promise<CallResultFrame>;
 }
 
 export const createRelay = (deps: RelayDeps): Relay => {
   const now = deps.now ?? (() => Date.now());
 
-  const handleCall = async (frame: CallFrame): Promise<CallResultFrame> => {
+  const handleCall = async (frame: HostCallFrame): Promise<CallResultFrame> => {
     const base = { type: "call_result" as const, callId: frame.callId, sessionId: frame.sessionId };
 
     const decision = deps.registry.authorize(frame.sessionId, frame.envelope, now());
     if (!decision.ok) {
-      return { ...base, ok: false, error: decision.error ?? "denied" };
+      return { ...base, ok: false, error: { message: decision.error ?? "denied" } };
     }
 
     const record = deps.registry.get(frame.sessionId);
     if (record === undefined) {
-      return { ...base, ok: false, error: "unknown session" };
+      return { ...base, ok: false, error: { message: "unknown session" } };
     }
 
     try {
@@ -53,7 +57,11 @@ export const createRelay = (deps: RelayDeps): Relay => {
       return { ...base, ok: true, result: payload };
     } catch (error) {
       // Surface the package error message (these are authz/validation/chain errors — never the seed).
-      return { ...base, ok: false, error: error instanceof Error ? error.message : String(error) };
+      return {
+        ...base,
+        ok: false,
+        error: { message: error instanceof Error ? error.message : String(error) }
+      };
     }
   };
 

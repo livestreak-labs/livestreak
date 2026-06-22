@@ -4,14 +4,15 @@
 // locks the keystore (never hold an unlocked seed with no supervisor).
 
 import WebSocket from "ws";
-import { assertNoSeedInFrame, type Relay } from "./relay.js";
+import type { FunctionDescriptor } from "@livestreak/schema";
 import {
   isHostFrame,
-  type CallFrame,
   type GatewayFrame,
+  type HostCallFrame,
   type RegisterFrame,
   type RevokeFrame
-} from "./protocol.js";
+} from "@livestreak/schema";
+import { assertNoSeedInFrame, type Relay } from "./relay.js";
 import type { SessionRecord, SessionRegistry } from "./session.js";
 
 export interface WssClientDeps {
@@ -26,8 +27,16 @@ export interface WssClientDeps {
   readonly log?: (line: string) => void;
 }
 
+export interface RegisterInput {
+  readonly record: SessionRecord;
+  // scrypt verifier of the pairing password — the host verifies `/join` against it.
+  readonly passwordVerifier: string;
+  // Gateway-projected, console-normalized function catalog for the UI.
+  readonly functions?: readonly FunctionDescriptor[];
+}
+
 export interface WssClient {
-  register(record: SessionRecord, spendCapUSDC?: bigint): void;
+  register(input: RegisterInput): void;
   revoke(sessionId: string): void;
   send(frame: GatewayFrame): void;
   close(): void;
@@ -61,7 +70,7 @@ export const connectGateway = (deps: WssClientDeps): WssClient => {
     }
   };
 
-  const onCall = (frame: CallFrame): void => {
+  const onCall = (frame: HostCallFrame): void => {
     void deps.relay
       .handleCall(frame)
       .then((result) => safeSend(result))
@@ -72,7 +81,7 @@ export const connectGateway = (deps: WssClientDeps): WssClient => {
           callId: frame.callId,
           sessionId: frame.sessionId,
           ok: false,
-          error: "internal relay error"
+          error: { message: "internal relay error" }
         });
       });
   };
@@ -131,13 +140,17 @@ export const connectGateway = (deps: WssClientDeps): WssClient => {
   open();
 
   return {
-    register: (record, spendCapUSDC) => {
+    register: ({ record, passwordVerifier, functions }) => {
+      // The spend cap is gateway-LOCAL (enforced in SessionRegistry.authorize) and is
+      // intentionally NOT sent on the wire — the host neither needs nor stores it.
       const frame: RegisterFrame = {
         type: "register",
         sessionId: record.sessionId,
         scopes: record.scopes,
         ttlMs: Math.max(0, record.expiresAt - record.createdAtMs),
-        ...(spendCapUSDC === undefined ? {} : { spendCapUSDC: spendCapUSDC.toString() })
+        passwordVerifier,
+        ...(deps.authToken === undefined ? {} : { gatewayToken: deps.authToken }),
+        ...(functions === undefined ? {} : { functions })
       };
       safeSend(frame);
     },

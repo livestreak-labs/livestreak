@@ -3,6 +3,9 @@ import {
   createOptionsBridge,
   createOptionsChain,
   createOptionsRuntime,
+  projectOptionsDescriptors,
+  projectOptionsPanel,
+  readUserOptionsSnapshot,
   type CallActionEnvelope,
   type MarketId,
   type OptionsBoard,
@@ -12,7 +15,7 @@ import {
   type OptionsRuntime,
   type UserAddress
 } from "@livestreak/options";
-import type { WalletInit } from "@livestreak/schema";
+import type { FunctionDescriptor, WalletInit } from "@livestreak/schema";
 import { localOperatorCaller } from "../gateway/caller.js";
 import type { LivestreakInitDoc } from "../prefs/init-doc.js";
 
@@ -38,6 +41,9 @@ export interface OptionsEdge {
   readonly chain: OptionsChain;
   readBoard(): Promise<OptionsBoard>;
   readControls(): Promise<OptionsControlsView>;
+  // Canonical FunctionDescriptor[] for the Remote Bridge Console (the gateway projects these,
+  // normalizes scopes, and forwards them to the host → UI). Reads a live user snapshot.
+  describeFunctions(): Promise<readonly FunctionDescriptor[]>;
   callAction(action: string, args: unknown): Promise<string>;
   mint(args: { readonly marketId: MarketId; readonly to: UserAddress }): Promise<MintOutcome>;
   subscribeBoard(listener: (board: OptionsBoard) => void): () => void;
@@ -88,6 +94,15 @@ export const createOptionsEdge = (input: CreateOptionsEdgeInput): OptionsEdge =>
     readBoard: () => bridge.readBoard(caller),
 
     readControls: () => bridge.readControls(caller),
+
+    describeFunctions: async () => {
+      const snapshot = await readUserOptionsSnapshot(
+        chain.reader,
+        input.userAddress,
+        marketId as MarketId | undefined
+      );
+      return projectOptionsDescriptors(projectOptionsPanel(snapshot));
+    },
 
     callAction: async (action, args) => {
       const envelope: CallActionEnvelope = {

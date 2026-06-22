@@ -7,6 +7,8 @@ import { resolvePassword } from "../gateway/password.js";
 import { defaultKeystorePath, ensureAndUnlock } from "../gateway/keystore.js";
 import { createRelay, type DispatchFn } from "../gateway/relay.js";
 import { SessionRegistry, parseScopes, parseTtlMs } from "../gateway/session.js";
+import { generatePairingPassword, makePasswordVerifier } from "../gateway/pairing.js";
+import { projectConsoleFunctions } from "../gateway/console-functions.js";
 import {
   activeSessions,
   defaultSessionStorePath,
@@ -38,10 +40,16 @@ export const runRemoteOpen = async (input: {
   readonly ttl: string;
   readonly spendCap?: string;
   readonly hostWss?: string;
+  readonly pairPassword?: string;
 }): Promise<string> => {
   const scopes = parseScopes(input.scopes);
   const ttlMs = parseTtlMs(input.ttl);
   const spendCapUSDC = input.spendCap === undefined ? undefined : BigInt(input.spendCap);
+
+  // The PAIRING password is shared with the remote user and is SEPARATE from the keystore password.
+  // Only its scrypt verifier crosses the wire; the host never sees the plaintext.
+  const pairingPassword = input.pairPassword ?? generatePairingPassword();
+  const passwordVerifier = makePasswordVerifier(pairingPassword);
 
   const password = await resolvePassword(input.password);
   const ctx = await resolveOperatorContext({ ...input, password });
@@ -96,6 +104,15 @@ export const runRemoteOpen = async (input: {
     return { txId: String(result) };
   };
 
+  // Project the in-scope console function catalog (best-effort: a chain-read failure must not stop the
+  // daemon — the host can still relay; the UI just renders no auto-forms until functions arrive).
+  let consoleFunctions: readonly import("@livestreak/schema").FunctionDescriptor[] = [];
+  try {
+    consoleFunctions = projectConsoleFunctions(await edge.describeFunctions(), scopes);
+  } catch (error) {
+    console.error(`[gateway] function projection skipped: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   const relay = createRelay({ registry, dispatch });
   const hostWss = deriveHostWss(ctx.doc.host.url, input.hostWss);
   const wss = connectGateway({
@@ -119,7 +136,11 @@ export const runRemoteOpen = async (input: {
       console.error(`[gateway] ${line}`);
     }
   });
-  wss.register(record, spendCapUSDC);
+  wss.register({
+    record,
+    passwordVerifier,
+    ...(consoleFunctions.length === 0 ? {} : { functions: consoleFunctions })
+  });
 
   // Cross-process revoke + TTL expiry watcher: sync store revocations into the live registry; lock &
   // exit when the session ends.
@@ -165,12 +186,13 @@ export const runRemoteOpen = async (input: {
         "livestreak remote open",
         "",
         `pairing code: ${record.sessionId}`,
+        `pairing pass: ${pairingPassword}`,
         `scopes:       ${record.scopes.join(", ")}`,
         `expires in:   ${ttlSecs}s`,
         spendCapUSDC === undefined ? "spend cap:    none" : `spend cap:    ${spendCapUSDC.toString()} (atomic USDC)`,
         `host (leg A): ${hostWss}`,
         "",
-        "Share the pairing code with the remote operator. Ctrl-C to revoke & exit."
+        "Share the pairing code AND pairing pass with the remote operator. Ctrl-C to revoke & exit."
       ].join("\n")
     );
   });
@@ -203,11 +225,23 @@ const scopesOpt = Options.text("scopes").pipe(
 const ttlOpt = Options.text("ttl").pipe(Options.withDescription("Session lifetime, e.g. 30m, 1h, 90s"));
 const spendCapOpt = Options.text("spend-cap").pipe(Options.optional);
 const hostWssOpt = Options.text("host-wss").pipe(Options.optional);
+const pairPasswordOpt = Options.text("pair-password").pipe(
+  Options.withDescription("Pairing password shared with the remote user (generated if omitted)"),
+  Options.optional
+);
 
 const remoteOpenCommand = Command.make(
   "open",
-  { scopes: scopesOpt, ttl: ttlOpt, spendCap: spendCapOpt, hostWss: hostWssOpt, config: configOpt, password: passwordOpt },
-  ({ scopes, ttl, spendCap, hostWss, config, password }) =>
+  {
+    scopes: scopesOpt,
+    ttl: ttlOpt,
+    spendCap: spendCapOpt,
+    hostWss: hostWssOpt,
+    pairPassword: pairPasswordOpt,
+    config: configOpt,
+    password: passwordOpt
+  },
+  ({ scopes, ttl, spendCap, hostWss, pairPassword, config, password }) =>
     Effect.tryPromise({
       try: () =>
         runRemoteOpen({
@@ -215,6 +249,7 @@ const remoteOpenCommand = Command.make(
           ttl,
           ...(Option.isSome(spendCap) ? { spendCap: spendCap.value } : {}),
           ...(Option.isSome(hostWss) ? { hostWss: hostWss.value } : {}),
+          ...(Option.isSome(pairPassword) ? { pairPassword: pairPassword.value } : {}),
           ...readCommandConfig(config, password)
         }),
       catch: (error) => (error instanceof Error ? error : new Error(String(error)))
