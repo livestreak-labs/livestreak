@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { CapabilityGrant } from "@livestreak/schema";
+import { hasAnyScope, type CapabilityGrant, type FunctionDescriptor } from "@livestreak/schema";
 import type { HostGrantSigner } from "./grant.js";
 import { grantAuthorizes } from "./grant.js";
 import type { RemoteSessionStore } from "./session-store.js";
@@ -59,6 +59,11 @@ export const createRemoteRelay = (
   const boundGrants = new Map<string, CapabilityGrant>();
   const grantKey = (sessionId: string, connId: string): string => `${sessionId}::${connId}`;
 
+  const filterFunctionsByGrant = (
+    functions: readonly FunctionDescriptor[],
+    grant: CapabilityGrant
+  ): readonly FunctionDescriptor[] => functions.filter((fn) => hasAnyScope([grant], fn.scope));
+
   const closeSession = (
     sessionId: string,
     reason: "ttl_expired" | "revoked" | "gateway_down"
@@ -108,7 +113,8 @@ export const createRemoteRelay = (
       scopes: register.scopes,
       passwordVerifier: register.passwordVerifier,
       ttlMs: register.ttlMs,
-      gateway: (frame) => conn.send(frame)
+      gateway: (frame) => conn.send(frame),
+      ...(Array.isArray(register.functions) ? { functions: register.functions } : {})
     });
     conn.send({ type: "ack", sessionId, remoteUrl: `${config.remoteBaseUrl}/remote/${sessionId}` });
     return true;
@@ -199,7 +205,10 @@ export const createRemoteRelay = (
     }
     store.bindUi(sessionId, connId, (frame) => conn.send(frame));
     boundGrants.set(grantKey(sessionId, connId), grant);
-    conn.send({ type: "ready", sessionId });
+    // Filter the gateway-projected catalog by THIS grant's scopes server-side, so
+    // the UI only ever learns about functions it is actually authorized to call.
+    const functions = filterFunctionsByGrant(session.functions, grant);
+    conn.send({ type: "ready", sessionId, functions });
     return true;
   };
 

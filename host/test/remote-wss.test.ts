@@ -45,9 +45,14 @@ describe("remote WSS transport (real sockets)", () => {
       JSON.stringify({
         type: "register",
         sessionId,
-        scopes: ["bridge:action"],
+        scopes: ["bridge:action:fund"],
         ttlMs: 60_000,
-        passwordVerifier: makePasswordVerifier("pw")
+        passwordVerifier: makePasswordVerifier("pw"),
+        functions: [
+          { name: "fund", label: "Fund", scope: "bridge:action:fund", disabled: false },
+          // out-of-scope for this session's grant → must be filtered out server-side.
+          { name: "withdraw", label: "Withdraw", scope: "bridge:action:withdraw", disabled: false }
+        ]
       })
     );
     const ack = await nextJson(gw);
@@ -57,7 +62,7 @@ describe("remote WSS transport (real sockets)", () => {
     const grant = deps.remote.signer.issueGrant({
       sessionId,
       holder: "ui:e2e",
-      scopes: ["bridge:action"],
+      scopes: ["bridge:action:fund"],
       expiresAt: Date.now() + 60_000
     });
 
@@ -65,7 +70,11 @@ describe("remote WSS transport (real sockets)", () => {
     const ui = new WebSocket(`${base}/remote/${sessionId}/ui`);
     await new Promise((r) => ui.once("open", r));
     ui.send(JSON.stringify({ type: "ui.hello", sessionId, grant, seq: 0 }));
-    expect((await nextJson(ui)).type).toBe("ready");
+    const ready = await nextJson(ui);
+    expect(ready.type).toBe("ready");
+    // The host filters the gateway catalog by THIS grant's scopes: only `fund` survives.
+    const readyFns = ready.functions as ReadonlyArray<{ name: string }>;
+    expect(readyFns.map((f) => f.name)).toEqual(["fund"]);
 
     // Gateway answers the relayed call.
     gw.on("message", (d) => {

@@ -150,12 +150,12 @@ describe("remote relay — scope enforcement, replay, isolation", () => {
   it("forwards an in-scope action to the gateway and drops a replayed envelope", () => {
     const service = newService();
     const sessionId = "sess_ok";
-    const { gw } = registerSession(service, sessionId, ["bridge:action"], "pw");
+    const { gw } = registerSession(service, sessionId, ["bridge:action:fund"], "pw");
 
     const grant = service.signer.issueGrant({
       sessionId,
       holder: "ui:test",
-      scopes: ["bridge:action"],
+      scopes: ["bridge:action:fund"],
       expiresAt: Date.now() + 60_000
     });
     const ui = fakeConn();

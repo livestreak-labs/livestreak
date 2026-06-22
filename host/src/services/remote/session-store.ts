@@ -1,5 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import type { CapabilityScope } from "@livestreak/schema";
+import type { CapabilityScope, FunctionDescriptor } from "@livestreak/schema";
 
 // --- Remote Bridge Console: in-memory session registry (P4) ---
 //
@@ -16,6 +16,8 @@ export interface RemoteSession {
   readonly sessionId: string;
   readonly scopes: readonly CapabilityScope[];
   readonly passwordVerifier: string;
+  // Gateway-projected, console-normalized function catalog (the UI renders these).
+  readonly functions: readonly FunctionDescriptor[];
   expiresAt: number;
   revoked: boolean;
   gateway: GatewaySink | null;
@@ -31,6 +33,7 @@ export interface RegisterSessionInput {
   readonly passwordVerifier: string;
   readonly ttlMs: number;
   readonly gateway: GatewaySink;
+  readonly functions?: readonly FunctionDescriptor[];
 }
 
 const NONCE_WINDOW = 512;
@@ -88,6 +91,7 @@ export const createRemoteSessionStore = (): RemoteSessionStore => {
       sessionId: input.sessionId,
       scopes: input.scopes,
       passwordVerifier: input.passwordVerifier,
+      functions: input.functions ?? [],
       expiresAt: Date.now() + input.ttlMs,
       revoked: false,
       gateway: input.gateway,
