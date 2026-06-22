@@ -14,12 +14,13 @@ export function ChainSelector() {
   if (!optionsEnabled) return null
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+    <div data-testid="chain-selector" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       {CHAINS.map(item => {
         const active = chain === item.id
         return (
           <button
             key={item.id}
+            data-testid={`chain-select-${item.id}`}
             type="button"
             disabled={isLoading || (isConnected && !active)}
             title={isConnected && !active ? 'Disconnect to switch chain' : undefined}

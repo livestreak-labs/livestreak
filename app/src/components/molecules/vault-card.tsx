@@ -67,6 +67,7 @@ export function VaultCard({ vault, index = 0 }: { vault: OptionsVault; index?: n
   return (
     <motion.div
       id={`vault-${vault.vaultId}`}
+      data-testid={`vault-card-${vault.vaultId}`}
       layout
       initial={{ opacity: 0, transform: 'translateY(8px)', filter: 'blur(4px)' }}
       animate={{ opacity: 1, transform: 'translateY(0px)', filter: 'blur(0px)' }}
@@ -113,6 +114,7 @@ export function VaultCard({ vault, index = 0 }: { vault: OptionsVault; index?: n
         {canBet && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
             <button
+              data-testid={`fund-yes-${vault.vaultId}`}
               className="vault-bet-btn vault-bet-yes"
               onClick={() => setExpanded(true)}
               disabled={funding.useOptions && funding.fundYes?.disabled && !funding.activeFundedSide}
@@ -128,7 +130,7 @@ export function VaultCard({ vault, index = 0 }: { vault: OptionsVault; index?: n
               <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', color: '#00ff87' }}>YES</span>
               <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'rgba(0,255,135,0.6)' }}>+{formatMultiplier(yesMultiplier)}</span>
             </button>
-            <button className="vault-bet-no" onClick={() => setExpanded(true)} style={{
+            <button data-testid={`fund-no-${vault.vaultId}`} className="vault-bet-no" onClick={() => setExpanded(true)} style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               padding: '7px 0', borderRadius: 7, border: '1px solid rgba(255,45,120,0.25)',
               background: hasPos && view.userPosition?.side === 'no' ? 'rgba(255,45,120,0.15)' : 'rgba(255,45,120,0.06)',
@@ -201,7 +203,7 @@ export function VaultCard({ vault, index = 0 }: { vault: OptionsVault; index?: n
           >
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '12px 14px' }}>
               {canBet && (
-                <div style={{ marginBottom: 14 }}>
+                <div data-testid={`fund-amount-${vault.vaultId}`} style={{ marginBottom: 14 }}>
                   <StreamSlider
                     vaultId={vault.vaultId}
                     initialSide={funding.activeFundedSide ?? view.userPosition?.side ?? null}

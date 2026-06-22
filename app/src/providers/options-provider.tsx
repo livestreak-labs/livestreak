@@ -33,7 +33,7 @@ import {
   type UserAddress,
 } from '@livestreak/options'
 
-import { HOST_BASE_URL, LOCAL_CHAIN_ID, defaultOptionsMarketId, isOptionsModeEnabled } from '#/utils/env'
+import { HOST_BASE_URL, LOCAL_CHAIN_ID, defaultOptionsMarketId, isOptionsModeEnabled, testOptionsSeed } from '#/utils/env'
 import {
   buildOptionsContractAddresses,
   LOCALHOST_AA_CONTRACTS,
@@ -349,7 +349,12 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
 
   const connect = useCallback(async (password: string) => {
     if (!enabled) return
-    if (!password.trim()) {
+    // Test-only override: a configured `VITE_OPTIONS_SEED` makes connect derive from a fixed
+    // seed (e.g. "1234") so the operator wallet is reproducible across E2E runs. Derivation is
+    // byte-identical to the CLI's deriveSeedFromPassword (sha256(STEALTH_DOMAIN + seed)). When the
+    // env var is unset this is undefined and the typed password is used exactly as before.
+    const effectiveSeed = testOptionsSeed() ?? password
+    if (!effectiveSeed.trim()) {
       setError('Password required')
       return
     }
@@ -361,7 +366,7 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     setIsLoading(true)
     setError(null)
     try {
-      const secret = toBytes(sha256(toBytes(STEALTH_DOMAIN + password)))
+      const secret = toBytes(sha256(toBytes(STEALTH_DOMAIN + effectiveSeed)))
       sessionStorage.setItem(SESSION_SECRET_KEY, bytesToHex(secret))
 
       const chainConfig = buildChainConfig(chainRef.current, secret, walletInitRef.current)
