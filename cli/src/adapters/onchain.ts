@@ -26,7 +26,6 @@ import {
 import {
   createPublicClient,
   encodeFunctionData,
-  erc20Abi,
   http,
   parseEventLogs,
   type Abi,
@@ -126,32 +125,8 @@ export const sendContractCall = async (
   return { userOpHash: sendResult.hash, userOpReceipt };
 };
 
-export const ensureErc20Approval = async (
-  account: WalletAccountEvmErc4337,
-  publicClient: PublicClient,
-  token: `0x${string}`,
-  spender: `0x${string}`,
-  amount: bigint
-): Promise<string | undefined> => {
-  const owner = (await account.getAddress()) as `0x${string}`;
-  const allowance = await publicClient.readContract({
-    address: token,
-    abi: erc20Abi,
-    functionName: "allowance",
-    args: [owner, spender]
-  });
-
-  if (allowance >= amount) {
-    return undefined;
-  }
-
-  const { userOpHash } = await sendContractCall(account, token, erc20Abi, "approve", [
-    spender,
-    amount
-  ]);
-
-  return userOpHash;
-};
+// ensureErc20Approval removed (G4): options `fund`/`setLanes` and bookmaker `createVault` approve
+// USDC internally now, so the CLI no longer pre-approves at the edge.
 
 // ── goLive / setEnded (TEMP: migrates to @livestreak/observe) ───────────────
 

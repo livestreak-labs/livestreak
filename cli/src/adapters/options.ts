@@ -24,6 +24,14 @@ export interface CreateOptionsEdgeInput {
   readonly marketId?: MarketId;
 }
 
+// The options bridge `mint`/`mintWithSalt` actions return `{txId, tokenId}` (options chains/types
+// MintResult — not re-exported from the package root, so we describe the runtime shape locally and
+// stringify both fields). Lets the CLI drop the TEMP onchain `operatorMintNft` for the plain path.
+export interface MintOutcome {
+  readonly txId: string;
+  readonly tokenId: string;
+}
+
 export interface OptionsEdge {
   readonly runtime: OptionsRuntime;
   readonly bridge: OptionsBridge;
@@ -31,6 +39,7 @@ export interface OptionsEdge {
   readBoard(): Promise<OptionsBoard>;
   readControls(): Promise<OptionsControlsView>;
   callAction(action: string, args: unknown): Promise<string>;
+  mint(args: { readonly marketId: MarketId; readonly to: UserAddress }): Promise<MintOutcome>;
   subscribeBoard(listener: (board: OptionsBoard) => void): () => void;
   refresh(): Promise<void>;
 }
@@ -88,6 +97,19 @@ export const createOptionsEdge = (input: CreateOptionsEdgeInput): OptionsEdge =>
       };
       const txId = await bridge.callAction(caller, envelope);
       return String(txId);
+    },
+
+    mint: async (args) => {
+      const envelope: CallActionEnvelope = {
+        scope: bridgeActionScope,
+        action: "mint",
+        args
+      };
+      const result = (await bridge.callAction(caller, envelope)) as {
+        readonly txId: unknown;
+        readonly tokenId: unknown;
+      };
+      return { txId: String(result.txId), tokenId: String(result.tokenId) };
     },
 
     subscribeBoard: (listener) => bridge.subscribeBoard(caller, listener),

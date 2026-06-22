@@ -32,16 +32,39 @@ export const runNftMint = async (input: {
   const ctx = await resolveOperatorContext({ ...input, configPath });
   const marketId = parseMarketIdArg(input.market);
 
-  const result = await operatorMintNft({
-    account: ctx.account,
-    publicClient: ctx.publicClient,
-    marketDriverAddress: ctx.doc.options.marketDriver,
-    marketId: asMarketId(marketId),
-    ...(input.salt !== undefined ? { salt: input.salt } : {}),
-    ...(input.to !== undefined ? { to: input.to as `0x${string}` } : {})
-  });
+  let tokenId: string;
+  let tx: string;
+  if (input.salt !== undefined) {
+    // TEMP (salt path only): the options bridge `mintWithSalt` validates/encodes salt as bytes32,
+    // but the contract's `mintWithSalt(bytes32,uint64,address)` takes a uint64 salt — so the bridge
+    // salt path is broken against the live ABI. Keep the edge-side uint64 mint here until options
+    // reconciles the salt type. See context/temp-convo/options/inbox/from-cli__reconcile-mintwithsalt-salt.md.
+    const result = await operatorMintNft({
+      account: ctx.account,
+      publicClient: ctx.publicClient,
+      marketDriverAddress: ctx.doc.options.marketDriver,
+      marketId: asMarketId(marketId),
+      salt: input.salt,
+      ...(input.to !== undefined ? { to: input.to as `0x${string}` } : {})
+    });
+    tokenId = result.tokenId.toString();
+    tx = result.tx;
+  } else {
+    // Plain mint now routes through the options bridge (G2: returns {txId, tokenId}).
+    const edge = createOptionsEdge({
+      doc: ctx.doc,
+      walletInit: ctx.walletInit,
+      seed: ctx.seed,
+      userAddress: ctx.userAddress
+    });
+    const result = await edge.mint({
+      marketId: asMarketId(marketId),
+      to: asUserAddress(input.to ?? ctx.userAddress)
+    });
+    tokenId = result.tokenId;
+    tx = result.txId;
+  }
 
-  const tokenId = result.tokenId.toString();
   await saveInitDoc(configPath, {
     ...ctx.doc,
     run: {
@@ -53,7 +76,7 @@ export const runNftMint = async (input: {
     }
   });
 
-  return renderNftMintResult({ tokenId, tx: result.tx, marketId });
+  return renderNftMintResult({ tokenId, tx, marketId });
 };
 
 export const runNftTransfer = async (input: {
