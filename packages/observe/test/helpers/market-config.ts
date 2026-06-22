@@ -9,6 +9,7 @@ export const minimalEvmWalletInit = () =>
       chainId: 31_337,
       provider: "http://127.0.0.1:8545",
       bundlerUrl: "http://127.0.0.1:4337",
+      paymasterUrl: "http://127.0.0.1:4337/paymaster",
       isSponsored: true,
       useNativeCoins: false,
       entryPointAddress: Address.make("0x0000000000000000000000000000000000000001"),
