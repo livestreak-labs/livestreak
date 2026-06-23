@@ -98,5 +98,8 @@ const catalogKindToSinkKind = (catalog: string | undefined): string => {
   if (catalog === "sink:file") {
     return "file";
   }
+  if (catalog === "sink:local") {
+    return "local";
+  }
   return "unknown";
 };
