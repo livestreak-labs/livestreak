@@ -15,23 +15,11 @@ import {
   type ReactNode,
 } from 'react'
 import type { CallActionEnvelope, CapabilityGrant, FunctionDescriptor } from '@livestreak/schema'
-import {
-  LocalMockTransport,
-  type CallResult,
-  type RemoteBoard,
-  type RemoteStatus,
-  type RemoteTransport,
-} from '#/utils/remote-transport'
+import type { CallResult, RemoteBoard, RemoteStatus, RemoteTransport } from '#/utils/remote-transport'
 import { HostWssTransport } from '#/utils/host-wss-transport'
-import { demoMockSeed } from '#/utils/remote-mock-seed'
 import { env } from '#/utils/env'
 
-// Session-aware transport: real CLI-minted sessions use HostWssTransport against the
-// host relay; only the keynote `demo` fixture stays on the in-process LocalMockTransport.
-function defaultTransport(sessionId: string): RemoteTransport {
-  if (sessionId === 'demo') {
-    return new LocalMockTransport(demoMockSeed)
-  }
+function defaultTransport(_sessionId: string): RemoteTransport {
   return new HostWssTransport({ hostBaseUrl: env.hostBaseUrl })
 }
 

@@ -1,7 +1,6 @@
-// HostWssTransport — the REAL leg-B client for the Remote Bridge Console (P5).
+// HostWssTransport — leg-B client for the Remote Bridge Console (P5).
 //
-// Implements the same `RemoteTransport` interface as `LocalMockTransport`, so it drops into
-// `RemoteProvider` unchanged. It speaks the ONE canonical wire protocol from `@livestreak/schema`:
+// Speaks the canonical wire protocol from `@livestreak/schema`:
 //   redeem  → POST /remote/:session/join (password → host-signed grant)
 //   connect → open WSS to /remote/:session/ui, send ui.hello{grant, seq:0}, await `ready` (+ functions)
 //   send    → call{callId, seq, nonce, envelope} → await the matching call_result
