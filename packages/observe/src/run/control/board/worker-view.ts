@@ -83,6 +83,10 @@ const projectSinkPolicies = (board: Board): readonly WorkerControlSinkPolicy[] =
       continue;
     }
 
+    if (cell.readonly?.configured === false) {
+      continue;
+    }
+
     policies.push({
       sinkId: cellId.slice("sink:".length),
       kind: catalogKindToSinkKind(cell.catalog),

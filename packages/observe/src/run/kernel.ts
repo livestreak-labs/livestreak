@@ -10,7 +10,9 @@ import { buildControlCatalog } from "./control/catalog.js";
 import { createControlBus, stageCellSurface } from "./control/bus/index.js";
 import { applyWorkerSnapshotToBoard } from "./control/board/index.js";
 import { validateBoardSettings } from "./control/board/index.js";
+import { bootstrapLegacyObserveBoard } from "./control/board/legacy-bootstrap.js";
 import { createObserveControlSurfaces } from "./control/surfaces.js";
+import type { BoardPatch } from "./control/bus/types.js";
 import type { SystemRunHooks } from "./control/system/run.js";
 import { systemRunStopScope } from "./control/index.js";
 import type { DescribeControlContext } from "./control/bus/index.js";
@@ -57,7 +59,8 @@ export const prepareObserveRun = (
     const captureConfig = yield* captureDriver.validate(run.config.capture.config);
     const sinkConfig = yield* sinkDriver.validate(run.config.sink.config);
 
-    let board = setBoardRunStatus(run.board, "preparing", "validating observe run");
+    let board = bootstrapLegacyObserveBoard(run.board, run.config);
+    board = setBoardRunStatus(board, "preparing", "validating observe run");
 
     const bus = yield* createControlBus({
       runId: run.config.runId,
@@ -70,7 +73,7 @@ export const prepareObserveRun = (
     });
 
     const nowMs = Date.now();
-    const sinkInstanceId = run.config.sink.instanceId ?? "file-export";
+    const sinkInstanceId = resolveSinkInstanceId(run.config);
     const captureContext: DescribeControlContext = {
       runId: run.config.runId,
       nowMs
@@ -86,6 +89,7 @@ export const prepareObserveRun = (
 
     const sinkCell = yield* sinkDriver.describeControl(sinkConfig, sinkContext);
     yield* bus.mountSurface(stageCellSurface(sinkCell));
+    yield* bus.applyBoardPatch(markSinkCellConfiguredPatch(sinkCell.id));
 
     board = yield* bus.readBoard();
     yield* validateBoardSettings(board);
@@ -136,7 +140,7 @@ export const startObserveRun = (
         yield* bus.mountSurface(attachment.control);
       }
 
-      const sinkInstanceId = run.config.sink.instanceId ?? "file-export";
+      const sinkInstanceId = resolveSinkInstanceId(run.config);
       const sinks: Record<string, SinkStageState> = {
         [sinkInstanceId]: {
           attachment,
@@ -256,6 +260,32 @@ export const stopObserveRun = (
   });
 
 // --- helpers ---
+
+const resolveSinkInstanceId = (config: ObserveRun["config"]): string => {
+  if (config.sink.instanceId !== undefined) {
+    return config.sink.instanceId;
+  }
+
+  if (config.sink.driverId === "memory") {
+    return "memory-sink";
+  }
+
+  if (config.sink.driverId === "local") {
+    return "local";
+  }
+
+  return "file-export";
+};
+
+const markSinkCellConfiguredPatch = (cellId: string): BoardPatch => ({
+  cells: {
+    [cellId]: {
+      readonly: {
+        set: { configured: true }
+      }
+    }
+  }
+});
 
 const resolveSinkDriver = (
   sinkDriverId: string,
