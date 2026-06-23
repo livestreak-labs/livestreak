@@ -15,6 +15,20 @@ export const Route = createFileRoute('/')({
 
 const CHAIN_LABEL: Record<'evm' | 'sui', string> = { evm: 'EVM', sui: 'Sui' }
 
+/** Permutation #4: headline = effective pool; muted settled subline when host splits them. */
+function showsSettledSubline(effective: number, settled?: number): settled is number {
+  return settled !== undefined && effective > settled
+}
+
+function SettledPoolSubline({ effective, settled }: { effective: number; settled?: number }) {
+  if (!showsSettledSubline(effective, settled)) return null
+  return (
+    <span className="mono" style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.02em' }}>
+      Settled {formatUSDCFull(settled)}
+    </span>
+  )
+}
+
 function HomePage() {
   const { streams, liveVaults, lifetimeVaults, protocolStats } = useHomepageData()
   const preferFixture = usePreferFixture()
@@ -261,7 +275,13 @@ function StreamCard({ stream, index }: { stream: HomepageStreamCard; index: numb
           <p style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.35, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stream.title}</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Stack size={11} color="rgba(255,255,255,0.3)" /><span className="mono" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{stream.activeVaults} vaults</span></div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><CurrencyDollar size={11} color="#00c8ff" /><span className="mono" style={{ fontSize: 11, color: '#00c8ff' }}>{formatUSDCFull(stream.totalPooled)}</span></div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <CurrencyDollar size={11} color="#00c8ff" />
+                <span className="mono" style={{ fontSize: 11, color: '#00c8ff', fontWeight: 600 }}>{formatUSDCFull(stream.totalPooled)}</span>
+              </div>
+              <SettledPoolSubline effective={stream.totalPooled} settled={stream.settledPooled} />
+            </div>
           </div>
           {stream.elapsed && (
             <div style={{ marginTop: 8 }}><span className="mono" style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>{stream.elapsed}</span></div>
@@ -296,10 +316,13 @@ function LiveVaultCard({ vault, index }: { vault: HomepageLiveVaultCard; index: 
             {vault.multiplier.toFixed(2)}x
           </span>
         </div>
-        <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>Pool</span>
-            <span className="mono" style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{formatUSDCFull(vault.totalPool)}</span>
+        <div style={{ marginTop: 6, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>Pool</span>
+              <span className="mono" style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.55)' }}>{formatUSDCFull(vault.totalPool)}</span>
+            </div>
+            <SettledPoolSubline effective={vault.totalPool} settled={vault.settledPool} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <Clock size={10} color="rgba(255,255,255,0.2)" />
