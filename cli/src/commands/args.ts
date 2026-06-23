@@ -64,6 +64,34 @@ export const parseBigIntArg = (value: string, label: string): bigint => {
   }
 };
 
+/** EVM LVST = 18 decimals; Sui LVST = 9 (D2 decision — chain-local). */
+export const LVST_DECIMALS_EVM = 18;
+export const LVST_DECIMALS_SUI = 9;
+
+export const parseHumanLvstAmount = (
+  value: string,
+  chain: "evm" | "sui" = "evm"
+): bigint => {
+  const trimmed = value.trim();
+  if (!/^\d+(\.\d+)?$/.test(trimmed)) {
+    throw new Error("amount must be a positive decimal LVST quantity (e.g. 400 or 0.5)");
+  }
+
+  const decimals = chain === "sui" ? LVST_DECIMALS_SUI : LVST_DECIMALS_EVM;
+  const [whole, fraction = ""] = trimmed.split(".");
+  if (fraction.length > decimals) {
+    throw new Error(`amount has more than ${decimals} decimal places for ${chain} LVST`);
+  }
+
+  const scale = 10n ** BigInt(decimals);
+  const raw = BigInt(whole) * scale + BigInt(fraction.padEnd(decimals, "0"));
+  if (raw <= 0n) {
+    throw new Error("amount must be > 0");
+  }
+
+  return raw;
+};
+
 export const parseNonNegativeBigIntArg = (value: string, label: string): bigint => {
   try {
     const parsed = BigInt(value);
