@@ -39,8 +39,26 @@ export const createOptionsConsoleEdge = (input: CreateOptionsConsoleEdgeInput): 
     package: "options",
 
     describeFunctions: async (): Promise<readonly FunctionDescriptor[]> => {
-      const snapshot = await readUserOptionsSnapshot(chain.reader, input.userAddress, undefined);
-      return projectOptionsDescriptors(projectOptionsPanel(snapshot));
+      try {
+        const snapshot = await readUserOptionsSnapshot(chain.reader, input.userAddress, undefined);
+        return projectOptionsDescriptors(projectOptionsPanel(snapshot));
+      } catch {
+        return projectOptionsDescriptors(
+          projectOptionsPanel({
+            account: input.userAddress,
+            markets: [],
+            vaults: [],
+            nfts: [],
+            lvstAccount: {
+              account: input.userAddress,
+              balance: 0n,
+              staked: 0n,
+              pendingDividends: 0n
+            },
+            usdcBalance: 0n
+          })
+        );
+      }
     },
 
     dispatch: async (_remoteCaller, envelope: CallActionEnvelope) => {
