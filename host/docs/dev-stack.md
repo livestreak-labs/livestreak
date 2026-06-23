@@ -1,6 +1,6 @@
 # Local EVM dev stack — proven bring-up & full loop
 
-> **Canonical operator path (board-first):** `host/docs/remote-console.md` + `docs/GO-LIVE-SCOPE.md`  
+> **Canonical operator path (board-first):** `host/docs/remote-console.md` + `context/temp-convo/GO-LIVE-SCOPE.md`  
 > Use `settings init` → `auth login` → `remote open` → browser package tabs.  
 > Sections §2–§4 below marked **LEGACY** describe the deleted `produce` CLI — kept for AA/paymaster
 > debugging context only.
@@ -81,7 +81,7 @@ There is no `faucet` CLI subcommand on the slim CLI — `cast` (or a `scripts/` 
 ## 4. LEGACY — deleted `produce` live test
 
 The gated `LIVESTREAK_LIVE=1` / `produce` e2e path was removed with the board-first CLI.
-Keynote proof is **remote-console E2E** (`docs/GO-LIVE-SCOPE.md`, agent-5 prompt).
+Keynote proof is **remote-console E2E** (`context/temp-convo/GO-LIVE-SCOPE.md`, agent-5 prompt).
 
 Each on-chain step still uses real userOps through the host bundler + paymaster (~5s/block).
 

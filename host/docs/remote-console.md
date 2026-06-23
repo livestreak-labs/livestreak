@@ -72,7 +72,7 @@ automatable here.
 
 ## E2E success criteria (go-live keynote)
 
-**Canonical scope:** `docs/GO-LIVE-SCOPE.md`. This section is the host-facing summary.
+**Canonical scope:** `context/temp-convo/GO-LIVE-SCOPE.md`. This section is the host-facing summary.
 
 ### Product path (board-first — no `produce`)
 
