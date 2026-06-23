@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createConsoleEdges } from "../src/gateway/package-client.js";
-import { mergeConsoleDescriptors } from "../src/gateway/console-edge.js";
+import { createConsoleEdges } from "../src/gateway/console/edges.js";
+import { mergeConsoleDescriptors } from "../src/gateway/console/edge.js";
 import { buildDefaultSettings } from "../src/prefs/settings.js";
-import { buildSessionWallet } from "../src/gateway/session-wallet.js";
-import { resolveOperator } from "../src/gateway/identity.js";
+import { buildSessionWallet } from "../src/gateway/auth/session-wallet.js";
+import { resolveOperator } from "../src/gateway/auth/identity.js";
 
 describe("remote console gateway integration", () => {
   it("observe T0 exposes only system:config; options exposes options:config — no cross-package merge", async () => {

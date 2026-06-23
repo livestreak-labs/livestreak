@@ -1,6 +1,6 @@
 import { createWalletManager, type EvmErc4337WalletConfig } from "@livestreak/wallet";
 import type { SessionWallet, SettingsDoc, WalletInit } from "@livestreak/schema";
-import { chainSettingsFor, mergedContracts } from "../prefs/settings.js";
+import { chainSettingsFor, mergedContracts } from "../../prefs/settings.js";
 
 export const buildWalletInitFromSettings = (
   doc: SettingsDoc,

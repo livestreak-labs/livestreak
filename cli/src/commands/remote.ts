@@ -1,21 +1,21 @@
 import { Command, Options } from "@effect/cli";
 import { Console, Effect, Option } from "effect";
 import type { BridgeCaller, CallActionEnvelope } from "@livestreak/schema";
-import { createConsoleEdges } from "../gateway/package-client.js";
+import { createConsoleEdges } from "../gateway/console/edges.js";
 import {
   buildConsoleRoutes,
   createMergedDispatch,
   mergeConsoleDescriptors,
   type ConsoleEdge
-} from "../gateway/console-edge.js";
-import { resolvePassword } from "../gateway/password.js";
-import { resolveOperator } from "../gateway/identity.js";
-import { defaultKeystorePath, ensureAndUnlock } from "../gateway/keystore.js";
-import { createRelay } from "../gateway/relay.js";
-import { SessionRegistry, parseScopes, parseTtlMs } from "../gateway/session.js";
-import { generatePairingPassword, makePasswordVerifier } from "../gateway/pairing.js";
-import { projectConsoleFunctions } from "../gateway/console-functions.js";
-import { buildSessionWallet } from "../gateway/session-wallet.js";
+} from "../gateway/console/edge.js";
+import { resolvePassword } from "../gateway/auth/password.js";
+import { resolveOperator } from "../gateway/auth/identity.js";
+import { defaultKeystorePath, ensureAndUnlock } from "../gateway/auth/keystore.js";
+import { createRelay } from "../gateway/remote/relay.js";
+import { SessionRegistry, parseScopes, parseTtlMs } from "../gateway/session/registry.js";
+import { generatePairingPassword, makePasswordVerifier } from "../gateway/session/pairing.js";
+import { projectConsoleFunctions } from "../gateway/console/functions.js";
+import { buildSessionWallet } from "../gateway/auth/session-wallet.js";
 import {
   activeSessions,
   defaultSessionStorePath,
@@ -23,8 +23,8 @@ import {
   markRevoked,
   upsertSession,
   type StoredSession
-} from "../gateway/session-store.js";
-import { connectGateway } from "../gateway/wss-client.js";
+} from "../gateway/session/store.js";
+import { connectGateway } from "../gateway/remote/wss-client.js";
 import { ensureSettings, defaultSettingsPath } from "../prefs/settings.js";
 import { passwordOpt } from "./args.js";
 

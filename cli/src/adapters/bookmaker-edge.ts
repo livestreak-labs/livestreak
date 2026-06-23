@@ -8,8 +8,8 @@ import {
   type CallActionEnvelope
 } from "@livestreak/bookmaker";
 import type { FunctionDescriptor, PackageRuntimeInit } from "@livestreak/schema";
-import { localOperatorCaller } from "../gateway/caller.js";
-import type { ConsoleEdge } from "../gateway/console-edge.js";
+import { localOperatorCaller } from "../gateway/auth/caller.js";
+import type { ConsoleEdge } from "../gateway/console/edge.js";
 
 export interface CreateBookmakerEdgeInput {
   readonly packageInit: PackageRuntimeInit;

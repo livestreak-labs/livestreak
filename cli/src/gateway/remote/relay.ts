@@ -9,7 +9,7 @@ import type {
   CallResultFrame,
   HostCallFrame
 } from "@livestreak/schema";
-import type { SessionRegistry } from "./session.js";
+import type { SessionRegistry } from "../session/registry.js";
 
 // Abstracts the package bridge call so the relay never imports chain/seed code directly. The daemon
 // supplies a closure bound to the unlocked-seed options bridge.

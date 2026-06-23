@@ -13,7 +13,7 @@ import {
   type RevokeFrame
 } from "@livestreak/schema";
 import { assertNoSeedInFrame, type Relay } from "./relay.js";
-import type { SessionRecord, SessionRegistry } from "./session.js";
+import type { SessionRecord, SessionRegistry } from "../session/registry.js";
 
 export interface WssClientDeps {
   readonly hostWssUrl: string; // e.g. wss://host/control

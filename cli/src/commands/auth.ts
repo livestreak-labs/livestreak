@@ -1,8 +1,8 @@
 import { Command, Options } from "@effect/cli";
 import { Console, Effect, Option } from "effect";
-import { buildSessionWallet } from "../gateway/session-wallet.js";
-import { resolveOperator } from "../gateway/identity.js";
-import { resolvePassword } from "../gateway/password.js";
+import { buildSessionWallet } from "../gateway/auth/session-wallet.js";
+import { resolveOperator } from "../gateway/auth/identity.js";
+import { resolvePassword } from "../gateway/auth/password.js";
 import { ensureSettings, defaultSettingsPath } from "../prefs/settings.js";
 import { passwordOpt } from "./args.js";
 

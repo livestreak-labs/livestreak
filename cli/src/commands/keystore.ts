@@ -4,9 +4,9 @@ import {
   defaultKeystorePath,
   ensureAndUnlock,
   keystoreExists
-} from "../gateway/keystore.js";
-import { resolveOperator } from "../gateway/identity.js";
-import { resolvePassword } from "../gateway/password.js";
+} from "../gateway/auth/keystore.js";
+import { resolveOperator } from "../gateway/auth/identity.js";
+import { resolvePassword } from "../gateway/auth/password.js";
 import { passwordOpt } from "./args.js";
 
 export const runKeystoreStatus = async (): Promise<string> => {

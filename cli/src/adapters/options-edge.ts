@@ -11,8 +11,8 @@ import {
   projectOptionsPanel,
   readUserOptionsSnapshot
 } from "@livestreak/options";
-import { localOperatorCaller } from "./caller.js";
-import type { ConsoleEdge } from "./console-edge.js";
+import { localOperatorCaller } from "../gateway/auth/caller.js";
+import type { ConsoleEdge } from "../gateway/console/edge.js";
 
 export interface CreateOptionsConsoleEdgeInput {
   readonly packageInit: PackageRuntimeInit;

@@ -1,12 +1,12 @@
 import { asUserAddress } from "@livestreak/options";
 import type { SessionWallet, SettingsDoc } from "@livestreak/schema";
-import { createBookmakerEdge } from "../adapters/bookmaker-edge.js";
-import { createObserveConsoleEdge } from "../adapters/observe-edge.js";
-import { createStewardConsoleEdge } from "../adapters/steward-edge.js";
-import { chainSettingsFor } from "../prefs/settings.js";
-import { buildPackageInits } from "./package-init.js";
-import type { ConsoleEdge } from "./console-edge.js";
-import { createOptionsConsoleEdge } from "./package-client-options.js";
+import { createBookmakerEdge } from "../../adapters/bookmaker-edge.js";
+import { createObserveConsoleEdge } from "../../adapters/observe-edge.js";
+import { createStewardConsoleEdge } from "../../adapters/steward-edge.js";
+import { createOptionsConsoleEdge } from "../../adapters/options-edge.js";
+import { chainSettingsFor } from "../../prefs/settings.js";
+import { buildPackageInits } from "./init.js";
+import type { ConsoleEdge } from "./edge.js";
 
 export const createConsoleEdges = (input: {
   readonly settings: SettingsDoc;

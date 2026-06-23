@@ -13,8 +13,8 @@ import {
 } from "@livestreak/observe";
 import type { PackageRuntimeInit } from "@livestreak/schema";
 import type { BridgeCaller, CallActionEnvelope, FunctionDescriptor } from "@livestreak/schema";
-import { localOperatorCaller } from "../gateway/caller.js";
-import type { ConsoleEdge } from "../gateway/console-edge.js";
+import { localOperatorCaller } from "../gateway/auth/caller.js";
+import type { ConsoleEdge } from "../gateway/console/edge.js";
 
 const buildObserveScopeByAction = (): ReadonlyMap<string, string> => {
   const catalog = buildControlCatalog();

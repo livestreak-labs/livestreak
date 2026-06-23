@@ -1,5 +1,5 @@
 import type { PackageRuntimeInit, SessionWallet, SettingsDoc } from "@livestreak/schema";
-import { chainSettingsFor, mergedContracts } from "../prefs/settings.js";
+import { chainSettingsFor, mergedContracts } from "../../prefs/settings.js";
 
 export const buildPackageInits = (
   settings: SettingsDoc,

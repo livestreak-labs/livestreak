@@ -8,7 +8,7 @@ import {
   type CallActionEnvelope
 } from "@livestreak/steward";
 import type { FunctionDescriptor, PackageRuntimeInit } from "@livestreak/schema";
-import type { ConsoleEdge } from "../gateway/console-edge.js";
+import type { ConsoleEdge } from "../gateway/console/edge.js";
 
 const noopFacts = async () => [] as readonly unknown[];
 const noopMemorySink = { remember: () => {} };

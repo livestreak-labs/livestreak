@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { FunctionDescriptor } from "@livestreak/schema";
-import { mergeConsoleDescriptors, buildConsoleRoutes } from "../src/gateway/console-edge.js";
-import type { ConsoleEdge } from "../src/gateway/console-edge.js";
+import { mergeConsoleDescriptors, buildConsoleRoutes } from "../src/gateway/console/edge.js";
+import type { ConsoleEdge } from "../src/gateway/console/edge.js";
 
 const edge = (
   pkg: ConsoleEdge["package"],
