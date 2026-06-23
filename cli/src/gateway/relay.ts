@@ -15,7 +15,8 @@ import type { SessionRegistry } from "./session.js";
 // supplies a closure bound to the unlocked-seed options bridge.
 export type DispatchFn = (
   caller: BridgeCaller,
-  envelope: CallActionEnvelope
+  envelope: CallActionEnvelope,
+  target?: string
 ) => Promise<{ readonly txId?: string; readonly tokenId?: string }>;
 
 export interface RelayDeps {
@@ -45,7 +46,7 @@ export const createRelay = (deps: RelayDeps): Relay => {
     }
 
     try {
-      const result = await deps.dispatch(deps.registry.callerFor(record), frame.envelope);
+      const result = await deps.dispatch(deps.registry.callerFor(record), frame.envelope, frame.target);
       deps.registry.commitSpend(frame.sessionId, frame.envelope);
       const payload: { txId?: string; tokenId?: string } = {};
       if (result.txId !== undefined) {
