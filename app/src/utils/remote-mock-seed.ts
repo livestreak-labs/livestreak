@@ -12,11 +12,29 @@ import type { MockBridgeSeed, RemoteBoard } from './remote-transport'
 
 const fns: readonly FunctionDescriptor[] = [
   {
+    id: 'options.vault.vault-01',
+    package: 'options',
+    nodeKind: 'group',
+    name: 'vault-01',
+    label: 'Vault 01',
+    scope: bridgeActionScope,
+    target: { kind: 'vault', vaultId: 'vault-01' },
+    disabled: false,
+    visible: true,
+    order: 0,
+  },
+  {
+    id: 'options.action.fundVault',
+    parentId: 'options.vault.vault-01',
+    package: 'options',
+    nodeKind: 'action',
     name: 'fundVault',
     label: 'Fund Vault',
     scope: bridgeActionScope,
     target: { kind: 'vault', vaultId: 'vault-01', side: 'yes' },
     disabled: false,
+    visible: true,
+    order: 0,
     inputSchema: {
       type: 'object',
       properties: [
@@ -34,11 +52,16 @@ const fns: readonly FunctionDescriptor[] = [
     },
   },
   {
+    id: 'options.action.setLanes',
+    package: 'options',
+    nodeKind: 'action',
     name: 'setLanes',
     label: 'Set Lanes',
     scope: bridgeActionScope,
     target: { kind: 'nft', tokenId: 'nft-7' },
     disabled: false,
+    visible: true,
+    order: 1,
     inputSchema: {
       type: 'object',
       properties: [
@@ -56,11 +79,16 @@ const fns: readonly FunctionDescriptor[] = [
     },
   },
   {
+    id: 'options.action.stakeLvst',
+    package: 'options',
+    nodeKind: 'action',
     name: 'stakeLvst',
     label: 'Stake $LVST',
     scope: bridgeActionScope,
     target: { kind: 'lvst' },
     disabled: false,
+    visible: true,
+    order: 2,
     inputSchema: {
       type: 'object',
       properties: [
@@ -73,12 +101,27 @@ const fns: readonly FunctionDescriptor[] = [
     },
   },
   {
+    id: 'options.action.hiddenProbe',
+    package: 'options',
+    nodeKind: 'action',
+    name: 'hiddenProbe',
+    label: 'Hidden Probe',
+    scope: bridgeActionScope,
+    disabled: false,
+    visible: false,
+    order: 99,
+  },
+  {
+    id: 'options.action.pauseMarket',
+    package: 'options',
+    nodeKind: 'action',
     name: 'pauseMarket',
     label: 'Pause Market',
     // Deliberately a DIFFERENT scope than the demo grant carries → must NOT render.
     scope: 'bridge:admin:market',
     target: { kind: 'market', marketId: 'market-01' },
     disabled: false,
+    visible: true,
     inputSchema: {
       type: 'object',
       properties: [
@@ -93,27 +136,30 @@ const fns: readonly FunctionDescriptor[] = [
 ]
 
 const initialBoard: RemoteBoard = {
-  'vault-01': { tvlUSDC: 12500, side: 'yes' },
-  'nft-7': { lane: 'standard', autoCompound: true },
-  lvst: { staked: 0 },
-  calls: [] as string[],
+  options: {
+    'vault-01': { tvlUSDC: 12500, side: 'yes' },
+    'nft-7': { lane: 'standard', autoCompound: true },
+    lvst: { staked: 0 },
+    calls: [] as string[],
+  },
 }
 
-const apply = (board: RemoteBoard, envelope: CallActionEnvelope): RemoteBoard => {
-  const next: RemoteBoard = { ...board }
+const apply = (board: RemoteBoard, envelope: CallActionEnvelope, target?: string): RemoteBoard => {
+  const pkg = target ?? 'options'
+  const pkgSlice = { ...((board[pkg] as Record<string, unknown>) ?? {}) }
   const args = (envelope.args ?? {}) as Record<string, unknown>
   if (envelope.action === 'fundVault') {
-    const vault = (next['vault-01'] as Record<string, unknown>) ?? {}
+    const vault = (pkgSlice['vault-01'] as Record<string, unknown>) ?? {}
     const add = Number(args.amountUSDC) || 0
-    next['vault-01'] = { ...vault, tvlUSDC: (Number(vault.tvlUSDC) || 0) + add }
+    pkgSlice['vault-01'] = { ...vault, tvlUSDC: (Number(vault.tvlUSDC) || 0) + add }
   } else if (envelope.action === 'setLanes') {
-    next['nft-7'] = { lane: args.lane, autoCompound: Boolean(args.autoCompound) }
+    pkgSlice['nft-7'] = { lane: args.lane, autoCompound: Boolean(args.autoCompound) }
   } else if (envelope.action === 'stakeLvst') {
-    const lvst = (next.lvst as Record<string, unknown>) ?? {}
-    next.lvst = { staked: (Number(lvst.staked) || 0) + (Number(args.amount) || 0) }
+    const lvst = (pkgSlice.lvst as Record<string, unknown>) ?? {}
+    pkgSlice.lvst = { staked: (Number(lvst.staked) || 0) + (Number(args.amount) || 0) }
   }
-  next.calls = [...((board.calls as string[]) ?? []), envelope.action]
-  return next
+  pkgSlice.calls = [...((pkgSlice.calls as string[]) ?? []), envelope.action]
+  return { ...board, [pkg]: pkgSlice }
 }
 
 export const demoMockSeed: MockBridgeSeed = {

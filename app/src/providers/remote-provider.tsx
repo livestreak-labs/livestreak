@@ -24,17 +24,15 @@ import {
 } from '#/utils/remote-transport'
 import { HostWssTransport } from '#/utils/host-wss-transport'
 import { demoMockSeed } from '#/utils/remote-mock-seed'
+import { env } from '#/utils/env'
 
-// Default transport selection: the REAL HostWssTransport when a host origin is configured
-// (`VITE_REMOTE_HOST_URL`), otherwise the in-process LocalMockTransport for dev/keynote demos.
-function defaultTransport(): RemoteTransport {
-  const hostUrl =
-    (import.meta as unknown as { env?: Record<string, string | undefined> }).env
-      ?.VITE_REMOTE_HOST_URL
-  if (hostUrl !== undefined && hostUrl.length > 0) {
-    return new HostWssTransport({ hostBaseUrl: hostUrl })
+// Session-aware transport: real CLI-minted sessions use HostWssTransport against the
+// host relay; only the keynote `demo` fixture stays on the in-process LocalMockTransport.
+function defaultTransport(sessionId: string): RemoteTransport {
+  if (sessionId === 'demo') {
+    return new LocalMockTransport(demoMockSeed)
   }
-  return new LocalMockTransport(demoMockSeed)
+  return new HostWssTransport({ hostBaseUrl: env.hostBaseUrl })
 }
 
 export interface RemoteContextValue {
@@ -45,7 +43,7 @@ export interface RemoteContextValue {
   readonly functions: readonly FunctionDescriptor[]
   readonly board: RemoteBoard
   readonly redeem: (password: string) => Promise<void>
-  readonly callRemote: (envelope: CallActionEnvelope) => Promise<CallResult>
+  readonly callRemote: (envelope: CallActionEnvelope, target?: string) => Promise<CallResult>
 }
 
 const RemoteContext = createContext<RemoteContextValue | undefined>(undefined)
@@ -58,13 +56,13 @@ export function useRemote(): RemoteContextValue {
 
 interface Props {
   readonly session: string
-  // Injectable for tests / the real HostWssTransport; defaults to the local mock.
+  // Injectable for tests / the real HostWssTransport; defaults to session-aware pick.
   readonly transport?: RemoteTransport
   readonly children: ReactNode
 }
 
 export function RemoteProvider({ session, transport, children }: Props) {
-  const transportRef = useRef<RemoteTransport>(transport ?? defaultTransport())
+  const transportRef = useRef<RemoteTransport>(transport ?? defaultTransport(session))
 
   const [status, setStatus] = useState<RemoteStatus>(transportRef.current.status)
   const [error, setError] = useState<string | undefined>(undefined)
@@ -102,7 +100,7 @@ export function RemoteProvider({ session, transport, children }: Props) {
   )
 
   const callRemote = useCallback(
-    (envelope: CallActionEnvelope) => transportRef.current.send(envelope),
+    (envelope: CallActionEnvelope, target?: string) => transportRef.current.send(envelope, target),
     []
   )
 

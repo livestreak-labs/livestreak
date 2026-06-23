@@ -17,8 +17,8 @@ import {
 
 export type RemoteStatus = 'idle' | 'redeeming' | 'connecting' | 'open' | 'closed' | 'error'
 
-// A board is the bridge's live read-model. The console renders it generically, so it
-// is intentionally an opaque JSON-serialisable record patched over the wire.
+// Per-package board snapshots keyed by ConsolePackage name (`options`, `observe`, …).
+// Host `board_patch` frames carry a `target` package id; the transport merges into here.
 export type RemoteBoard = Record<string, unknown>
 
 export interface RemoteSession {
@@ -42,8 +42,8 @@ export interface RemoteTransport {
   // Host pushes board patches (full board snapshots in the mock; real impl may diff).
   onPatch(cb: (board: RemoteBoard) => void): () => void
   onStatus(cb: (status: RemoteStatus) => void): () => void
-  // Relay a call action envelope; resolves once the bridge has executed.
-  send(envelope: CallActionEnvelope): Promise<CallResult>
+  // Relay a call action envelope; `target` is the owning package on the wire (UiCallFrame.target).
+  send(envelope: CallActionEnvelope, target?: string): Promise<CallResult>
   disconnect(): void
   readonly status: RemoteStatus
 }
@@ -64,7 +64,7 @@ export interface MockBridgeSeed {
   readonly functions: readonly FunctionDescriptor[]
   readonly board: RemoteBoard
   // Applies an executed action to the board, returning the next board snapshot.
-  readonly apply?: (board: RemoteBoard, envelope: CallActionEnvelope) => RemoteBoard
+  readonly apply?: (board: RemoteBoard, envelope: CallActionEnvelope, target?: string) => RemoteBoard
 }
 
 export class LocalMockTransport implements RemoteTransport {
@@ -140,17 +140,19 @@ export class LocalMockTransport implements RemoteTransport {
     return () => this.statusSubs.delete(cb)
   }
 
-  async send(envelope: CallActionEnvelope): Promise<CallResult> {
+  async send(envelope: CallActionEnvelope, target?: string): Promise<CallResult> {
     if (this.status !== 'open') return { ok: false, error: 'Not connected' }
     if (envelope.scope !== bridgeActionScope) {
       return { ok: false, error: `Unexpected scope: ${envelope.scope}` }
     }
     // Authorise against the grant exactly as the host relay would (defence in depth).
-    const fn = this.inScopeFunctions().find((f) => f.name === envelope.action)
+    const fn = this.inScopeFunctions().find(
+      (f) => f.name === envelope.action && (!target || f.package === target)
+    )
     if (!fn) return { ok: false, error: 'Action not authorised for this session' }
     await tick()
     if (this.seed.apply) {
-      this.board = this.seed.apply(this.board, envelope)
+      this.board = this.seed.apply(this.board, envelope, target ?? fn.package)
       for (const cb of this.patchSubs) cb(this.board)
     }
     return { ok: true, board: this.board }
