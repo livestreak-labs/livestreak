@@ -1,9 +1,12 @@
 import {
   bridgeActionScope,
+  createActionPlanSink,
   createStewardBridge,
+  createStewardContractExecutor,
   createStewardRuntime,
   createStewardRuntimeBootstrap,
   projectStewardDescriptors,
+  stewardChainConfigFromPackageInit,
   type BridgeCaller,
   type CallActionEnvelope
 } from "@livestreak/steward";
@@ -12,7 +15,6 @@ import type { ConsoleEdge } from "../gateway/console/edge.js";
 
 const noopFacts = async () => [] as readonly unknown[];
 const noopMemorySink = { remember: () => {} };
-const noopActionSink = { submit: () => {} };
 
 export interface CreateStewardConsoleEdgeInput {
   readonly packageInit: PackageRuntimeInit;
@@ -24,6 +26,14 @@ export const createStewardConsoleEdge = (input: CreateStewardConsoleEdgeInput): 
     stewardId: input.packageInit.wallet.operatorAddress
   }).runtimeConfig;
 
+  // Real on-chain executor (EVM Safe userOp / Sui PTB resolve_vault), chain-dispatched from the
+  // session wallet — replaces the old noop action sink so the steward console actually resolves.
+  const executor = createStewardContractExecutor(stewardChainConfigFromPackageInit(input.packageInit));
+  const actionPlanSink = createActionPlanSink({
+    contract: executor,
+    host: { runHostAction: () => {} }
+  });
+
   const runtime = createStewardRuntime({
     config: runtimeConfig,
     contractFactSource: { readFacts: noopFacts },
@@ -31,7 +41,7 @@ export const createStewardConsoleEdge = (input: CreateStewardConsoleEdgeInput): 
     observeFactSource: { readFacts: noopFacts },
     memoryFactSource: { readFacts: noopFacts },
     memorySink: noopMemorySink,
-    actionPlanSink: noopActionSink
+    actionPlanSink
   });
   const bridge = createStewardBridge({ runtime });
 
