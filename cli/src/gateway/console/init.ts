@@ -34,12 +34,7 @@ export const buildPackageInits = (
     bookmaker: {
       ...base,
       package: "bookmaker",
-      contracts: {
-        vaultDriver: contracts.vaultDriver ?? "",
-        marketRegistry: contracts.marketRegistry ?? "",
-        vault: contracts.vault ?? "",
-        usdc: contracts.mockUsdc ?? ""
-      },
+      contracts,
       runId
     },
     steward: {
