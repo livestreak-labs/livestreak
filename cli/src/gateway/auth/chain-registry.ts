@@ -116,7 +116,13 @@ const evmChainAdapter: ChainAdapter = {
 
 const flattenSuiDeployment = (): Record<string, string> => ({
   ...localnetDeployment.objects,
-  packageId: localnetDeployment.packageId
+  packageId: localnetDeployment.packageId,
+  // observe's Sui market registrar consumes the registry as ONE JSON-encoded contract key
+  // (control.ts parses contracts.suiMarketRegistry -> { packageId, marketRegistryObjectId }).
+  suiMarketRegistry: JSON.stringify({
+    packageId: localnetDeployment.packageId,
+    marketRegistryObjectId: localnetDeployment.objects.marketRegistry
+  })
 });
 
 const suiChainAdapter: ChainAdapter = {
