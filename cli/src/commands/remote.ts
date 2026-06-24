@@ -114,7 +114,7 @@ export const runRemoteOpen = async (input: {
   };
 
   const routes = await buildConsoleRoutes(consoleEdges);
-  const dispatch = createMergedDispatch(routes);
+  const dispatch = createMergedDispatch(routes, consoleEdges);
 
   let consoleFunctions: readonly import("@livestreak/schema").FunctionDescriptor[] = [];
   try {
