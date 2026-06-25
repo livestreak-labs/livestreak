@@ -33,7 +33,7 @@ import {
   type UserAddress,
 } from '@livestreak/options'
 
-import { HOST_BASE_URL, LOCAL_CHAIN_ID, defaultOptionsMarketId, isOptionsModeEnabled, testOptionsSeed } from '#/utils/env'
+import { HOST_BASE_URL, LOCAL_CHAIN_ID, isOptionsModeEnabled, testOptionsSeed } from '#/utils/env'
 import {
   buildOptionsContractAddresses,
   LOCALHOST_AA_CONTRACTS,
@@ -228,7 +228,9 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
   const bridgeRef = useRef<OptionsBridge | null>(null)
   const pollingStopRef = useRef<(() => void) | null>(null)
   const boardUnsubRef = useRef<(() => void) | null>(null)
-  const activeMarketIdRef = useRef<string | undefined>(defaultOptionsMarketId())
+  // The active market is driven by the ROUTE (/stream/$id → setActiveMarketId), not a build-time
+  // constant. Starts undefined: the homepage needs no single market, and each stream page sets its own.
+  const activeMarketIdRef = useRef<string | undefined>(undefined)
   const chainRef = useRef(chain)
   chainRef.current = chain
 
@@ -461,13 +463,19 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     }
   }, [enabled, bootRuntime, teardownRuntime, deriveUserAddress])
 
+  // Point the runtime at a (newly-viewed) market. We REBOOT the runtime rather than just refreshing
+  // once, because the 3s poll targets the market baked into the runtime config at boot
+  // (config.defaultMarketId) — a one-off refresh would be overwritten by the next poll on the old
+  // market. Rebooting from the cached secret re-pins board + poll to the new market together.
   const setActiveMarketId = useCallback((marketId: string | undefined) => {
+    if (marketId === activeMarketIdRef.current) return
     activeMarketIdRef.current = marketId
     const user = address as UserAddress | null
-    if (isConnected && user) {
-      void refreshConnected(user, marketId)
+    const cached = typeof window !== 'undefined' ? sessionStorage.getItem(SESSION_SECRET_KEY) : null
+    if (isConnected && user && cached) {
+      void bootRuntime(hexToBytes(cached as `0x${string}`), user)
     }
-  }, [address, isConnected, refreshConnected])
+  }, [address, isConnected, bootRuntime])
 
   const requireUser = useCallback((): UserAddress => {
     if (!address) throw new Error('Wallet not connected')

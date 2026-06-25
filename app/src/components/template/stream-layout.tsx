@@ -35,8 +35,15 @@ export function StreamLayout({ streamTitle, category, totalPooled, streamId }: S
   const { frame, events } = useWebSocket()
   const { legacyWallet } = useWalletContext()
   const { flow, stake, unstake, claimDividends, claiming } = useFlow()
-  const { board, fundStream, isConnected: optionsConnected } = useOptionsContext()
+  const { board, fundStream, isConnected: optionsConnected, setActiveMarketId } = useOptionsContext()
   const optionsEnabled = isOptionsModeEnabled()
+
+  // The route param IS the marketId — point the options runtime at THIS stream's market so its vaults
+  // (board) load + poll live. Without this the runtime has no market and every stream shows no vaults.
+  useEffect(() => {
+    if (!optionsEnabled) return
+    setActiveMarketId(streamId)
+  }, [optionsEnabled, streamId, setActiveMarketId])
   const { notifications, push, dismiss } = useWinNotifications()
   const [selectedVaultId, setSelectedVaultId] = useState<string | null>(null)
 
