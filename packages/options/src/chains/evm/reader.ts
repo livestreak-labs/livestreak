@@ -145,6 +145,7 @@ export const createEvmOptionsReader = (config: OptionsChainConfig): OptionsReade
 const buildReader = (ctx: ReaderContext): OptionsReader => ({
   readMarket: (marketId) => readMarket(ctx, marketId),
   readStreamState: (marketId) => readStreamState(ctx, marketId),
+  listMarketIds: () => listMarketIds(ctx),
   listMarketVaults: (marketId) => listMarketVaults(ctx, marketId),
   readVault: (vaultId) => readVault(ctx, vaultId),
   readVaultShareTotals: (vaultId) => readVaultShareTotals(ctx, vaultId),
@@ -253,6 +254,32 @@ const readStreamState = async (
 
     throw contractsReadFailed("stream state", error);
   }
+};
+
+// Enumerate every registered market straight off the registry (marketCount + marketIdAt).
+// The host indexer uses this so observe-registered markets surface on the homepage without
+// relying on the in-memory discovery store or an env seed.
+const listMarketIds = async (ctx: ReaderContext): Promise<readonly MarketId[]> => {
+  const marketCount = await call<bigint>(
+    ctx,
+    ctx.addresses.marketRegistry,
+    ctx.abis.MarketRegistry,
+    "marketCount",
+    []
+  );
+  const count = Number(marketCount);
+  const ids: MarketId[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const raw = await call<`0x${string}`>(
+      ctx,
+      ctx.addresses.marketRegistry,
+      ctx.abis.MarketRegistry,
+      "marketIdAt",
+      [BigInt(index)]
+    );
+    ids.push(asMarketId(raw));
+  }
+  return ids;
 };
 
 const listMarketVaults = async (

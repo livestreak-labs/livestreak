@@ -126,6 +126,11 @@ export type AdvanceInput = {
 export interface OptionsReader {
   readMarket(marketId: MarketId): Promise<OptionsMarket>;
   readStreamState(marketId: MarketId): Promise<OptionsStreamState>;
+  // Enumerate every registered market off the on-chain registry. The host indexer uses this
+  // to discover markets without an in-memory store or env seed. Optional: the EVM registry
+  // exposes marketCount + marketIdAt; the Sui registry does not enumerate, so its reader omits
+  // this and the host falls back to the discovery store for that leg.
+  listMarketIds?(): Promise<readonly MarketId[]>;
   listMarketVaults(marketId: MarketId): Promise<readonly VaultId[]>;
   readVault(vaultId: VaultId): Promise<OptionsVault>;
   readVaultShareTotals(vaultId: VaultId): Promise<OptionsVaultShareTotals>;
