@@ -452,8 +452,15 @@ else
     [ -z "$ui_addr" ] && { warn "UI demo wallet '$pw' derive failed — not funded"; continue; }
     wire "mint USDC -> UI($pw)" "$MOCK_USDC" "mint(address,uint256)" "$ui_addr" 1000000000000000
   done
-  # Sponsorship headroom (R4) — top up the paymaster's EntryPoint deposit (the deploy already seeds it).
-  wire "paymaster depositTo top-up" "$ENTRY_POINT" "depositTo(address)" "$PAYMASTER" --value 5ether
+  # Sponsorship headroom (R4) — top up the paymaster's EntryPoint deposit so a long demo never hits
+  # AA31 ("paymaster deposit too low"). A billion ETH is far past anything the dev EOA holds, so give
+  # the depositor headroom first (local anvil only; harmless on a throwaway chain).
+  DEPOSITOR="$(cast wallet address --private-key "$ANVIL_KEY" 2>/dev/null)"
+  if [ -n "$DEPOSITOR" ]; then
+    cast rpc anvil_setBalance "$DEPOSITOR" "$(cast to-hex "$(cast to-wei 2000000000 ether)")" \
+      --rpc-url "$RPC" >/dev/null 2>&1 || warn "anvil_setBalance depositor failed"
+  fi
+  wire "paymaster depositTo top-up" "$ENTRY_POINT" "depositTo(address)" "$PAYMASTER" --value 1000000000ether
 fi
 
 # ── 9. Open a remote console per package-role (each its own keystore; chain per settings) ──
