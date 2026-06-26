@@ -26,10 +26,11 @@ interface StreamLayoutProps {
   streamTitle: string
   category: string
   totalPooled: number
+  totalPooledRatePerSec?: number
   streamId: string
 }
 
-export function StreamLayout({ streamTitle, category, totalPooled, streamId }: StreamLayoutProps) {
+export function StreamLayout({ streamTitle, category, totalPooled, totalPooledRatePerSec, streamId }: StreamLayoutProps) {
   const vaults = useVaults(streamId)
   const positions = usePositions(streamId)
   const { frame, events } = useWebSocket()
@@ -170,7 +171,7 @@ export function StreamLayout({ streamTitle, category, totalPooled, streamId }: S
       </div>
 
       {/* Stream bar */}
-      <StreamBar frame={frame} streamTitle={streamTitle} totalPooled={totalPooled} />
+      <StreamBar frame={frame} streamTitle={streamTitle} totalPooled={totalPooled} totalPooledRatePerSec={totalPooledRatePerSec} />
 
       {/* Main content: LEFT video + RIGHT predictions */}
       <div className="stream-split" style={{ flex: 1, display: 'flex', position: 'relative', zIndex: 1, overflow: 'hidden' }}>

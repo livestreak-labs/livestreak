@@ -115,6 +115,8 @@ interface OptionsContextValue {
   bridge: OptionsBridge | null
   connect: (password: string) => Promise<void>
   disconnect: () => void
+  /** Re-read the connected user's board/balance now (e.g. after an out-of-band wallet top-up). */
+  refresh: () => Promise<void>
   setActiveMarketId: (marketId: string | undefined) => void
   findFunction: (name: string, match?: (fn: OptionsFunctionView) => boolean) => OptionsFunctionView | undefined
   findFundFunction: (vaultId: string, side: 'yes' | 'no') => OptionsFunctionView | undefined
@@ -126,6 +128,13 @@ interface OptionsContextValue {
     durationMinutes?: number,
   ) => Promise<TxId>
   stopFunding: (vaultId: string, side: 'yes' | 'no') => Promise<TxId>
+  /** Add USDC deposit to a position NFT's shared funding (extends every lane's runway) by re-asserting
+   *  its existing lanes with addDeposit — no lane is added or removed. */
+  topUpNft: (
+    tokenId: string,
+    lanes: readonly { vaultId: string; side: 'yes' | 'no'; rate: string }[],
+    depositUsd: number,
+  ) => Promise<TxId>
   previewAccrual: (
     vaultId: string,
     side: 'yes' | 'no',
@@ -583,6 +592,31 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     })
   }, [callBridgeAction, ensureTokenId])
 
+  // Top up a position NFT's shared Drips balance: re-assert its CURRENT lanes (so none are removed or
+  // re-rated) with addDeposit > 0. setLanes diffs desired-vs-current, so passing the existing lanes
+  // back is a pure deposit. Extends the runway for every lane the NFT funds.
+  const topUpNft = useCallback(async (
+    tokenId: string,
+    lanes: readonly { vaultId: string; side: 'yes' | 'no'; rate: string }[],
+    depositUsd: number,
+  ): Promise<TxId> => {
+    const fundable = lanes.filter((lane) => {
+      try { return BigInt(lane.rate) > 0n } catch { return false }
+    })
+    if (fundable.length === 0) throw new Error('No active lane to top up — open a position first')
+    const addDeposit = BigInt(Math.round(depositUsd * 1_000_000))
+    if (addDeposit <= 0n) throw new Error('Enter an amount greater than 0')
+    return callBridgeAction('setLanes', {
+      tokenId: asTokenId(BigInt(tokenId)),
+      lanes: fundable.map((lane) => ({
+        vaultId: asVaultId(lane.vaultId),
+        side: lane.side,
+        rate: BigInt(lane.rate),
+      })),
+      addDeposit,
+    })
+  }, [callBridgeAction])
+
   const stopFunding = useCallback(async (vaultId: string, side: 'yes' | 'no'): Promise<TxId> => {
     return callBridgeAction('stopFunding', {
       tokenId: asTokenId(resolveTokenId(vaultId)),
@@ -694,12 +728,14 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     bridge: bridgeRef.current,
     connect,
     disconnect,
+    refresh: afterWrite,
     setActiveMarketId,
     findFunction,
     findFundFunction: findFundFunctionForVault,
     findStopFundingFunction: findStopFundingFunctionForVault,
     fundStream,
     stopFunding,
+    topUpNft,
     previewAccrual,
     claimWin,
     hasNftForVault,
@@ -713,8 +749,8 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     setApprovalForAll,
   }), [
     enabled, ready, chain, setChain, isConnected, isLoading, derivationStep, claiming, error, address, usdcBalance, board, controls,
-    connect, disconnect, setActiveMarketId, findFunction, findFundFunctionForVault,
-    findStopFundingFunctionForVault, fundStream, stopFunding, previewAccrual, claimWin, hasNftForVault, mint, claimLoss,
+    connect, disconnect, afterWrite, setActiveMarketId, findFunction, findFundFunctionForVault,
+    findStopFundingFunctionForVault, fundStream, stopFunding, topUpNft, previewAccrual, claimWin, hasNftForVault, mint, claimLoss,
     stake, unstake, claimDividends, transferNft, approveNft, setApprovalForAll,
   ])
 
