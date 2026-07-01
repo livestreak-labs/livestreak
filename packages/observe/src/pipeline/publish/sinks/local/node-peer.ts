@@ -1,7 +1,6 @@
 import { Effect } from "effect";
 import { LiveStreakRuntimeError, type LiveStreakError } from "@livestreak/core";
 import type {
-  RtcDataChannelState,
   RtcPeerConnectionFactory,
   RtcPeerConnectionLike,
   RtcVideoTrackHandle
@@ -33,18 +32,7 @@ type WrtcModule = {
 
 const importNode = (specifier: string): Promise<unknown> => import(/* @vite-ignore */ specifier);
 
-interface NodeRtcDataChannel {
-  readonly label: string;
-  readonly readyState: string;
-  readonly bufferedAmount?: number;
-  send: (data: Uint8Array) => void;
-  close: () => void;
-  addEventListener: (type: string, listener: (...args: unknown[]) => void) => void;
-  binaryType?: string;
-}
-
 interface NodeRtcPeer {
-  createDataChannel: (label: string) => NodeRtcDataChannel;
   addTrack: (track: NodeVideoTrack) => unknown;
   createOffer: () => Promise<{ type: "offer" | "answer"; sdp: string }>;
   createAnswer: () => Promise<{ type: "offer" | "answer"; sdp: string }>;
@@ -53,39 +41,7 @@ interface NodeRtcPeer {
   readonly iceGatheringState: string;
   readonly localDescription: { type: "offer" | "answer"; sdp: string } | null;
   close: () => void;
-  addEventListener: (type: string, listener: (event: { channel: NodeRtcDataChannel }) => void) => void;
 }
-
-const adaptNodeChannel = (channel: NodeRtcDataChannel) => {
-  channel.binaryType = "arraybuffer";
-  const adapter = {
-    label: channel.label,
-    get readyState(): RtcDataChannelState {
-      return channel.readyState as RtcDataChannelState;
-    },
-    get bufferedAmount(): number {
-      return channel.bufferedAmount ?? 0;
-    },
-    send: (data: Uint8Array) => channel.send(data),
-    close: () => channel.close(),
-    onopen: null as (() => void) | null,
-    onclose: null as (() => void) | null,
-    onmessage: null as ((event: { data: Uint8Array }) => void) | null
-  };
-  channel.addEventListener("open", () => adapter.onopen?.());
-  channel.addEventListener("close", () => adapter.onclose?.());
-  channel.addEventListener("message", (event: unknown) => {
-    const data = (event as { data?: unknown }).data;
-    const bytes =
-      data instanceof Uint8Array
-        ? data
-        : data instanceof ArrayBuffer
-          ? new Uint8Array(data)
-          : new Uint8Array(0);
-    adapter.onmessage?.({ data: bytes });
-  });
-  return adapter;
-};
 
 const adaptNodeVideoTrack = (
   peer: NodeRtcPeer,
@@ -114,20 +70,15 @@ const adaptNodePeer = (
   VideoSource: (new () => NodeRtcVideoSource) | undefined
 ): RtcPeerConnectionLike => {
   const adapter: RtcPeerConnectionLike = {
-    createDataChannel: (label) => adaptNodeChannel(peer.createDataChannel(label)),
     createOffer: () => peer.createOffer(),
     createAnswer: () => peer.createAnswer(),
     setLocalDescription: (d) => peer.setLocalDescription(d),
     setRemoteDescription: (d) => peer.setRemoteDescription(d),
     localDescriptionWithCandidates: (fallback) => gatheredLocalDescription(peer, fallback),
     close: () => peer.close(),
-    ondatachannel: null,
     ontrack: null,
     ...(VideoSource === undefined ? {} : { addVideoTrack: () => adaptNodeVideoTrack(peer, VideoSource) })
   };
-  peer.addEventListener("datachannel", (event) => {
-    adapter.ondatachannel?.({ channel: adaptNodeChannel(event.channel) });
-  });
   return adapter;
 };
 

@@ -248,13 +248,13 @@ export {
   type ConsumerSignalingChannel,
   type SinkSignalingChannel,
   type LoopbackNetwork,
-  type RtcDataChannelLike,
   type RtcPeerConnectionLike,
   type RtcPeerConnectionFactory,
   type RtcSessionDescription,
   type RtcSdpType,
-  type RtcDataChannelEvent,
-  type RtcMessageEvent
+  type RtcVideoFrame,
+  type RtcVideoTrackHandle,
+  type RtcTrackEvent
 } from "./pipeline/publish/sinks/local/signaling.js";
 
 // --- Per-stream feed resolution (issue 7) ---

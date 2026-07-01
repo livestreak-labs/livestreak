@@ -156,8 +156,6 @@ describe('consumeHostWebRtcFeed (mock relay)', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const peer: any = {
         ontrack: null,
-        ondatachannel: null,
-        createDataChannel: () => ({}),
         createOffer: async () => ({ type: 'offer', sdp: '' }),
         createAnswer: async () => ({ type: 'answer', sdp: 'mock-answer' }),
         setLocalDescription: async () => {},
@@ -231,7 +229,6 @@ describe('consumeHostWebRtcFeed (mock relay)', () => {
     })
 
     const peer = network.factory()
-    peer.ondatachannel = () => {}
 
     const remoteOffer = await Effect.runPromise(consumerSignaling.awaitOffer)
     await peer.setRemoteDescription(remoteOffer)
