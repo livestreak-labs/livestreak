@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import type { HostRouteDeps } from "../../deps.js";
 import { asyncHandler, param, sendRouteResult } from "../middleware/respond.js";
 import { parseSignalPayload, type SignalPayload } from "../../services/webrtc/signal.js";
+import { iceServersForHost, readTurnConfig } from "../../services/webrtc/turn.js";
 
 // --- exports ---
 
@@ -68,6 +69,23 @@ export const createWebrtcController = (deps: HostRouteDeps) => {
     clear: asyncHandler((req: Request, res: Response, next: NextFunction) => {
       store.clear(param(req.params.streamId));
       sendRouteResult(res, { ok: true, result: { ok: true } }, next);
+    }),
+
+    // The host advertises ITS embedded relay: hand back TURN/STUN on the same host the caller reached us at
+    // (so a browser gets localhost/LAN and a container gets host.docker.internal, each reachable for them).
+    // relayOnly is advised because the dev peers (Docker container, Chromium mDNS host candidates) can't do
+    // direct — the reachable path is the relay.
+    getIce: asyncHandler((req: Request, res: Response, next: NextFunction) => {
+      const config = readTurnConfig();
+      const hostname = (req.headers.host ?? "").split(":")[0] || "127.0.0.1";
+      const iceServers = config.enabled
+        ? iceServersForHost(hostname, config)
+        : [{ urls: "stun:stun.l.google.com:19302" }];
+      sendRouteResult(
+        res,
+        { ok: true, result: { iceServers, relayOnly: config.enabled } },
+        next
+      );
     })
   };
 };

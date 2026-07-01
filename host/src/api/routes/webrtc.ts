@@ -8,6 +8,7 @@ export const createWebrtcRouter = (deps: HostRouteDeps): Router => {
   const router = Router();
   const controller = createWebrtcController(deps);
 
+  router.get("/webrtc/ice", controller.getIce);
   router.post("/webrtc/signal/:streamId/offer", controller.postOffer);
   router.get("/webrtc/signal/:streamId/offer", controller.getOffer);
   router.post("/webrtc/signal/:streamId/answer", controller.postAnswer);
