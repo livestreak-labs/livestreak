@@ -224,6 +224,7 @@ describe('consumeHostWebRtcFeed (mock relay)', () => {
     const consumerSignaling = createHostMediatedConsumerSignaling({
       baseUrl,
       streamId,
+      viewerId: 'viewer-x',
       fetch: relay.fetchImpl,
       pollIntervalMs: 5,
     })

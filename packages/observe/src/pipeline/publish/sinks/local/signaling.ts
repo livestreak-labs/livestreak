@@ -87,17 +87,26 @@ export const gatheredLocalDescription = async (
 export type RtcPeerConnectionFactory = () => RtcPeerConnectionLike;
 
 /**
- * Sink-side signaling: publish the local offer, await the consumer's answer.
+ * Sink-side (producer) signaling — MULTI-VIEWER. One producer serves many viewers: it polls for viewers
+ * that want in, mints a per-viewer offer, and awaits that viewer's answer. Each viewer id ⇒ its own peer +
+ * encode on the producer (bounded by the producer's CPU/bandwidth, before any SFU).
  */
 export interface SinkSignalingChannel {
-  readonly publishOffer: (offer: RtcSessionDescription) => Effect.Effect<void, LiveStreakError>;
-  readonly awaitAnswer: Effect.Effect<RtcSessionDescription, LiveStreakError>;
+  /** Viewer ids currently wanting to watch (the producer polls this and spins a peer per new id). */
+  readonly listViewers: Effect.Effect<readonly string[], LiveStreakError>;
+  readonly publishOfferFor: (
+    viewerId: string,
+    offer: RtcSessionDescription
+  ) => Effect.Effect<void, LiveStreakError>;
+  readonly awaitAnswerFor: (viewerId: string) => Effect.Effect<RtcSessionDescription, LiveStreakError>;
 }
 
 /**
- * Consumer-side signaling: await the sink's offer, publish an answer.
+ * Consumer-side (viewer) signaling: announce intent (register), await THIS viewer's offer, publish an answer.
+ * The viewer id is baked into the channel instance.
  */
 export interface ConsumerSignalingChannel {
+  readonly register: Effect.Effect<void, LiveStreakError>;
   readonly awaitOffer: Effect.Effect<RtcSessionDescription, LiveStreakError>;
   readonly publishAnswer: (answer: RtcSessionDescription) => Effect.Effect<void, LiveStreakError>;
 }
@@ -123,16 +132,31 @@ const deferred = <Value>(): Deferred<Value> => {
 export class LocalSignalingHub {
   private readonly offerSlot = deferred<RtcSessionDescription>();
   private readonly answerSlot = deferred<RtcSessionDescription>();
+  private readonly registeredSlot = deferred<void>();
+  private registered = false;
+  // A loopback hub carries exactly one viewer (the in-process consumer) — enough to exercise the SDP
+  // rendezvous and media path in tests. Multi-viewer fan-out is exercised by the host relay + live tests.
+  static readonly viewerId = "loopback-viewer";
 
   readonly sink: SinkSignalingChannel = {
-    publishOffer: (offer) =>
+    // Blocks until the consumer registers, then reports the one viewer on every poll (the accept loop dedupes).
+    listViewers: Effect.promise(() =>
+      this.registeredSlot.promise.then(() => [LocalSignalingHub.viewerId] as readonly string[])
+    ),
+    publishOfferFor: (_viewerId, offer) =>
       Effect.sync(() => {
         this.offerSlot.resolve(offer);
       }),
-    awaitAnswer: Effect.promise(() => this.answerSlot.promise)
+    awaitAnswerFor: (_viewerId) => Effect.promise(() => this.answerSlot.promise)
   };
 
   readonly consumer: ConsumerSignalingChannel = {
+    register: Effect.sync(() => {
+      if (!this.registered) {
+        this.registered = true;
+        this.registeredSlot.resolve();
+      }
+    }),
     awaitOffer: Effect.promise(() => this.offerSlot.promise),
     publishAnswer: (answer) =>
       Effect.sync(() => {

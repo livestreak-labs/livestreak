@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Scope } from "effect";
 import {
   LiveStreakConfigError,
   LiveStreakRuntimeError,
@@ -64,6 +64,8 @@ import {
 
 const attachmentId = "local-preview";
 const defaultAnswerTimeoutMs = 30_000;
+// How often the producer polls the host for newly-registered viewers (to spin a peer per viewer).
+const viewerPollIntervalMs = 500;
 
 const stringValue = (description: string, required = false): DescriptorValueSchema => ({
   type: "string",
@@ -116,9 +118,9 @@ export const validateLocalSinkConfig = (
     if (config.signaling === null || typeof config.signaling !== "object") {
       return yield* Effect.fail(configError("Local sink requires a signaling channel"));
     }
-    if (typeof config.signaling.publishOffer !== "function") {
+    if (typeof config.signaling.publishOfferFor !== "function") {
       return yield* Effect.fail(
-        configError("Local sink signaling channel must provide publishOffer")
+        configError("Local sink signaling channel must provide publishOfferFor")
       );
     }
     if (
@@ -157,46 +159,89 @@ export const createLocalSinkDriver = (
         message: "local sink streaming video over a WebRTC media track"
       };
 
-      const peer = factory();
-      if (peer.addVideoTrack === undefined) {
-        return yield* Effect.fail(
-          new LiveStreakRuntimeError({
-            message:
-              "Local sink requires a WebRTC transport with video-track support (@roamhq/wrtc RTCVideoSource)"
-          })
-        );
-      }
-      const track = peer.addVideoTrack();
-
+      // One peer + video track PER viewer; deliver fans each frame out to all of them. The producer maxes out
+      // its OWN capacity — a peer + encode per viewer — before any SFU is warranted. Keyed by viewer id.
+      const viewers = new Map<string, { peer: RtcPeerConnectionLike; track: RtcVideoTrackHandle }>();
       let finalized = false;
+
+      const closeAllViewers = (): void => {
+        for (const { peer, track } of viewers.values()) {
+          try {
+            track.stop();
+            peer.close();
+          } catch {
+            /* best-effort teardown */
+          }
+        }
+        viewers.clear();
+      };
 
       yield* Effect.addFinalizer(() =>
         Effect.sync(() => {
-          if (!finalized) {
-            track.stop();
-            peer.close();
-          }
+          if (!finalized) closeAllViewers();
         }).pipe(Effect.catchAll(() => Effect.void))
       );
 
-      // Publish the offer (carrying the video m-line) so the viewer can fetch it, then apply the viewer's
-      // answer in the BACKGROUND. We do NOT block attach on the answer: the worker loop must start to hold the
-      // run open, and frames stream live while the viewer joins whenever it answers (forkScoped ties the
-      // answer fiber to this sink's scope, so it's interrupted on finalize). A failed/late answer logs but
-      // does not kill the run — the producer keeps streaming.
-      yield* publishSinkOffer(peer, config.signaling);
+      // Bring one viewer online: its own peer + track (fed by deliver), a per-viewer offer, and a background
+      // answer-apply. A viewer that never answers is dropped without touching the stream or other viewers.
+      const acceptViewer = (viewerId: string): Effect.Effect<void, LiveStreakError, Scope.Scope> =>
+        Effect.gen(function* () {
+          const peer = factory();
+          if (peer.addVideoTrack === undefined) {
+            return yield* Effect.fail(
+              new LiveStreakRuntimeError({
+                message:
+                  "Local sink requires a WebRTC transport with video-track support (@roamhq/wrtc RTCVideoSource)"
+              })
+            );
+          }
+          const track = peer.addVideoTrack();
+          viewers.set(viewerId, { peer, track });
+          yield* publishSinkOfferFor(peer, viewerId, config.signaling);
+          yield* Effect.forkScoped(
+            applyViewerAnswer(peer, viewerId, config.signaling, answerTimeoutMs).pipe(
+              Effect.catchAll((cause) =>
+                Effect.sync(() => {
+                  const entry = viewers.get(viewerId);
+                  if (entry !== undefined) {
+                    try {
+                      entry.peer.close();
+                    } catch {
+                      /* ignore */
+                    }
+                    viewers.delete(viewerId);
+                  }
+                  stats.message = `viewer ${viewerId} not connected — ${
+                    cause instanceof Error ? cause.message : String(cause)
+                  }`;
+                })
+              )
+            )
+          );
+        });
+
+      // Poll the host for viewers and spin a peer per NEW id. Forked so the worker loop starts immediately and
+      // holds the run open; frames stream live and viewers join whenever they register.
+      const acceptLoop: Effect.Effect<never, LiveStreakError, Scope.Scope> = Effect.gen(function* () {
+        const ids = yield* config.signaling.listViewers;
+        for (const id of ids) {
+          if (!viewers.has(id)) {
+            yield* acceptViewer(id).pipe(
+              Effect.catchAll((cause) =>
+                Effect.sync(() => {
+                  stats.message = `accept viewer ${id} failed — ${
+                    cause instanceof Error ? cause.message : String(cause)
+                  }`;
+                })
+              )
+            );
+          }
+        }
+        yield* Effect.sleep(`${viewerPollIntervalMs} millis`);
+        return yield* acceptLoop;
+      });
+      yield* Effect.forkScoped(acceptLoop.pipe(Effect.catchAll(() => Effect.void)));
       stats.status = "running";
-      yield* Effect.forkScoped(
-        applyViewerAnswer(peer, config.signaling, answerTimeoutMs).pipe(
-          Effect.catchAll((cause) =>
-            Effect.sync(() => {
-              stats.message = `local sink: viewer answer not applied — ${
-                cause instanceof Error ? cause.message : String(cause)
-              }`;
-            })
-          )
-        )
-      );
 
       const deliver = (item: SinkDeliveryItem): Effect.Effect<void, LiveStreakError> =>
         Effect.gen(function* () {
@@ -204,15 +249,16 @@ export const createLocalSinkDriver = (
             return;
           }
           const frame = yield* readI420Frame(item.payload);
-          track.pushFrame(frame);
+          for (const { track } of viewers.values()) {
+            track.pushFrame(frame);
+          }
           stats.deliveredItems += 1;
         });
 
       const finalize: Effect.Effect<SinkFinalizeResult, LiveStreakError> = Effect.sync(() => {
         if (!finalized) {
           finalized = true;
-          track.stop();
-          peer.close();
+          closeAllViewers();
           if (stats.status !== "failed") {
             stats.status = "stopped";
           }
@@ -270,8 +316,9 @@ const describeLocalSinkCell = (
 // Create the offer (carrying the video m-line), gather ICE candidates non-trickle, and publish it so the
 // viewer can fetch it. Non-trickle: candidates are embedded in the offer SDP before publishing — the
 // signaling relays only the SDP, so without this the viewer never learns where to connect.
-const publishSinkOffer = (
+const publishSinkOfferFor = (
   peer: RtcPeerConnectionLike,
+  viewerId: string,
   signaling: SinkSignalingChannel
 ): Effect.Effect<void, LiveStreakError> =>
   Effect.gen(function* () {
@@ -287,7 +334,7 @@ const publishSinkOffer = (
       try: () => peer.localDescriptionWithCandidates(offer),
       catch: (cause) => runtimeError("Local sink failed to gather ICE candidates", cause)
     });
-    yield* signaling.publishOffer(localOffer);
+    yield* signaling.publishOfferFor(viewerId, localOffer);
   });
 
 // Await the viewer's answer and apply it. Run in the BACKGROUND (forked) so the worker loop starts
@@ -296,16 +343,17 @@ const publishSinkOffer = (
 // run with nothing holding its scope open before the worker loop starts, so it gets interrupted.
 const applyViewerAnswer = (
   peer: RtcPeerConnectionLike,
+  viewerId: string,
   signaling: SinkSignalingChannel,
   answerTimeoutMs: number
 ): Effect.Effect<void, LiveStreakError> =>
   Effect.gen(function* () {
-    const answer = yield* signaling.awaitAnswer.pipe(
+    const answer = yield* signaling.awaitAnswerFor(viewerId).pipe(
       Effect.timeoutFail({
         duration: `${answerTimeoutMs} millis`,
         onTimeout: () =>
           new LiveStreakRuntimeError({
-            message: "Local sink timed out waiting for the viewer's WebRTC answer"
+            message: `Local sink timed out waiting for viewer ${viewerId}'s WebRTC answer`
           })
       })
     );

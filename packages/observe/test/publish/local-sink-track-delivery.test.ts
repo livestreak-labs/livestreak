@@ -88,6 +88,8 @@ describe("local sink media-track delivery", () => {
     };
 
     const runConsumer = Effect.gen(function* () {
+      // Announce this viewer so the producer's accept loop mints an offer for it, then answer that offer.
+      yield* hub.consumer.register;
       const offer = yield* hub.consumer.awaitOffer;
       yield* Effect.promise(() => consumerPeer.setRemoteDescription(offer));
       const answer = yield* Effect.promise(() => consumerPeer.createAnswer());
@@ -130,20 +132,14 @@ describe("local sink media-track delivery", () => {
     expect(received[0]?.height).toBe(H);
   }, 20000);
 
-  it("attach publishes the offer and returns without blocking on the viewer's answer", async () => {
-    // Regression: a live producer streams continuously and the viewer's WebRTC answer arrives whenever a
-    // viewer opens the page. attach must publish the offer and return IMMEDIATELY (applying the answer in a
-    // background fiber) so the worker loop can start and hold the run open. If attach blocked on awaitAnswer,
-    // nothing would hold the run's scope open before the worker loop and the whole run gets interrupted — the
-    // producer's peer closes before any viewer can connect. Here awaitAnswer never resolves, yet attach must
-    // still return an attachment that delivers frames.
+  it("attach returns without blocking on a viewer's answer and mints a peer per registered viewer", async () => {
+    // Regression + multi-viewer: a live producer streams continuously; the accept loop spins a peer per
+    // registered viewer and applies each viewer's answer in the BACKGROUND. attach must NOT block on any
+    // answer — the worker loop must start to hold the run open. Here two viewers register but never answer;
+    // attach must still return, publish an offer for EACH, and fan a delivered frame out to both.
+    const offersFor: string[] = [];
     const pushedWidths: number[] = [];
-    let offerPublished = false;
-    const fakeTrack = {
-      pushFrame: (frame: { width: number }) => pushedWidths.push(frame.width),
-      stop: () => {}
-    };
-    const fakePeer: RtcPeerConnectionLike = {
+    const fakePeer = (): RtcPeerConnectionLike => ({
       createOffer: () => Promise.resolve({ type: "offer", sdp: "v=0\r\n" }),
       createAnswer: () => Promise.resolve({ type: "answer", sdp: "v=0\r\n" }),
       setLocalDescription: () => Promise.resolve(),
@@ -151,33 +147,36 @@ describe("local sink media-track delivery", () => {
       localDescriptionWithCandidates: (offer) => Promise.resolve(offer),
       close: () => {},
       ontrack: null,
-      addVideoTrack: () => fakeTrack
-    };
+      addVideoTrack: () => ({ pushFrame: (frame) => pushedWidths.push(frame.width), stop: () => {} })
+    });
     const signaling: SinkSignalingChannel = {
-      publishOffer: () =>
+      listViewers: Effect.succeed(["v1", "v2"] as readonly string[]),
+      publishOfferFor: (viewerId) =>
         Effect.sync(() => {
-          offerPublished = true;
+          offersFor.push(viewerId);
         }),
-      // The viewer never answers — attach must not hang on this.
-      awaitAnswer: Effect.never
+      // Neither viewer ever answers — attach must not hang on this.
+      awaitAnswerFor: () => Effect.never
     };
 
     const program = Effect.scoped(
       Effect.gen(function* () {
         const attachment = yield* createLocalSinkDriver().attach({
           signaling,
-          streamId: "no-viewer",
-          peerConnectionFactory: () => fakePeer
+          streamId: "no-answer",
+          peerConnectionFactory: fakePeer
         });
-        // attach returned despite no answer — the sink is live and delivers frames immediately.
+        // attach returned without any answer. Give the forked accept loop a beat to bring both viewers online
+        // (publish their offers), then deliver one frame — it must fan out to BOTH viewers' tracks.
+        for (let i = 0; i < 100 && offersFor.length < 2; i += 1) yield* Effect.sleep("20 millis");
         yield* attachment.deliver(makeI420Item(0, grayI420()));
         yield* attachment.finalize;
       })
     );
 
-    // A 5s test timeout: if attach blocked on awaitAnswer (Effect.never), this rejects instead of passing.
+    // A 5s test timeout: if attach blocked on awaitAnswerFor (Effect.never), this rejects instead of passing.
     await Effect.runPromise(program);
-    expect(offerPublished).toBe(true);
-    expect(pushedWidths).toEqual([W]);
+    expect(offersFor.sort()).toEqual(["v1", "v2"]);
+    expect(pushedWidths).toEqual([W, W]); // one frame fanned out to two viewers
   }, 5000);
 });

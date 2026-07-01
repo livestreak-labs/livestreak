@@ -88,9 +88,16 @@ export async function consumeHostWebRtcFeed(
     throw new DOMException('Aborted', 'AbortError')
   }
 
+  // A unique id for THIS viewer — the producer serves many viewers, minting a dedicated offer/peer per id.
+  const viewerId =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `v-${Math.random().toString(36).slice(2)}`
+
   const signaling = createHostMediatedConsumerSignaling({
     baseUrl: input.baseUrl,
     streamId: input.streamId,
+    viewerId,
     fetch: input.fetch,
     pollIntervalMs: input.pollIntervalMs,
     offerTimeoutMs: input.offerTimeoutMs,
@@ -110,6 +117,11 @@ export async function consumeHostWebRtcFeed(
   let peer: ReturnType<RtcPeerConnectionFactory> | undefined
 
   try {
+    // Announce this viewer so the producer's accept loop mints a dedicated offer for us.
+    await Promise.race([
+      Effect.runPromise(signaling.register),
+      ...(abortPromise ? [abortPromise] : []),
+    ])
     const offer = await Promise.race([
       Effect.runPromise(signaling.awaitOffer),
       ...(abortPromise ? [abortPromise] : []),
