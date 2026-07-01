@@ -4,6 +4,12 @@ import { createHostMediatedSinkSignaling } from "#pipeline/publish/sinks/local/h
 import type { Board } from "./control/board/index.js";
 import type { ObserveRunConfig } from "./run.js";
 
+// A live producer streams continuously and waits for a viewer to join: the WebRTC answer arrives whenever a
+// viewer opens the stream page (seconds to minutes after go-live), not within a tight window of `start`. Keep
+// the answer-wait generous so that handshake completes regardless of when the viewer shows up; the answer
+// fiber is background/forked and interrupted when the run stops.
+const liveViewerAnswerTimeoutMs = 10 * 60_000;
+
 // Read a board cell's settings/readonly maps with safe defaults — the only place that knows the board's
 // cell-id / field-path schema for deriving a run config.
 const cellRecord = (
@@ -76,7 +82,12 @@ export const runConfigFromBoard = (
         // Real-time media-track preview keyed to the registered market (the id the viewer consumes under).
         config: {
           streamId: marketId,
-          signaling: createHostMediatedSinkSignaling({ baseUrl: hostBaseUrl, streamId: marketId })
+          answerTimeoutMs: liveViewerAnswerTimeoutMs,
+          signaling: createHostMediatedSinkSignaling({
+            baseUrl: hostBaseUrl,
+            streamId: marketId,
+            answerTimeoutMs: liveViewerAnswerTimeoutMs
+          })
         }
       },
       process: null

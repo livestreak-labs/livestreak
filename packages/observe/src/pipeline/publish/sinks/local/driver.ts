@@ -179,10 +179,24 @@ export const createLocalSinkDriver = (
         }).pipe(Effect.catchAll(() => Effect.void))
       );
 
-      // Signaling handshake: offer (now carrying the video m-line) -> publish -> await the consumer's answer.
-      // We do NOT block on media connectivity — frames are pushed continuously and the viewer joins live.
-      yield* handshake(peer, config.signaling, answerTimeoutMs);
+      // Publish the offer (carrying the video m-line) so the viewer can fetch it, then apply the viewer's
+      // answer in the BACKGROUND. We do NOT block attach on the answer: the worker loop must start to hold the
+      // run open, and frames stream live while the viewer joins whenever it answers (forkScoped ties the
+      // answer fiber to this sink's scope, so it's interrupted on finalize). A failed/late answer logs but
+      // does not kill the run — the producer keeps streaming.
+      yield* publishSinkOffer(peer, config.signaling);
       stats.status = "running";
+      yield* Effect.forkScoped(
+        applyViewerAnswer(peer, config.signaling, answerTimeoutMs).pipe(
+          Effect.catchAll((cause) =>
+            Effect.sync(() => {
+              stats.message = `local sink: viewer answer not applied — ${
+                cause instanceof Error ? cause.message : String(cause)
+              }`;
+            })
+          )
+        )
+      );
 
       const deliver = (item: SinkDeliveryItem): Effect.Effect<void, LiveStreakError> =>
         Effect.gen(function* () {
@@ -253,10 +267,12 @@ const describeLocalSinkCell = (
   };
 };
 
-const handshake = (
+// Create the offer (carrying the video m-line), gather ICE candidates non-trickle, and publish it so the
+// viewer can fetch it. Non-trickle: candidates are embedded in the offer SDP before publishing — the
+// signaling relays only the SDP, so without this the viewer never learns where to connect.
+const publishSinkOffer = (
   peer: RtcPeerConnectionLike,
-  signaling: SinkSignalingChannel,
-  answerTimeoutMs: number
+  signaling: SinkSignalingChannel
 ): Effect.Effect<void, LiveStreakError> =>
   Effect.gen(function* () {
     const offer = yield* Effect.tryPromise({
@@ -267,16 +283,23 @@ const handshake = (
       try: () => peer.setLocalDescription(offer),
       catch: (cause) => runtimeError("Local sink failed to set the local description", cause)
     });
-
-    // Non-trickle ICE: embed the gathered candidates in the offer before publishing — the signaling relays
-    // only the SDP, so without this the viewer never learns where to connect and media never flows.
     const localOffer = yield* Effect.tryPromise({
       try: () => peer.localDescriptionWithCandidates(offer),
       catch: (cause) => runtimeError("Local sink failed to gather ICE candidates", cause)
     });
-
     yield* signaling.publishOffer(localOffer);
+  });
 
+// Await the viewer's answer and apply it. Run in the BACKGROUND (forked) so the worker loop starts
+// immediately and holds the run open — the producer streams frames live and the viewer's answer completes
+// the WebRTC handshake whenever it arrives (within answerTimeoutMs). Blocking attach on this would leave the
+// run with nothing holding its scope open before the worker loop starts, so it gets interrupted.
+const applyViewerAnswer = (
+  peer: RtcPeerConnectionLike,
+  signaling: SinkSignalingChannel,
+  answerTimeoutMs: number
+): Effect.Effect<void, LiveStreakError> =>
+  Effect.gen(function* () {
     const answer = yield* signaling.awaitAnswer.pipe(
       Effect.timeoutFail({
         duration: `${answerTimeoutMs} millis`,

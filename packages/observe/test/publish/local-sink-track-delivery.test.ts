@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { Effect, Fiber } from "effect";
 import type { SinkDeliveryItem } from "#pipeline/publish/index.js";
 import { createLocalSinkDriver } from "#pipeline/publish/sinks/local/driver.js";
-import { createLocalSignalingHub } from "#pipeline/publish/sinks/local/signaling.js";
+import {
+  createLocalSignalingHub,
+  type RtcPeerConnectionLike,
+  type SinkSignalingChannel
+} from "#pipeline/publish/sinks/local/signaling.js";
 import { resolveNodePeerConnectionFactory } from "#pipeline/publish/sinks/local/node-peer.js";
 
 /**
@@ -125,4 +129,55 @@ describe("local sink media-track delivery", () => {
     expect(received[0]?.width).toBe(W);
     expect(received[0]?.height).toBe(H);
   }, 20000);
+
+  it("attach publishes the offer and returns without blocking on the viewer's answer", async () => {
+    // Regression: a live producer streams continuously and the viewer's WebRTC answer arrives whenever a
+    // viewer opens the page. attach must publish the offer and return IMMEDIATELY (applying the answer in a
+    // background fiber) so the worker loop can start and hold the run open. If attach blocked on awaitAnswer,
+    // nothing would hold the run's scope open before the worker loop and the whole run gets interrupted — the
+    // producer's peer closes before any viewer can connect. Here awaitAnswer never resolves, yet attach must
+    // still return an attachment that delivers frames.
+    const pushedWidths: number[] = [];
+    let offerPublished = false;
+    const fakeTrack = {
+      pushFrame: (frame: { width: number }) => pushedWidths.push(frame.width),
+      stop: () => {}
+    };
+    const fakePeer: RtcPeerConnectionLike = {
+      createOffer: () => Promise.resolve({ type: "offer", sdp: "v=0\r\n" }),
+      createAnswer: () => Promise.resolve({ type: "answer", sdp: "v=0\r\n" }),
+      setLocalDescription: () => Promise.resolve(),
+      setRemoteDescription: () => Promise.resolve(),
+      localDescriptionWithCandidates: (offer) => Promise.resolve(offer),
+      close: () => {},
+      ontrack: null,
+      addVideoTrack: () => fakeTrack
+    };
+    const signaling: SinkSignalingChannel = {
+      publishOffer: () =>
+        Effect.sync(() => {
+          offerPublished = true;
+        }),
+      // The viewer never answers — attach must not hang on this.
+      awaitAnswer: Effect.never
+    };
+
+    const program = Effect.scoped(
+      Effect.gen(function* () {
+        const attachment = yield* createLocalSinkDriver().attach({
+          signaling,
+          streamId: "no-viewer",
+          peerConnectionFactory: () => fakePeer
+        });
+        // attach returned despite no answer — the sink is live and delivers frames immediately.
+        yield* attachment.deliver(makeI420Item(0, grayI420()));
+        yield* attachment.finalize;
+      })
+    );
+
+    // A 5s test timeout: if attach blocked on awaitAnswer (Effect.never), this rejects instead of passing.
+    await Effect.runPromise(program);
+    expect(offerPublished).toBe(true);
+    expect(pushedWidths).toEqual([W]);
+  }, 5000);
 });
