@@ -190,16 +190,23 @@ const buildObserveRuntime = (
 
     startRun: (runId, options) =>
       Effect.gen(function* () {
-        // A board-configured local-sink run needs its injected sink driver re-supplied at start (the kernel
-        // re-resolves it); the runtime owns that wiring so callers don't have to.
+        // Re-supply the injected local WebRTC sink for a board-configured local-sink run (the kernel
+        // re-resolves the driver at start). For every other sink, leave sinkDriver unset — writing an
+        // `undefined` key into the overrides would clobber defaultKernelOptions.sinkDriver, so the kernel
+        // fails to resolve the driver (e.g. the in-memory test sink) and the worker hangs.
         const run = yield* store.require(runId);
-        const sinkDriver =
-          run.config.sink.driverId === "local" ? yield* ensureLocalSink() : options?.sinkDriver;
+        const localSink =
+          run.config.sink.driverId === "local" ? yield* ensureLocalSink() : undefined;
         return yield* startRunEffect(
           store,
           scope,
           runId,
-          mergeKernelOptions(defaultKernelOptions, { ...options, sinkDriver, sessionInit, runHooks })
+          mergeKernelOptions(defaultKernelOptions, {
+            ...options,
+            ...(localSink === undefined ? {} : { sinkDriver: localSink }),
+            sessionInit,
+            runHooks
+          })
         );
       }),
 
