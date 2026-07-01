@@ -2,15 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { Effect } from 'effect'
 import {
   createHostMediatedConsumerSignaling,
-  createHostMediatedSinkSignaling,
   createLoopbackNetwork,
-  streamFileToWebRtc,
+  type RtcPeerConnectionFactory,
   type RtcSessionDescription,
   type SignalingFetch,
 } from '@livestreak/observe'
 
 import {
-  assembleChunksToBlobUrl,
   consumeHostWebRtcFeed,
   nextWebRtcLatch,
   resolveWebRtcEnabled,
@@ -149,76 +147,69 @@ describe('webrtc enabled latch', () => {
   })
 })
 
-describe('assembleChunksToBlobUrl', () => {
-  it('concatenates chunks into one blob URL', () => {
-    const chunks = [new Uint8Array([1, 2]), new Uint8Array([3, 4, 5])]
-    const { blobUrl, totalBytes } = assembleChunksToBlobUrl(chunks, 'application/octet-stream')
-    expect(totalBytes).toBe(5)
-    expect(blobUrl.startsWith('blob:')).toBe(true)
-    URL.revokeObjectURL(blobUrl)
-  })
-})
-
 describe('consumeHostWebRtcFeed (mock relay)', () => {
-  it(
-    'answers a sink offer and reassembles file bytes byte-identical',
-    async () => {
-    const source = new Uint8Array(32_768)
-    for (let i = 0; i < source.length; i += 1) {
-      source[i] = (i * 3 + 5) & 0xff
+  // A media peer whose setRemoteDescription synchronously fires `ontrack` with a fake stream — models the
+  // real transport where the inbound video track arrives as the remote description is applied.
+  const mockMediaPeerFactory = (fakeStream: unknown): { factory: RtcPeerConnectionFactory; isClosed: () => boolean } => {
+    let closed = false
+    const factory: RtcPeerConnectionFactory = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const peer: any = {
+        ontrack: null,
+        ondatachannel: null,
+        createDataChannel: () => ({}),
+        createOffer: async () => ({ type: 'offer', sdp: '' }),
+        createAnswer: async () => ({ type: 'answer', sdp: 'mock-answer' }),
+        setLocalDescription: async () => {},
+        setRemoteDescription: async () => {
+          peer.ontrack?.({ streams: [fakeStream], track: fakeStream })
+        },
+        localDescriptionWithCandidates: async (fb: RtcSessionDescription) => fb,
+        close: () => {
+          closed = true
+        },
+      }
+      return peer
     }
+    return { factory, isClosed: () => closed }
+  }
 
-    const streamId = '0xconsumer-stream'
+  it('resolves the inbound MediaStream from ontrack and returns a close handle', async () => {
+    const streamId = '0xmedia-track-stream'
     const baseUrl = 'http://relay.test'
     const relay = makeRelay()
-    const network = createLoopbackNetwork()
+    // Pre-post the producer's offer so the consumer's awaitOffer resolves immediately.
+    await relay.fetchImpl(`${baseUrl}/webrtc/signal/${encodeURIComponent(streamId)}/offer`, {
+      method: 'POST',
+      body: JSON.stringify({ type: 'offer', sdp: 'sink-offer' }),
+    })
 
-    const consumer = consumeHostWebRtcFeed({
+    const fakeStream = { id: 'fake-media-stream' }
+    const mock = mockMediaPeerFactory(fakeStream)
+
+    const result = await consumeHostWebRtcFeed({
       baseUrl,
       streamId,
       fetch: relay.fetchImpl,
-      peerConnectionFactory: network.factory,
+      peerConnectionFactory: mock.factory,
       pollIntervalMs: 5,
       offerTimeoutMs: 5_000,
-      mimeType: 'application/octet-stream',
     })
 
-    const sinkSignaling = createHostMediatedSinkSignaling({
-      baseUrl,
-      streamId,
-      fetch: relay.fetchImpl,
-      pollIntervalMs: 5,
-    })
+    // The consumer surfaces the exact inbound stream (no blob), and the answer is posted to the relay.
+    expect(result.stream as unknown).toBe(fakeStream)
+    const answerResp = await relay.fetchImpl(
+      `${baseUrl}/webrtc/signal/${encodeURIComponent(streamId)}/answer`,
+      { method: 'GET' },
+    )
+    expect(answerResp.ok).toBe(true)
+    expect(JSON.parse(await answerResp.text()).sdp).toBe('mock-answer')
 
-    const dir = await import('node:os').then((os) => import('node:fs/promises').then((fs) =>
-      fs.mkdtemp(`${os.tmpdir()}/livestreak-app-webrtc-`).then(async (path) => {
-        const filePath = `${path}/clip.bin`
-        await fs.writeFile(filePath, source)
-        return { dir: path, filePath, fs }
-      }),
-    ))
-
-    try {
-      await streamFileToWebRtc({
-        filePath: dir.filePath,
-        streamId,
-        signaling: sinkSignaling,
-        peerConnectionFactory: network.factory,
-      })
-
-      const { blobUrl, totalBytes } = await consumer
-      expect(totalBytes).toBe(source.length)
-
-      const response = await fetch(blobUrl)
-      const body = new Uint8Array(await response.arrayBuffer())
-      expect(Array.from(body)).toEqual(Array.from(source))
-      URL.revokeObjectURL(blobUrl)
-    } finally {
-      await dir.fs.rm(dir.dir, { recursive: true, force: true })
-    }
-  },
-    15_000,
-  )
+    // close() tears down the peer (a live stream keeps it open until the viewer is done).
+    expect(mock.isClosed()).toBe(false)
+    result.close()
+    expect(mock.isClosed()).toBe(true)
+  })
 
   it('posts an answer to the relay after receiving the offer', async () => {
     const streamId = 'relay-answer-check'

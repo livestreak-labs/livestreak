@@ -16,13 +16,15 @@ export interface ConsumeHostWebRtcInput {
   readonly peerConnectionFactory?: RtcPeerConnectionFactory
   readonly pollIntervalMs?: number
   readonly offerTimeoutMs?: number
-  readonly mimeType?: string
   readonly signal?: AbortSignal
 }
 
 export interface ConsumeHostWebRtcResult {
-  readonly blobUrl: string
-  readonly totalBytes: number
+  /** The live inbound `MediaStream` to assign to `<video>.srcObject`. */
+  readonly stream: MediaStream
+  /** Tear down the peer connection. MUST be called when the viewer is done — a live stream keeps the
+   *  peer open to receive media, so (unlike the old blob) it is not self-contained. */
+  readonly close: () => void
 }
 
 /**
@@ -73,34 +75,11 @@ export function resolveWebRtcEnabled(
   return !ended && ((latch.streamId === streamId && latch.enabled) || eligible)
 }
 
-const toUint8Array = (data: unknown): Uint8Array => {
-  if (data instanceof Uint8Array) return data
-  if (data instanceof ArrayBuffer) return new Uint8Array(data)
-  if (ArrayBuffer.isView(data)) {
-    const view = data as ArrayBufferView
-    return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
-  }
-  return new Uint8Array(0)
-}
-
-export const assembleChunksToBlobUrl = (
-  chunks: readonly Uint8Array[],
-  mimeType = 'video/mp4',
-): { blobUrl: string; totalBytes: number } => {
-  const totalBytes = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0)
-  const assembled = new Uint8Array(totalBytes)
-  let offset = 0
-  for (const chunk of chunks) {
-    assembled.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  const blob = new Blob([assembled], { type: mimeType })
-  return { blobUrl: URL.createObjectURL(blob), totalBytes }
-}
-
 /**
- * Host-mediated browser consumer: poll relay for sink offer, answer, collect data-channel
- * chunks, reassemble into a blob URL for `<video src>`.
+ * Host-mediated browser consumer: poll the relay for the producer's offer, answer it, and surface the live
+ * inbound video track as a `MediaStream` for `<video>.srcObject`. This is real-time — frames render as they
+ * arrive over the RTP media track; there is no file to assemble. The peer stays OPEN to keep receiving media
+ * (the caller closes it via the returned `close`).
  */
 export async function consumeHostWebRtcFeed(
   input: ConsumeHostWebRtcInput,
@@ -116,8 +95,6 @@ export async function consumeHostWebRtcFeed(
     pollIntervalMs: input.pollIntervalMs,
     offerTimeoutMs: input.offerTimeoutMs,
   })
-
-  const chunks: Uint8Array[] = []
 
   const abortPromise = input.signal
     ? new Promise<never>((_, reject) => {
@@ -141,61 +118,39 @@ export async function consumeHostWebRtcFeed(
     const factory = input.peerConnectionFactory ?? resolveBrowserPeerFactory()
     peer = factory()
 
-    let resolveTransfer!: () => void
-    const transferComplete = new Promise<void>((resolve) => {
-      resolveTransfer = resolve
+    let resolveStream!: (stream: MediaStream) => void
+    const streamReady = new Promise<MediaStream>((resolve) => {
+      resolveStream = resolve
     })
-    let idleTimer: ReturnType<typeof setTimeout> | undefined
-    const finishTransfer = () => {
-      if (idleTimer !== undefined) clearTimeout(idleTimer)
-      resolveTransfer()
-    }
-    // The producer drains its send buffer fully and then closes, so `onclose` is the authoritative
-    // completion signal. The idle timer is only a fallback for a lost close — give it real margin so a
-    // producer-side backpressure pause (large MP4) can't prematurely finalize a partial, undecodable blob.
-    const bumpIdle = () => {
-      if (chunks.length === 0) return
-      if (idleTimer !== undefined) clearTimeout(idleTimer)
-      idleTimer = setTimeout(finishTransfer, 3000)
-    }
-
-    peer.ondatachannel = (event) => {
-      const channel = event.channel
-      // A native RTCDataChannel may default `binaryType` to "blob"; our reassembly only handles
-      // ArrayBuffer/typed-array, so Blobs would be dropped to zero-length and the feed would be empty.
-      ;(channel as unknown as { binaryType?: string }).binaryType = 'arraybuffer'
-      channel.onmessage = (message) => {
-        const bytes = toUint8Array(message.data)
-        if (bytes.byteLength > 0) {
-          chunks.push(bytes)
-          bumpIdle()
-        }
-      }
-      channel.onclose = finishTransfer
+    // The inbound video track arrives as the remote description is applied. Prefer the sender's stream;
+    // fall back to a fresh MediaStream around the raw track (the producer adds the track without a stream).
+    peer.ontrack = (event) => {
+      const provided = event.streams[0] as MediaStream | undefined
+      const stream = provided ?? new MediaStream([event.track as MediaStreamTrack])
+      resolveStream(stream)
     }
 
     await peer.setRemoteDescription(offer)
     const answer = await peer.createAnswer()
     await peer.setLocalDescription(answer)
     // Non-trickle ICE: publish the answer WITH its gathered candidates (the relay carries only the SDP, so
-    // the producer never learns our address otherwise and the data channel never opens).
+    // the producer never learns our address otherwise and media never flows).
     const localAnswer = await peer.localDescriptionWithCandidates(answer)
     await Promise.race([
       Effect.runPromise(signaling.publishAnswer(localAnswer)),
       ...(abortPromise ? [abortPromise] : []),
     ])
-    await Promise.race([
-      transferComplete,
+
+    const stream = await Promise.race([
+      streamReady,
       ...(abortPromise ? [abortPromise] : []),
     ])
 
-    if (chunks.length === 0) {
-      throw new Error('WebRTC consumer received no data-channel chunks')
-    }
-
-    return assembleChunksToBlobUrl(chunks, input.mimeType)
-  } finally {
+    const activePeer = peer
+    return { stream, close: () => activePeer.close() }
+  } catch (error) {
     peer?.close()
+    throw error
   }
 }
 
