@@ -45,6 +45,33 @@ export interface RtcDataChannelEvent {
   readonly channel: RtcDataChannelLike;
 }
 
+/** One I420 (yuv420p) video frame pushed into an outbound track. `data` is width*height*3/2 bytes. */
+export interface RtcVideoFrame {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8Array;
+}
+
+/**
+ * Producer-side handle to an outbound WebRTC VIDEO TRACK — real RTP media, not a data channel. The sink
+ * pushes each decoded frame with {@link pushFrame} and the transport (RTCVideoSource → RTP) sends it live
+ * to the viewer, who receives it as a normal `MediaStreamTrack`. This is what makes streaming real-time.
+ */
+export interface RtcVideoTrackHandle {
+  readonly pushFrame: (frame: RtcVideoFrame) => void;
+  readonly stop: () => void;
+}
+
+/**
+ * Consumer-side inbound track event. `streams[0]` is the real browser `MediaStream` the app assigns to
+ * `<video>.srcObject` (opaque here — observe never touches the DOM); `track` is the raw `MediaStreamTrack`,
+ * used to synthesize a stream when the producer added the track without a stream. Mirrors `RTCTrackEvent`.
+ */
+export interface RtcTrackEvent {
+  readonly streams: readonly unknown[];
+  readonly track?: unknown;
+}
+
 export interface RtcPeerConnectionLike {
   createDataChannel: (label: string) => RtcDataChannelLike;
   createOffer: () => Promise<RtcSessionDescription>;
@@ -58,6 +85,14 @@ export interface RtcPeerConnectionLike {
   localDescriptionWithCandidates: (fallback: RtcSessionDescription) => Promise<RtcSessionDescription>;
   close: () => void;
   ondatachannel: ((event: RtcDataChannelEvent) => void) | null;
+  /**
+   * Add an outbound video track (PRODUCER). Must be called BEFORE `createOffer` so the offer carries the
+   * video m-line. Present only on transports with media support (the Node @roamhq/wrtc producer); undefined
+   * on the loopback/data-channel-only test transport.
+   */
+  addVideoTrack?: () => RtcVideoTrackHandle;
+  /** Inbound remote track handler (CONSUMER): fires with the remote `MediaStream` once media negotiates. */
+  ontrack?: ((event: RtcTrackEvent) => void) | null;
 }
 
 /**
@@ -338,11 +373,17 @@ const adaptBrowserPeer = (peer: BrowserRtcPeerConnection): RtcPeerConnectionLike
     setRemoteDescription: (description) => peer.setRemoteDescription(description),
     localDescriptionWithCandidates: (fallback) => gatheredLocalDescription(peer, fallback),
     close: () => peer.close(),
-    ondatachannel: null
+    ondatachannel: null,
+    ontrack: null
   };
   peer.addEventListener("datachannel", (event) => {
     const channel = (event as { channel: BrowserRtcDataChannel }).channel;
     adapter.ondatachannel?.({ channel: adaptBrowserChannel(channel) });
+  });
+  // Inbound video track (consumer): surface the remote MediaStream for `<video>.srcObject`.
+  peer.addEventListener("track", (event) => {
+    const typed = event as { streams?: readonly unknown[]; track?: unknown };
+    adapter.ontrack?.({ streams: typed.streams ?? [], track: typed.track });
   });
   return adapter;
 };

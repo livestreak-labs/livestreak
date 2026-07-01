@@ -64,15 +64,18 @@ export const runConfigFromBoard = (
 
     return {
       runId,
-      capture: { driverId: "file", config: { path: capturePath } },
+      // Decode straight to I420 at real time (`-re`) so frames feed the local sink's WebRTC video track with
+      // no color conversion and stream paced at wall-clock FPS (see the local sink + file capture).
+      capture: {
+        driverId: "file",
+        config: { path: capturePath, pixelFormat: "yuv420p", realtime: true }
+      },
       sink: {
         driverId: "local",
         instanceId: "local",
-        // The capture decodes to raw RGB24, which `<video>` cannot play — encode the frames into an MP4 the
-        // browser consumer can render. `streamId` keys the temp file; signaling is keyed to the same market.
+        // Real-time media-track preview keyed to the registered market (the id the viewer consumes under).
         config: {
           streamId: marketId,
-          deliverAs: "mp4",
           signaling: createHostMediatedSinkSignaling({ baseUrl: hostBaseUrl, streamId: marketId })
         }
       },

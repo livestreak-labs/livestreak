@@ -1,6 +1,11 @@
 import { Effect } from "effect";
 import { LiveStreakRuntimeError, type LiveStreakError } from "@livestreak/core";
-import type { RtcDataChannelState, RtcPeerConnectionFactory, RtcPeerConnectionLike } from "./signaling.js";
+import type {
+  RtcDataChannelState,
+  RtcPeerConnectionFactory,
+  RtcPeerConnectionLike,
+  RtcVideoTrackHandle
+} from "./signaling.js";
 import { gatheredLocalDescription, resolveDefaultPeerFactory } from "./signaling.js";
 
 /**
@@ -10,8 +15,20 @@ import { gatheredLocalDescription, resolveDefaultPeerFactory } from "./signaling
  * WebRTC fails with a clear message — inject a factory in tests via loopback.
  */
 
+interface NodeVideoTrack {
+  stop: () => void;
+}
+
+interface NodeRtcVideoSource {
+  createTrack: () => NodeVideoTrack;
+  onFrame: (frame: { width: number; height: number; data: Uint8ClampedArray }) => void;
+}
+
 type WrtcModule = {
   readonly RTCPeerConnection: new (config?: unknown) => NodeRtcPeer;
+  readonly nonstandard?: {
+    readonly RTCVideoSource: new () => NodeRtcVideoSource;
+  };
 };
 
 const importNode = (specifier: string): Promise<unknown> => import(/* @vite-ignore */ specifier);
@@ -28,6 +45,7 @@ interface NodeRtcDataChannel {
 
 interface NodeRtcPeer {
   createDataChannel: (label: string) => NodeRtcDataChannel;
+  addTrack: (track: NodeVideoTrack) => unknown;
   createOffer: () => Promise<{ type: "offer" | "answer"; sdp: string }>;
   createAnswer: () => Promise<{ type: "offer" | "answer"; sdp: string }>;
   setLocalDescription: (d: { type: "offer" | "answer"; sdp: string }) => Promise<void>;
@@ -69,7 +87,32 @@ const adaptNodeChannel = (channel: NodeRtcDataChannel) => {
   return adapter;
 };
 
-const adaptNodePeer = (peer: NodeRtcPeer): RtcPeerConnectionLike => {
+const adaptNodeVideoTrack = (
+  peer: NodeRtcPeer,
+  VideoSource: new () => NodeRtcVideoSource
+): RtcVideoTrackHandle => {
+  const source = new VideoSource();
+  const track = source.createTrack();
+  peer.addTrack(track);
+  return {
+    // RTCVideoSource wants an I420 buffer as Uint8ClampedArray; wrap the frame bytes without copying.
+    pushFrame: (frame) =>
+      source.onFrame({
+        width: frame.width,
+        height: frame.height,
+        data:
+          frame.data instanceof Uint8ClampedArray
+            ? frame.data
+            : new Uint8ClampedArray(frame.data.buffer, frame.data.byteOffset, frame.data.byteLength)
+      }),
+    stop: () => track.stop()
+  };
+};
+
+const adaptNodePeer = (
+  peer: NodeRtcPeer,
+  VideoSource: (new () => NodeRtcVideoSource) | undefined
+): RtcPeerConnectionLike => {
   const adapter: RtcPeerConnectionLike = {
     createDataChannel: (label) => adaptNodeChannel(peer.createDataChannel(label)),
     createOffer: () => peer.createOffer(),
@@ -78,7 +121,9 @@ const adaptNodePeer = (peer: NodeRtcPeer): RtcPeerConnectionLike => {
     setRemoteDescription: (d) => peer.setRemoteDescription(d),
     localDescriptionWithCandidates: (fallback) => gatheredLocalDescription(peer, fallback),
     close: () => peer.close(),
-    ondatachannel: null
+    ondatachannel: null,
+    ontrack: null,
+    ...(VideoSource === undefined ? {} : { addVideoTrack: () => adaptNodeVideoTrack(peer, VideoSource) })
   };
   peer.addEventListener("datachannel", (event) => {
     adapter.ondatachannel?.({ channel: adaptNodeChannel(event.channel) });
@@ -116,6 +161,7 @@ export const resolveNodePeerConnectionFactory = (): Effect.Effect<
     }
 
     const Ctor = wrtc.RTCPeerConnection;
+    const VideoSource = wrtc.nonstandard?.RTCVideoSource;
     // ICE servers are env-overridable (LIVESTREAK_ICE_SERVERS = JSON array) so a
     // Dockerized/remote producer can point at a TURN relay; default stays STUN-only.
     const iceServers: { urls: string; username?: string; credential?: string }[] = (() => {
@@ -134,5 +180,8 @@ export const resolveNodePeerConnectionFactory = (): Effect.Effect<
     // this ICE stalls on them instead of using the reachable TURN relay.
     const relayOnly = process.env.LIVESTREAK_ICE_RELAY_ONLY === "1";
     return () =>
-      adaptNodePeer(new Ctor(relayOnly ? { iceServers, iceTransportPolicy: "relay" } : { iceServers }));
+      adaptNodePeer(
+        new Ctor(relayOnly ? { iceServers, iceTransportPolicy: "relay" } : { iceServers }),
+        VideoSource
+      );
   });
