@@ -19,7 +19,7 @@ import {
 import { makeObserveRun, type ObserveRun, type ObserveRunConfig } from "./run.js";
 import { runConfigFromBoard } from "./board-run-config.js";
 import { createLocalSinkDriver } from "#pipeline/publish/sinks/local/driver.js";
-import { resolveNodePeerConnectionFactory } from "#pipeline/publish/sinks/local/node-peer.js";
+import { resolveNodePeerConnectionFactory, type NodeIceConfig } from "#pipeline/publish/sinks/local/node-peer.js";
 import {
   callStoredRunFunction,
   createRunStore,
@@ -115,6 +115,16 @@ const mergeKernelOptions = (
   overrides: RuntimeKernelOptions | undefined
 ): RuntimeKernelOptions => ({ ...defaults, ...overrides });
 
+// Discover the host's self-described ICE (its embedded STUN/TURN relay) so the producer streams over a
+// reachable relay with zero manual env — turnkey go-live. Best-effort: any failure falls back to the
+// env/STUN defaults in resolveNodePeerConnectionFactory. Explicit env still wins there.
+const resolveHostIceConfig = (hostBaseUrl: string): Effect.Effect<NodeIceConfig | undefined> =>
+  Effect.tryPromise(async () => {
+    const res = await fetch(`${hostBaseUrl.replace(/\/$/, "")}/webrtc/ice`);
+    if (!res.ok) return undefined;
+    return (await res.json()) as NodeIceConfig;
+  }).pipe(Effect.orElseSucceed(() => undefined));
+
 const buildObserveRuntime = (
   input: CreateObserveRuntimeInput,
   scope: Scope.Scope
@@ -125,10 +135,12 @@ const buildObserveRuntime = (
 
   // The Node WebRTC sink driver (peer factory via @roamhq/wrtc) — built once, reused for prepare + start.
   let cachedLocalSink: LocalSinkDriver | undefined;
-  const ensureLocalSink = (): Effect.Effect<LocalSinkDriver, LiveStreakError> =>
+  const ensureLocalSink = (
+    iceConfig?: NodeIceConfig
+  ): Effect.Effect<LocalSinkDriver, LiveStreakError> =>
     Effect.gen(function* () {
       if (cachedLocalSink === undefined) {
-        const peerConnectionFactory = yield* resolveNodePeerConnectionFactory();
+        const peerConnectionFactory = yield* resolveNodePeerConnectionFactory(iceConfig);
         cachedLocalSink = createLocalSinkDriver({ peerConnectionFactory });
       }
       return cachedLocalSink;
@@ -179,7 +191,8 @@ const buildObserveRuntime = (
           board: run.board,
           hostBaseUrl: options.hostBaseUrl
         });
-        const sinkDriver = yield* ensureLocalSink();
+        const iceConfig = yield* resolveHostIceConfig(options.hostBaseUrl);
+        const sinkDriver = yield* ensureLocalSink(iceConfig);
         const prepared = yield* prepareObserveRun(
           { ...run, config, manifest: run.manifest, prepared: false },
           mergeKernelOptions(defaultKernelOptions, { sinkDriver, sessionInit, runHooks })

@@ -127,7 +127,10 @@ export async function consumeHostWebRtcFeed(
       ...(abortPromise ? [abortPromise] : []),
     ])
 
-    const factory = input.peerConnectionFactory ?? resolveBrowserPeerFactory()
+    // Discover the host's ICE (its embedded TURN) so the viewer relays over a reachable server with no
+    // build-time env. Only when we build the browser peer ourselves (an injected factory brings its own).
+    const hostIce = input.peerConnectionFactory ? undefined : await fetchHostIce(input.baseUrl)
+    const factory = input.peerConnectionFactory ?? resolveBrowserPeerFactory(hostIce)
     peer = factory()
 
     let resolveStream!: (stream: MediaStream) => void
@@ -166,7 +169,21 @@ export async function consumeHostWebRtcFeed(
   }
 }
 
-const resolveBrowserPeerFactory = (): RtcPeerConnectionFactory => {
+type HostIceConfig = { readonly iceServers?: RTCIceServer[]; readonly relayOnly?: boolean }
+
+// Fetch the host's self-described ICE (its embedded STUN/TURN relay) so the viewer uses a reachable relay
+// with zero build-time env. Best-effort — any failure falls back to env/STUN. Build-time env still wins.
+async function fetchHostIce(baseUrl: string): Promise<HostIceConfig | undefined> {
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/webrtc/ice`)
+    if (!res.ok) return undefined
+    return (await res.json()) as HostIceConfig
+  } catch {
+    return undefined
+  }
+}
+
+const resolveBrowserPeerFactory = (hostIce?: HostIceConfig): RtcPeerConnectionFactory => {
   const Ctor = (globalThis as { RTCPeerConnection?: new (config?: RTCConfiguration) => RTCPeerConnection })
     .RTCPeerConnection
   if (Ctor === undefined) {
@@ -186,14 +203,17 @@ const resolveBrowserPeerFactory = (): RtcPeerConnectionFactory => {
       try {
         return JSON.parse(raw) as RTCIceServer[]
       } catch {
-        /* malformed → STUN default */
+        /* malformed → fall through */
       }
     }
+    // No build-time env → use the host's self-described ICE (its embedded TURN); else STUN default.
+    if (hostIce?.iceServers && hostIce.iceServers.length > 0) return hostIce.iceServers
     return [{ urls: 'stun:stun.l.google.com:19302' }]
   })()
   return () => {
-    const relayOnly = (import.meta as unknown as { env?: Record<string, string | undefined> }).env
-      ?.VITE_LIVESTREAK_ICE_RELAY_ONLY === '1'
+    const relayOnly =
+      (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+        ?.VITE_LIVESTREAK_ICE_RELAY_ONLY === '1' || (hostIce?.relayOnly ?? false)
     const peer = new Ctor(relayOnly ? { iceServers, iceTransportPolicy: 'relay' } : { iceServers })
     const like = peer as unknown as ReturnType<RtcPeerConnectionFactory>
     like.localDescriptionWithCandidates = async (fallback) => {

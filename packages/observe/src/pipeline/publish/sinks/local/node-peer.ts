@@ -82,10 +82,14 @@ const adaptNodePeer = (
   return adapter;
 };
 
-export const resolveNodePeerConnectionFactory = (): Effect.Effect<
-  RtcPeerConnectionFactory,
-  LiveStreakError
-> =>
+export type NodeIceConfig = {
+  readonly iceServers?: readonly { urls: string; username?: string; credential?: string }[];
+  readonly relayOnly?: boolean;
+};
+
+export const resolveNodePeerConnectionFactory = (
+  iceConfig?: NodeIceConfig
+): Effect.Effect<RtcPeerConnectionFactory, LiveStreakError> =>
   Effect.gen(function* () {
     if ((globalThis as { RTCPeerConnection?: unknown }).RTCPeerConnection !== undefined) {
       return yield* resolveDefaultPeerFactory();
@@ -121,15 +125,19 @@ export const resolveNodePeerConnectionFactory = (): Effect.Effect<
         try {
           return JSON.parse(raw) as { urls: string; username?: string; credential?: string }[];
         } catch {
-          /* malformed → STUN default */
+          /* malformed → fall through */
         }
+      }
+      // No env → use the host's self-described ICE (its embedded TURN); else STUN default.
+      if (iceConfig?.iceServers && iceConfig.iceServers.length > 0) {
+        return [...iceConfig.iceServers];
       }
       return [{ urls: "stun:stun.l.google.com:19302" }];
     })();
     // Relay-only (LIVESTREAK_ICE_RELAY_ONLY=1) forces TURN. A Dockerized producer's
     // host candidates are container-private (unreachable from the viewer), so without
     // this ICE stalls on them instead of using the reachable TURN relay.
-    const relayOnly = process.env.LIVESTREAK_ICE_RELAY_ONLY === "1";
+    const relayOnly = process.env.LIVESTREAK_ICE_RELAY_ONLY === "1" || (iceConfig?.relayOnly ?? false);
     return () =>
       adaptNodePeer(
         new Ctor(relayOnly ? { iceServers, iceTransportPolicy: "relay" } : { iceServers }),
