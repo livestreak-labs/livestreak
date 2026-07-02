@@ -52,7 +52,7 @@ export {
 export {
   configureObserveBoard,
   defaultFileExportConfigure,
-  defaultFileLocalConfigure,
+  defaultFileLiveConfigure,
   mountObserveT0Bus,
   prepareObserveRunBoardFirst,
   startObserveRunBoardFirst,

@@ -163,7 +163,7 @@ export const createObserveConsoleEdge = (input: CreateObserveConsoleEdgeInput): 
 
     dispatch: async (_remoteCaller: BridgeCaller, envelope: CallActionEnvelope) => {
       // Console path: the cell-qualified descriptor id resolves to exactly one cell (so capture:file /
-      // sink:local / sink:file-export `configure` no longer collide). Legacy path (no id): bare action
+      // sink:live / sink:file-export `configure` no longer collide). Legacy path (no id): bare action
       // name — `configure` is pinned to system:config, every other observe action name is unique.
       const internalScope =
         envelope.id !== undefined

@@ -29,7 +29,7 @@ describe("runConfigFromBoard → live fMP4 sink", () => {
     const config = await Effect.runPromise(
       runConfigFromBoard({
         runId: "run1",
-        board: boardWith({ capturePath: "/tmp/clip.mp4", publish: "local", marketId: "market-xyz" }),
+        board: boardWith({ capturePath: "/tmp/clip.mp4", publish: "live", marketId: "market-xyz" }),
         hostBaseUrl: "http://127.0.0.1:8787"
       })
     );
@@ -51,7 +51,7 @@ describe("runConfigFromBoard → live fMP4 sink", () => {
     const result = await Effect.runPromise(
       runConfigFromBoard({
         runId: "run1",
-        board: boardWith({ capturePath: "/tmp/clip.mp4", publish: "local" }),
+        board: boardWith({ capturePath: "/tmp/clip.mp4", publish: "live" }),
         hostBaseUrl: "http://127.0.0.1:8787"
       }).pipe(
         Effect.map(() => "ok"),
@@ -65,7 +65,7 @@ describe("runConfigFromBoard → live fMP4 sink", () => {
     const result = await Effect.runPromise(
       runConfigFromBoard({
         runId: "run1",
-        board: boardWith({ publish: "local", marketId: "m" }),
+        board: boardWith({ publish: "live", marketId: "m" }),
         hostBaseUrl: "http://127.0.0.1:8787"
       }).pipe(
         Effect.map(() => "ok"),

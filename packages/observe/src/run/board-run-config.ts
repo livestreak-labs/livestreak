@@ -28,7 +28,7 @@ export interface RunConfigFromBoardInput {
  * Derive the LIVE run config from the console-configured board: capture path from the `capture:file` cell,
  * and the encode-once fMP4 `live` sink whose ingest transport is keyed to the registered marketId (the id
  * the viewer consumes under, over the host `/live/watch/:streamId` endpoint). Going live means streaming to
- * viewers, so the board's live publish selector (`publish === "local"`, the go-live path) maps to the
+ * viewers, so the board's live publish selector (`publish === "live"`, the go-live path) maps to the
  * `live` sink here — the file-export recording sink is a separate, non-live concern. Fails with an
  * operator-facing message when a prerequisite is missing. Kept Node-free on purpose: observe's barrel is
  * bundled into the browser (consumer) app too — `createHostFmp4IngestTransport` only builds the transport
@@ -50,10 +50,10 @@ export const runConfigFromBoard = (
     }
 
     const publish = cellRecord(board, "system:config").readonly.publish;
-    if (publish !== "local") {
+    if (publish !== "live") {
       return yield* Effect.fail(
         new LiveStreakConfigError({
-          message: "Going live streams to viewers — set the publish sink to 'local' (the go-live path)."
+          message: "Going live streams to viewers — set the publish sink to 'live' (the go-live path)."
         })
       );
     }
