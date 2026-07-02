@@ -967,7 +967,8 @@ const readTreasuryU128 = async (
     return val !== undefined ? readU128(val) : 0n;
   } catch (error) {
     if (error instanceof LiveStreakConfigError) throw error;
-    throw suiReadFailed(`treasury ${fn}`, error);
+    const entity = fn === "lvst_staked" ? "treasury lvst_staked" : "treasury pending_dividends";
+    throw suiReadFailed(entity, error);
   }
 };
 
