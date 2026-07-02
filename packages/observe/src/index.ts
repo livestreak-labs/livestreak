@@ -232,6 +232,36 @@ export {
   type HostMediatedConsumerSignalingInput
 } from "./pipeline/publish/sinks/local/host-consumer-signaling.js";
 
+// --- Live fMP4 publisher sink (encode-once byte fan-out) ---
+export {
+  createLiveSinkDriver,
+  liveSinkDescriptor,
+  validateLiveSinkConfig,
+  type LiveSinkConfig,
+  type LiveSinkDriverOptions
+} from "./pipeline/publish/sinks/live/driver.js";
+
+export {
+  createHostFmp4IngestTransport,
+  frameFmp4,
+  FMP4_FRAME_INIT,
+  FMP4_FRAME_FRAGMENT,
+  FMP4_FRAME_END,
+  type Fmp4IngestTransport,
+  type HostFmp4IngestInput,
+  type WebSocketLike,
+  type WebSocketFactory
+} from "./pipeline/publish/sinks/live/transport.js";
+
+export {
+  createFmp4Encoder,
+  makeFfmpegFmp4Arguments,
+  type Fmp4Encoder,
+  type Fmp4EncoderConfig
+} from "./pipeline/publish/encoder/fmp4.js";
+
+export { createFmp4Chunker, type Fmp4Chunk, type Fmp4Chunker } from "./pipeline/publish/encoder/fmp4-boxes.js";
+
 export { resolveNodePeerConnectionFactory } from "./pipeline/publish/sinks/local/node-peer.js";
 
 export {
