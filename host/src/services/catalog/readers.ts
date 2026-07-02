@@ -15,6 +15,9 @@ import {
 } from "@livestreak/options";
 import type { WalletInit } from "@livestreak/schema";
 import type { SuiNetwork } from "@livestreak/wallet";
+import { readDeploymentOutputFromPath } from "@livestreak/contracts/evm/node";
+import type { EvmDeployOutput } from "@livestreak/contracts/evm";
+import { DEFAULT_DEPLOY_SNAPSHOT } from "../../config/aa/deploy-env.js";
 import type { CatalogChain } from "./types.js";
 import type { CatalogReaderProvider } from "./catalog.js";
 
@@ -31,10 +34,6 @@ const resolveSuiNetworkFromEnv = (): SuiNetwork => {
 const CATALOG_DIR = resolve(fileURLToPath(import.meta.url), "..");
 const HOST_ROOT = resolve(CATALOG_DIR, "..", "..", "..");
 
-const DEFAULT_EVM_SNAPSHOT = resolve(
-  HOST_ROOT,
-  "../packages/contracts/chains/evm/deployments/localhost.json"
-);
 const DEFAULT_SUI_DEPLOYMENT = resolve(
   HOST_ROOT,
   "../packages/contracts/chains/sui/deployments/localnet.json"
@@ -46,16 +45,6 @@ const DEFAULT_SUI_DEPLOYMENT = resolve(
 const READONLY_EVM_SEED =
   "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
-interface EvmDeploySnapshot {
-  readonly rpc?: string;
-  readonly chainId?: number | string;
-  readonly scopes?: {
-    readonly protocol?: { readonly contracts?: Record<string, string> };
-    readonly streaming?: { readonly contracts?: Record<string, string> };
-    readonly wire?: { readonly contracts?: Record<string, string> };
-  };
-}
-
 const readJsonFile = <T>(path: string): T | null => {
   try {
     return JSON.parse(readFileSync(path, "utf8")) as T;
@@ -64,9 +53,19 @@ const readJsonFile = <T>(path: string): T | null => {
   }
 };
 
+// Parse the EVM deploy snapshot through the single contracts parser (no local JSON.parse of the AA
+// snapshot), degrading to null so an absent/unparseable snapshot just omits the EVM reader.
+const readEvmSnapshot = (path: string): EvmDeployOutput | null => {
+  try {
+    return readDeploymentOutputFromPath(path);
+  } catch {
+    return null;
+  }
+};
+
 // Map the EVM deploy snapshot scopes onto the options contract address set.
 const evmAddressesFromSnapshot = (
-  snap: EvmDeploySnapshot
+  snap: EvmDeployOutput
 ): OptionsContractAddresses | null => {
   const protocol = snap.scopes?.protocol?.contracts;
   const streaming = snap.scopes?.streaming?.contracts;
@@ -101,8 +100,8 @@ const evmAddressesFromSnapshot = (
 };
 
 const buildEvmReader = (): OptionsReader | null => {
-  const snapshotPath = process.env.LIVESTREAK_DEPLOY_SNAPSHOT ?? DEFAULT_EVM_SNAPSHOT;
-  const snap = readJsonFile<EvmDeploySnapshot>(snapshotPath);
+  const snapshotPath = process.env.LIVESTREAK_DEPLOY_SNAPSHOT ?? DEFAULT_DEPLOY_SNAPSHOT;
+  const snap = readEvmSnapshot(snapshotPath);
   if (snap === null) return null;
   const addresses = evmAddressesFromSnapshot(snap);
   if (addresses === null) return null;
