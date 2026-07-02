@@ -23,10 +23,10 @@ import { resolveNodePeerConnectionFactory, type NodeIceConfig } from "#pipeline/
 import {
   callStoredRunFunction,
   createRunStore,
-  failIfActiveHandleExists,
   getStoredRunArtifact,
   readStoredRunBoard,
   readStoredRunPanel,
+  reclaimTerminalRunHandle,
   subscribeStoredRunArtifacts,
   subscribeStoredRunBoard,
   type ObserveRunHandle,
@@ -186,6 +186,9 @@ const buildObserveRuntime = (
     prepareConfiguredRun: (runId, options) =>
       Effect.gen(function* () {
         const run = yield* store.require(runId);
+        // Re-preparing a finished run reclaims its terminal handle (so reads route to the fresh bus,
+        // not the dead run's); an ACTIVE run refuses re-prepare.
+        yield* reclaimTerminalRunHandle(store, runId);
         const config = yield* runConfigFromBoard({
           runId,
           board: run.board,
@@ -258,7 +261,7 @@ const startRunEffect = (
   options: RuntimeKernelOptions
 ) =>
   Effect.gen(function* () {
-    yield* failIfActiveHandleExists(store, runId);
+    yield* reclaimTerminalRunHandle(store, runId);
     const run = yield* store.require(runId);
     const handle = yield* startObserveRunAsync({
       run,
