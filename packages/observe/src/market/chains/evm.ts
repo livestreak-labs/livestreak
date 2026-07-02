@@ -205,27 +205,6 @@ export const createEvmMarketRegistrar = (
   };
 };
 
-export const assertUserOperationSucceeded = (
-  receipt: unknown
-): Effect.Effect<void, LiveStreakRuntimeError> => {
-  if (!isRecord(receipt)) {
-    return Effect.fail(
-      receiptFailure("UserOperation receipt payload is not an object")
-    );
-  }
-
-  const success = readUserOperationSuccess(receipt);
-  if (success === undefined) {
-    return Effect.fail(receiptFailure("UserOperation receipt is missing success"));
-  }
-
-  if (success === false) {
-    return Effect.fail(receiptFailure("UserOperation included but reverted"));
-  }
-
-  return Effect.void;
-};
-
 // --- helpers ---
 
 // Delegate to the shared wallet poller (60s budget + exponential backoff, and the canonical
@@ -244,20 +223,6 @@ const pollUntilUserOperationIncluded = (
     catch: (error) => toRuntimeError("UserOperation inclusion failed", error)
   });
 
-const readUserOperationSuccess = (receipt: Record<string, unknown>): boolean | undefined => {
-  const direct = receipt["success"];
-  if (typeof direct === "boolean") {
-    return direct;
-  }
-
-  return undefined;
-};
-
-const receiptFailure = (message: string): LiveStreakRuntimeError =>
-  new LiveStreakRuntimeError({
-    message
-  });
-
 const classifySendFailure = (error: unknown): LiveStreakRuntimeError => {
   if (isPaymasterSideFailure(error)) {
     const message = error instanceof Error ? error.message : String(error);
@@ -273,6 +238,3 @@ const toRuntimeError = (prefix: string, error: unknown): LiveStreakRuntimeError 
   new LiveStreakRuntimeError({
     message: `${prefix}: ${error instanceof Error ? error.message : String(error)}`
   });
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
