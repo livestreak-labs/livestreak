@@ -170,7 +170,8 @@ export const createEvmMarketRegistrar = (
             userOpHash: `0x${"0".repeat(64)}`,
             marketId,
             streamId,
-            title: input.title
+            title: input.title,
+            alreadyRegistered: true
           } satisfies MarketRegisterResult;
         }
       }
