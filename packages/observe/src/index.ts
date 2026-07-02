@@ -218,20 +218,6 @@ export * from "./pipeline/publish/index.js";
 export * from "./pipeline/registry.js";
 export * from "./pipeline/shared.js";
 
-// --- Local WebRTC preview sink + file→WebRTC streaming (SEAM-WEBRTC) ---
-export {
-  createLocalSinkDriver,
-  localSinkDescriptor,
-  validateLocalSinkConfig,
-  type LocalSinkConfig,
-  type LocalSinkDriverOptions
-} from "./pipeline/publish/sinks/local/driver.js";
-
-export {
-  createHostMediatedConsumerSignaling,
-  type HostMediatedConsumerSignalingInput
-} from "./pipeline/publish/sinks/local/host-consumer-signaling.js";
-
 // --- Live fMP4 publisher sink (encode-once byte fan-out) ---
 export {
   createLiveSinkDriver,
@@ -261,31 +247,6 @@ export {
 } from "./pipeline/publish/encoder/fmp4.js";
 
 export { createFmp4Chunker, type Fmp4Chunk, type Fmp4Chunker } from "./pipeline/publish/encoder/fmp4-boxes.js";
-
-export { resolveNodePeerConnectionFactory } from "./pipeline/publish/sinks/local/node-peer.js";
-
-export {
-  createHostMediatedSinkSignaling,
-  type HostMediatedSinkSignalingInput,
-  type SignalingFetch,
-  type SignalingResponse
-} from "./pipeline/publish/sinks/local/host-signaling.js";
-
-export {
-  createLocalSignalingHub,
-  createLoopbackNetwork,
-  LocalSignalingHub,
-  type ConsumerSignalingChannel,
-  type SinkSignalingChannel,
-  type LoopbackNetwork,
-  type RtcPeerConnectionLike,
-  type RtcPeerConnectionFactory,
-  type RtcSessionDescription,
-  type RtcSdpType,
-  type RtcVideoFrame,
-  type RtcVideoTrackHandle,
-  type RtcTrackEvent
-} from "./pipeline/publish/sinks/local/signaling.js";
 
 // --- Per-stream feed resolution (issue 7) ---
 export {

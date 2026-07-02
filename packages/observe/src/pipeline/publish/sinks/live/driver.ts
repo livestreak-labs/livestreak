@@ -102,10 +102,11 @@ export const validateLiveSinkConfig = (
     if (
       typeof config.transport.sendInit !== "function" ||
       typeof config.transport.sendFragment !== "function" ||
-      typeof config.transport.end !== "function"
+      typeof config.transport.end !== "function" ||
+      typeof config.transport.onError !== "function"
     ) {
       return yield* Effect.fail(
-        configError("Live sink transport must provide sendInit / sendFragment / end")
+        configError("Live sink transport must provide sendInit / sendFragment / end / onError")
       );
     }
     if (
@@ -138,25 +139,20 @@ export const createLiveSinkDriver = (
       let encoder: Fmp4Encoder | undefined;
       let finalized = false;
 
-      // Ship each completed init/fragment out the single ingest connection. Fire-and-forget from the
-      // stdout callback (which is synchronous) — a failed send marks the sink degraded but never blocks
-      // the encode (the host drops slow viewers; the producer keeps encoding live).
+      // Surface transport send/connect errors on the health path without interrupting the encode (the host
+      // drops slow viewers; the producer keeps encoding live).
+      config.transport.onError((error) => {
+        stats.message = `live ingest send failed — ${error.message}`;
+      });
+
+      // Ship each completed init/fragment out the single ingest connection. The transport send is a
+      // synchronous fire-and-forget (a WS send is synchronous), matching the encoder's stdout callback.
       const shipChunk = (chunk: { kind: "init" | "fragment"; data: Uint8Array }): void => {
-        const send =
-          chunk.kind === "init"
-            ? config.transport.sendInit(chunk.data)
-            : config.transport.sendFragment(chunk.data);
-        void Effect.runPromise(
-          send.pipe(
-            Effect.catchAll((cause) =>
-              Effect.sync(() => {
-                stats.message = `live ingest send failed — ${
-                  cause instanceof Error ? cause.message : String(cause)
-                }`;
-              })
-            )
-          )
-        );
+        if (chunk.kind === "init") {
+          config.transport.sendInit(chunk.data);
+        } else {
+          config.transport.sendFragment(chunk.data);
+        }
       };
 
       const teardown = Effect.gen(function* () {

@@ -53,8 +53,9 @@ const makeFakeTransport = (): {
   const log: string[] = [];
   const ended = { count: 0, reason: undefined as string | undefined };
   const transport: Fmp4IngestTransport = {
-    sendInit: () => Effect.sync(() => void log.push("init")),
-    sendFragment: () => Effect.sync(() => void log.push("fragment")),
+    sendInit: () => void log.push("init"),
+    sendFragment: () => void log.push("fragment"),
+    onError: () => {},
     end: (reason) =>
       Effect.sync(() => {
         ended.count += 1;

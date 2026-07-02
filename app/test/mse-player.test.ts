@@ -115,11 +115,11 @@ const frame = (tag: number, body: number[]): ArrayBuffer => {
 }
 
 beforeEach(() => {
-  // jsdom-free: stub the URL object-url + DOMException surface the player touches.
-  ;(globalThis as { URL: { createObjectURL: () => string; revokeObjectURL: () => void } }).URL = {
+  // jsdom-free: stub the URL object-url surface the player touches.
+  ;(globalThis as unknown as { URL: unknown }).URL = {
     createObjectURL: () => 'blob:mock',
     revokeObjectURL: () => undefined,
-  } as unknown as typeof URL
+  }
 })
 
 describe('MSE live player', () => {
