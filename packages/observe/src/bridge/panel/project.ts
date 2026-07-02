@@ -107,20 +107,43 @@ const projectCellView = (
     readonly: cloneJsonRecord(cell.readonly),
     refs: projectReferences(cell.refs),
     functions: cell.functions
-      .filter((name) => isFunctionVisibleOnCell(id, name, liveConfigurators))
+      .filter((name) => isFunctionVisibleOnCell(id, name, cell, liveConfigurators))
       .map((name) =>
         applyDisabledState(projectFunctionView(id, cell.catalog, name, catalog), state, runState)
       )
   };
 };
 
+// A configurator cell's `close` tears down that cell's mounted configuration; it is meaningless (and
+// confused live operators) on a cell that was never configured. So `close` stays hidden until the cell
+// carries real config: system:config while it is still at the pristine `idle` root level, and the
+// pipeline cells (capture:* / sink:*) until their own `configure` flips readonly.configured to true.
+const cellHasBeenConfigured = (cellId: string, cell: Board["cells"][string]): boolean => {
+  if (cellId === "system:config") {
+    return cell.status[0] === "configured";
+  }
+  if (cellId.startsWith("capture:") || cellId.startsWith("sink:")) {
+    return cell.readonly?.configured === true;
+  }
+  // market / system:run etc. are not configure/close configurators — their own actions gate themselves.
+  return true;
+};
+
 const isFunctionVisibleOnCell = (
   cellId: string,
   fnName: string,
+  cell: Board["cells"][string],
   liveConfigurators: readonly string[]
 ): boolean => {
-  if (cellId === "system:config" && (fnName === "configure" || fnName === "close")) {
+  if (cellId === "system:config" && fnName === "configure") {
     return liveConfigurators.includes("observe.system.config");
+  }
+
+  if (fnName === "close") {
+    if (cellId === "system:config" && !liveConfigurators.includes("observe.system.config")) {
+      return false;
+    }
+    return cellHasBeenConfigured(cellId, cell);
   }
 
   return true;

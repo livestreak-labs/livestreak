@@ -4,6 +4,7 @@ export {
   makeObserveRun,
   browserCaptureRunConfig,
   fileCaptureRunConfig,
+  shellRunConfig,
   validateObserveRunConfig,
   type ObserveRun,
   type ObserveRunConfig,

@@ -1,6 +1,3 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { Effect, Scope } from "effect";
 import {
   buildControlCatalog,
@@ -8,10 +5,10 @@ import {
   createObserveRuntime,
   defaultFileExportConfigure,
   descriptorId,
-  fileCaptureRunConfig,
   makeObserveRun,
   mountObserveT0Bus,
   projectObserveDescriptors,
+  shellRunConfig,
   systemConfigConfigureScope,
   systemRunPrepareScope,
   systemRunStartScope,
@@ -53,13 +50,6 @@ export interface CreateObserveConsoleEdgeInput {
   readonly hostBaseUrl: string;
 }
 
-// Shell ObserveRunConfig (temp paths) for store identity only — T0 board stays system:config until
-// configure; kernel prepareRun / drivers mount after configure, not at edge construction.
-const stubRunConfig = async (runId: string) => {
-  const base = join(tmpdir(), `livestreak-remote-${runId}`);
-  await mkdir(base, { recursive: true });
-  return fileCaptureRunConfig(runId, join(base, "capture.mp4"), join(base, "output"), "file-export");
-};
 
 export const createObserveConsoleEdge = (input: CreateObserveConsoleEdgeInput): ConsoleEdge => {
   const { packageInit, runId, hostBaseUrl } = input;
@@ -88,8 +78,10 @@ export const createObserveConsoleEdge = (input: CreateObserveConsoleEdgeInput): 
     if (existing !== undefined) {
       return;
     }
-    const config = await stubRunConfig(runId);
-    const run = await Effect.runPromise(makeObserveRun(config));
+    // Neutral store-identity shell only — the T0 board is pristine (system:config) and the real
+    // capture/live sink are derived from the CONFIGURED board at prepare (runConfigFromBoard). No
+    // fabricated file-export lane here (that was phantom cruft on the remote console surface).
+    const run = await Effect.runPromise(makeObserveRun(shellRunConfig(runId)));
     const mounted = await Effect.runPromise(
       mountObserveT0Bus(run, { sessionInit: packageInit })
     );
