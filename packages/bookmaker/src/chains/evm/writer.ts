@@ -2,10 +2,10 @@
 
 import { LiveStreakConfigError, LiveStreakRuntimeError } from "@livestreak/core";
 import {
+  assertUserOperationSucceeded as assertUserOperationSucceededShared,
   createWalletManager,
   isPaymasterSideFailure,
   pollUntilUserOperationIncluded as pollUntilUserOperationIncludedShared,
-  readUserOperationSuccess,
   UserOperationPollTimeoutError,
   type EvmErc4337WalletConfig
 } from "@livestreak/wallet";
@@ -83,9 +83,11 @@ export const createEvmBookmakerWriter = (config: BookmakerChainConfig): Bookmake
         throw classifySendFailure(error);
       }
 
-      await pollUntilUserOperationIncluded(readOnly, sendResult.hash);
+      // The poller already fetched + asserted the userOp receipt; pass it through so the resolve step
+      // parses the vault log from the SAME receipt instead of re-fetching it.
+      const userOpReceipt = await pollUntilUserOperationIncluded(readOnly, sendResult.hash);
 
-      const resolved = await resolveCreateVaultFromUserOp(readOnly, sendResult.hash);
+      const resolved = await resolveCreateVaultFromUserOp(readOnly, sendResult.hash, userOpReceipt);
       if (resolved === undefined) {
         throw receiptFailure(`Transaction receipt missing for ${sendResult.hash}`);
       }
@@ -118,11 +120,15 @@ type WritableAccount = {
   readonly toReadOnlyAccount: () => Promise<ReadOnlyAccount>;
 };
 
+// `polledReceipt` is the userOp receipt already fetched + success-asserted by the poller (createVault
+// path). When omitted (confirmCreateVault's independent recovery) we fetch + assert it ourselves.
 const resolveCreateVaultFromUserOp = async (
   readOnly: ReadOnlyAccount,
-  userOpHash: string
+  userOpHash: string,
+  polledReceipt?: unknown
 ): Promise<CreateVaultResult | undefined> => {
-  const userOpReceipt = await readOnly.getUserOperationReceipt(userOpHash);
+  const userOpReceipt =
+    polledReceipt !== undefined ? polledReceipt : await readOnly.getUserOperationReceipt(userOpHash);
 
   if (userOpReceipt === null || userOpReceipt === undefined) {
     return undefined;
@@ -186,9 +192,9 @@ const ensureUsdcAllowance = async (
 const pollUntilUserOperationIncluded = async (
   readOnly: ReadOnlyAccount,
   userOpHash: string
-): Promise<void> => {
+): Promise<unknown> => {
   try {
-    await pollUntilUserOperationIncludedShared(readOnly, userOpHash, { timeoutMs: 60_000 });
+    return await pollUntilUserOperationIncludedShared(readOnly, userOpHash, { timeoutMs: 60_000 });
   } catch (error) {
     if (error instanceof UserOperationPollTimeoutError) {
       throw receiptTimeoutError(userOpHash);
@@ -197,18 +203,13 @@ const pollUntilUserOperationIncluded = async (
   }
 };
 
+// Delegate to the canonical wallet assert (handles boolean|hex|number|string success), re-wrapping its
+// plain Error as our LiveStreakRuntimeError so callers keep the bookmaker error type.
 const assertUserOperationSucceeded = (receipt: unknown): void => {
-  if (!isRecord(receipt)) {
-    throw receiptFailure("UserOperation receipt payload is not an object");
-  }
-
-  const success = readUserOperationSuccess(receipt);
-  if (success === undefined) {
-    throw receiptFailure("UserOperation receipt is missing success");
-  }
-
-  if (success === false) {
-    throw receiptFailure("UserOperation included but reverted");
+  try {
+    assertUserOperationSucceededShared(receipt);
+  } catch (error) {
+    throw receiptFailure(error instanceof Error ? error.message : String(error));
   }
 };
 
@@ -230,6 +231,3 @@ const classifySendFailure = (error: unknown): LiveStreakRuntimeError => {
     message: `UserOperation send failed: ${message}`
   });
 };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
