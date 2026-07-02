@@ -5,7 +5,11 @@ import type { BookmakerPanelView } from "../model/watch-source.js";
 import { createBookmakerChain, type BookmakerChain } from "../chains/index.js";
 import { validateBookmakerChainConfig } from "../chains/config.js";
 import type { BookmakerRuntimeConfig } from "./config.js";
-import { createIdempotencyStore, type IdempotencyStore } from "./idempotency.js";
+import {
+  createIdempotencyStore,
+  type IdempotencyPersistencePort,
+  type IdempotencyStore
+} from "./idempotency.js";
 import { createVaultOnce, type CreateVaultOnceResult } from "./create-vault-once.js";
 import { createSnapshotSubscriptionRegistry } from "./subscriptions.js";
 import { createBookmakerRuntimeStore, type BookmakerRuntimeState, type BookmakerRuntimeStore } from "./store.js";
@@ -18,6 +22,9 @@ import { validateBookmakerRuntimeConfig } from "../runtime/validate.js";
 export interface BookmakerRuntimeInput {
   readonly config: BookmakerRuntimeConfig;
   readonly chain?: BookmakerChain;
+  /** Optional file/store adapter (injected at the CLI edge) so settled + pending-userOp state
+   *  survives a gateway restart. Package stays port-only. */
+  readonly idempotencyPersistence?: IdempotencyPersistencePort;
 }
 
 export interface BookmakerRuntime {
@@ -63,7 +70,7 @@ class BookmakerRuntimeFacade implements BookmakerRuntime {
 
     this.config = validated.value;
     this.store = createBookmakerRuntimeStore(this.config.runtimeId);
-    this.idempotencyStore = createIdempotencyStore();
+    this.idempotencyStore = createIdempotencyStore(input.idempotencyPersistence);
     this.chain =
       input.chain ??
       createBookmakerChain(
