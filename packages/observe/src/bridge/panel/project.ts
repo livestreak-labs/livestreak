@@ -161,7 +161,14 @@ const projectFunctionView = (
     disabled: false
   };
 
-  const catalogFunction = catalog?.cells[catalogKey ?? cellId]?.functions[name];
+  // The control catalog is keyed by CELL ID (capture:file, sink:file-export, sink:live, system:config,
+  // market …), so the cell id is the canonical lookup key. `cell.catalog` (the catalog/kind identity) only
+  // coincides with the cell id for most cells — the file sink diverges (cell id `sink:file-export` vs
+  // catalog `sink:file`). Prefer the cell id so the file sink's configure resolves its `input` schema
+  // (the `path` field) instead of falling through fieldless; fall back to `cell.catalog` for safety.
+  const catalogFunction =
+    catalog?.cells[cellId]?.functions[name] ??
+    (catalogKey === undefined ? undefined : catalog?.cells[catalogKey]?.functions[name]);
 
   if (catalogFunction === undefined) {
     return derived;
