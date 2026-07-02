@@ -33,6 +33,15 @@ export const createSuiStewardExecutor = (config: StewardChainConfig): StewardCon
   // The VaultRegistry<T> type parameter is the USDC coin type.
   const coinType = `${ids.packageId}::mock_usdc::MOCK_USDC`;
 
+  // OPT.rederive: derive the wallet account ONCE per executor (deterministic), reuse across calls.
+  let accountPromise:
+    | Promise<{ sendTransaction(tx: Transaction): Promise<{ hash: string }> }>
+    | undefined;
+  const getAccount = () =>
+    (accountPromise ??= createWalletManager("sui", config.seed, suiConfig).getAccount() as Promise<{
+      sendTransaction(tx: Transaction): Promise<{ hash: string }>;
+    }>);
+
   return {
     chain: "sui",
     executeContractCall: async (call: StewardContractCall): Promise<{ readonly txId: string }> => {
@@ -56,10 +65,7 @@ export const createSuiStewardExecutor = (config: StewardChainConfig): StewardCon
         ]
       });
 
-      const manager = createWalletManager("sui", config.seed, suiConfig);
-      const account = (await manager.getAccount()) as {
-        sendTransaction(tx: Transaction): Promise<{ hash: string }>;
-      };
+      const account = await getAccount();
       tx.setGasBudgetIfNotSet(100_000_000);
       try {
         const result = await account.sendTransaction(tx);

@@ -69,6 +69,26 @@ export const createEvmMarketRegistrar = (
   // Shared wallet/account plumbing for the creator-gated lifecycle writes. The
   // registrar derives the SAME operator Safe as registerMarket, so the on-chain
   // `onlyMarketCreator` gate lines up (golden-vector / keccak invariant protected).
+  //
+  // OPT.rederive: derive account + read-only ONCE per registrar (deterministic Safe) and reuse across
+  // registerMarket / goLive / setEnded. Memoize the underlying promise; each Effect call awaits it.
+  const deriveAccount = async () => {
+    const manager = createWalletManager(
+      "evm",
+      config.seed,
+      config.walletInit.config as import("@livestreak/wallet").EvmErc4337WalletConfig
+    );
+    const account = await manager.getAccount();
+    const readOnly = await account.toReadOnlyAccount();
+    return { account, readOnly };
+  };
+  let accountPromise: ReturnType<typeof deriveAccount> | undefined;
+  const openAccount = () =>
+    Effect.tryPromise({
+      try: () => (accountPromise ??= deriveAccount()),
+      catch: (error) => toRuntimeError("Failed to open wallet account", error)
+    });
+
   const sendLifecycleCall = (
     functionName: "goLive" | "setEnded",
     input: MarketLifecycleInput
@@ -84,15 +104,7 @@ export const createEvmMarketRegistrar = (
 
       const validated = yield* validateLifecycleInput(input);
 
-      const manager = createWalletManager(
-        "evm",
-        config.seed,
-        config.walletInit.config as import("@livestreak/wallet").EvmErc4337WalletConfig
-      );
-      const account = yield* Effect.tryPromise({
-        try: () => manager.getAccount(),
-        catch: (error) => toRuntimeError("Failed to open wallet account", error)
-      });
+      const { account, readOnly } = yield* openAccount();
 
       const data = encodeFunctionData({
         abi: marketRegistryAbi,
@@ -108,11 +120,6 @@ export const createEvmMarketRegistrar = (
             value: 0n
           }),
         catch: (error) => classifySendFailure(error)
-      });
-
-      const readOnly = yield* Effect.tryPromise({
-        try: () => account.toReadOnlyAccount(),
-        catch: (error) => toRuntimeError("Failed to open read-only wallet account", error)
       });
 
       yield* pollUntilUserOperationIncluded(readOnly, sendResult.hash);
@@ -133,20 +140,7 @@ export const createEvmMarketRegistrar = (
 
       const runId = yield* validateMarketRunId(input.runId);
 
-      const manager = createWalletManager(
-        "evm",
-        config.seed,
-        config.walletInit.config as import("@livestreak/wallet").EvmErc4337WalletConfig
-      );
-      const account = yield* Effect.tryPromise({
-        try: () => manager.getAccount(),
-        catch: (error) => toRuntimeError("Failed to open wallet account", error)
-      });
-
-      const readOnly = yield* Effect.tryPromise({
-        try: () => account.toReadOnlyAccount(),
-        catch: (error) => toRuntimeError("Failed to open read-only wallet account", error)
-      });
+      const { account, readOnly } = yield* openAccount();
 
       const observer = yield* Effect.tryPromise({
         try: () => readOnly.getAddress(),

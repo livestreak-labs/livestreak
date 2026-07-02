@@ -41,10 +41,18 @@ export const createEvmBookmakerWriter = (config: BookmakerChainConfig): Bookmake
   const addresses = validateBookmakerContractAddresses(config.addresses);
   const abis = DEFAULT_ABIS;
 
-  const openReadOnlyAccount = async (): Promise<ReadOnlyAccount> => {
-    const manager = createWalletManager("evm", config.seed, evmConfig);
-    const account = await manager.getAccount();
-    return account.toReadOnlyAccount();
+  // OPT.rederive: derive the wallet account ONCE per writer (deterministic Safe), reuse across writes.
+  let accountPromise: Promise<{ account: WritableAccount; readOnly: ReadOnlyAccount }> | undefined;
+  const getAccount = (): Promise<{ account: WritableAccount; readOnly: ReadOnlyAccount }> => {
+    if (accountPromise === undefined) {
+      accountPromise = (async () => {
+        const manager = createWalletManager("evm", config.seed, evmConfig);
+        const account: WritableAccount = await manager.getAccount();
+        const readOnly = await account.toReadOnlyAccount();
+        return { account, readOnly };
+      })();
+    }
+    return accountPromise;
   };
 
   return {
@@ -54,9 +62,7 @@ export const createEvmBookmakerWriter = (config: BookmakerChainConfig): Bookmake
       const rate = validateSeedRate(input.seedRate);
       const deposit = validateDepositBounds(input.creatorStake);
 
-      const manager = createWalletManager("evm", config.seed, evmConfig);
-      const account = await manager.getAccount();
-      const readOnly = await account.toReadOnlyAccount();
+      const { account, readOnly } = await getAccount();
 
       await ensureUsdcAllowance(readOnly, account, addresses.usdc, addresses.vaultDriver, deposit);
 
@@ -88,7 +94,7 @@ export const createEvmBookmakerWriter = (config: BookmakerChainConfig): Bookmake
     },
 
     confirmCreateVault: async (userOpHash: TxId) => {
-      const readOnly = await openReadOnlyAccount();
+      const { readOnly } = await getAccount();
       return resolveCreateVaultFromUserOp(readOnly, userOpHash);
     }
   };

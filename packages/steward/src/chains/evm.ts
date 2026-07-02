@@ -21,6 +21,16 @@ export const createEvmStewardExecutor = (config: StewardChainConfig): StewardCon
   const evmConfig = config.walletInit.config as EvmErc4337WalletConfig;
   const addresses = validateStewardEvmAddresses(config.addresses);
 
+  // OPT.rederive: derive the wallet account ONCE per executor (deterministic Safe), reuse across calls.
+  const deriveAccount = async () => {
+    const manager = createWalletManager("evm", config.seed, evmConfig);
+    const account = await manager.getAccount();
+    const readOnly = await account.toReadOnlyAccount();
+    return { account, readOnly };
+  };
+  let accountPromise: ReturnType<typeof deriveAccount> | undefined;
+  const getAccount = () => (accountPromise ??= deriveAccount());
+
   return {
     chain: "evm",
     executeContractCall: async (call: StewardContractCall): Promise<{ readonly txId: string }> => {
@@ -39,9 +49,7 @@ export const createEvmStewardExecutor = (config: StewardChainConfig): StewardCon
         args: [vaultId as `0x${string}`, outcome]
       });
 
-      const manager = createWalletManager("evm", config.seed, evmConfig);
-      const account = await manager.getAccount();
-      const readOnly = await account.toReadOnlyAccount();
+      const { account, readOnly } = await getAccount();
 
       let sendResult: { hash: string };
       try {
