@@ -10,7 +10,17 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const deploymentsDir = join(dirname(fileURLToPath(import.meta.url)), "deployments");
+import { packageRootFrom } from "../package-root.js";
+
+// Always resolve to the committed SOURCE snapshot (chains/evm/deployments), never a dist copy — so a
+// redeploy is picked up at runtime without a package rebuild. Works whether this module runs from
+// source (tsx) or compiled dist, since both walk up to the same package root.
+const deploymentsDir = join(
+  packageRootFrom(dirname(fileURLToPath(import.meta.url))),
+  "chains",
+  "evm",
+  "deployments",
+);
 
 const KNOWN_DEPLOYMENTS = ["localhost"] as const satisfies readonly DeploymentName[];
 
@@ -38,6 +48,13 @@ const readDeploymentFile = (name: string): EvmDeployOutput => {
 
 const loadDeployment = (name: DeploymentName): EvmDeploymentAddresses =>
   flattenDeploymentScopes(readDeploymentFile(name));
+
+/** Raw deployment snapshot (rpc + full scopes) read fresh from disk — Node consumers that need the
+ * un-flattened AA/protocol scopes or rpc read this at runtime so stale compiled .ts can never serve
+ * dead addresses (the generated .ts stays browser-only). */
+export const loadDeploymentOutput = (
+  name: DeploymentName = "localhost",
+): EvmDeployOutput => readDeploymentFile(name);
 
 // Directory-listing stays lenient: an absent deployments dir (or none of the known snapshots on
 // disk) just lists the known names — the throw belongs to LOADING a specific deployment.
