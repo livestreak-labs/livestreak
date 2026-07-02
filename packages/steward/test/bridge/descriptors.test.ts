@@ -37,6 +37,21 @@ describe("projectStewardDescriptors — canonical FunctionDescriptors", () => {
     expect(JSON.parse(JSON.stringify(descriptors))).toEqual(descriptors);
   });
 
+  it("emits the steward.root group that every child's parentId points at (sibling contract)", () => {
+    const descriptors = projectStewardDescriptors(snapshot);
+    const root = descriptors.find((descriptor) => descriptor.id === "steward.root");
+
+    expect(root).toMatchObject({
+      id: "steward.root",
+      package: "steward",
+      nodeKind: "group",
+      visible: true
+    });
+    // Every steward.root-parented child now points at a node that is actually emitted.
+    const children = descriptors.filter((descriptor) => descriptor.parentId === "steward.root");
+    expect(children.length).toBeGreaterThan(0);
+  });
+
   it("emits the configure action under the root with tree identity fields", () => {
     const configure = byName(projectStewardDescriptors(snapshot), "configure");
 
