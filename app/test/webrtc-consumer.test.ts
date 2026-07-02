@@ -10,9 +10,12 @@ import {
 
 import {
   consumeHostWebRtcFeed,
+  fetchHostIce,
   nextWebRtcLatch,
+  resolveViewerIce,
   resolveWebRtcEnabled,
   shouldUseHostWebRtcFeed,
+  type HostIceConfig,
   type WebRtcLatch,
 } from '../src/utils/webrtc-consumer'
 import { resolveStreamFeed } from '../src/utils/stream'
@@ -144,6 +147,74 @@ describe('webrtc enabled latch', () => {
     const latch: WebRtcLatch = { streamId: 's1', enabled: true }
     expect(nextWebRtcLatch(latch, 's1', true, false)).toBe(latch)
     expect(nextWebRtcLatch(latch, 's1', false, false)).toBe(latch) // flicker, still enabled → no churn
+  })
+})
+
+describe('host ICE discovery (turnkey /webrtc/ice)', () => {
+  // The host's wire contract (getIce via sendRouteResult) is the BARE payload — no envelope.
+  const hostIce: HostIceConfig = {
+    iceServers: [
+      { urls: 'stun:192.168.1.7:3478' },
+      { urls: 'turn:192.168.1.7:3478?transport=udp', username: 'livestreak', credential: 'streampass' },
+    ],
+    relayOnly: true,
+  }
+
+  it('fetches GET {base}/webrtc/ice and parses {iceServers, relayOnly}', async () => {
+    const urls: string[] = []
+    const fetchImpl = (async (url: unknown) => {
+      urls.push(String(url))
+      return { ok: true, json: async () => hostIce }
+    }) as unknown as typeof globalThis.fetch
+
+    const config = await fetchHostIce('http://127.0.0.1:8787/', fetchImpl)
+
+    expect(urls).toEqual(['http://127.0.0.1:8787/webrtc/ice'])
+    expect(config).toEqual(hostIce)
+  })
+
+  it('degrades to undefined on non-OK, malformed JSON, or network failure', async () => {
+    const notOk = (async () => ({ ok: false, json: async () => ({}) })) as unknown as typeof globalThis.fetch
+    const badJson = (async () => ({
+      ok: true,
+      json: async () => {
+        throw new SyntaxError('bad json')
+      },
+    })) as unknown as typeof globalThis.fetch
+    const netFail = (async () => {
+      throw new TypeError('fetch failed')
+    }) as unknown as typeof globalThis.fetch
+
+    expect(await fetchHostIce('http://h', notOk)).toBeUndefined()
+    expect(await fetchHostIce('http://h', badJson)).toBeUndefined()
+    expect(await fetchHostIce('http://h', netFail)).toBeUndefined()
+  })
+
+  it('resolves host-described ICE (servers + advised relayOnly) when no env is set', () => {
+    expect(resolveViewerIce(hostIce, {})).toEqual({
+      iceServers: hostIce.iceServers,
+      relayOnly: true,
+    })
+  })
+
+  it('falls back to the STUN default when the host fetch degraded', () => {
+    expect(resolveViewerIce(undefined, {})).toEqual({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      relayOnly: false,
+    })
+  })
+
+  it('build-time env (VITE_LIVESTREAK_ICE_SERVERS) wins over the host ICE; malformed env falls through', () => {
+    const envServers = [{ urls: 'turn:relay.example:3478', username: 'u', credential: 'c' }]
+    expect(
+      resolveViewerIce(hostIce, { iceServersJson: JSON.stringify(envServers) }).iceServers,
+    ).toEqual(envServers)
+    expect(resolveViewerIce(hostIce, { iceServersJson: '{nope' }).iceServers).toEqual(hostIce.iceServers)
+  })
+
+  it('env VITE_LIVESTREAK_ICE_RELAY_ONLY=1 forces relay even when the host does not advise it', () => {
+    expect(resolveViewerIce({ iceServers: [], relayOnly: false }, { relayOnly: '1' }).relayOnly).toBe(true)
+    expect(resolveViewerIce(undefined, { relayOnly: '0' }).relayOnly).toBe(false)
   })
 })
 

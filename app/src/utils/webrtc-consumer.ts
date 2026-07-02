@@ -169,18 +169,53 @@ export async function consumeHostWebRtcFeed(
   }
 }
 
-type HostIceConfig = { readonly iceServers?: RTCIceServer[]; readonly relayOnly?: boolean }
+export type HostIceConfig = { readonly iceServers?: RTCIceServer[]; readonly relayOnly?: boolean }
 
-// Fetch the host's self-described ICE (its embedded STUN/TURN relay) so the viewer uses a reachable relay
-// with zero build-time env. Best-effort — any failure falls back to env/STUN. Build-time env still wins.
-async function fetchHostIce(baseUrl: string): Promise<HostIceConfig | undefined> {
+// Fetch the host's self-described ICE (GET /webrtc/ice → bare {iceServers, relayOnly}) so the viewer
+// uses a reachable relay with zero build-time env. Best-effort — any failure (network, non-OK status,
+// malformed JSON) falls back to env/STUN in resolveViewerIce. Build-time env still wins there.
+export async function fetchHostIce(
+  baseUrl: string,
+  fetchImpl: typeof globalThis.fetch = fetch,
+): Promise<HostIceConfig | undefined> {
   try {
-    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/webrtc/ice`)
+    const res = await fetchImpl(`${baseUrl.replace(/\/$/, '')}/webrtc/ice`)
     if (!res.ok) return undefined
     return (await res.json()) as HostIceConfig
   } catch {
     return undefined
   }
+}
+
+const readViteIceEnv = (): { iceServersJson?: string; relayOnly?: string } => {
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+  return {
+    iceServersJson: env?.VITE_LIVESTREAK_ICE_SERVERS,
+    relayOnly: env?.VITE_LIVESTREAK_ICE_RELAY_ONLY,
+  }
+}
+
+// Precedence: build-time env (operator override) → host-described ICE → STUN-only default. STUN
+// (symmetric with the producer) yields a server-reflexive candidate; without it the browser offers only
+// an mDNS-obfuscated host candidate the non-browser producer cannot resolve. relayOnly can be forced on
+// by env; the host advises it whenever its embedded TURN is up.
+export const resolveViewerIce = (
+  hostIce?: HostIceConfig,
+  env: { readonly iceServersJson?: string; readonly relayOnly?: string } = readViteIceEnv(),
+): { iceServers: RTCIceServer[]; relayOnly: boolean } => {
+  const iceServers = (() => {
+    if (env.iceServersJson !== undefined && env.iceServersJson.trim() !== '') {
+      try {
+        return JSON.parse(env.iceServersJson) as RTCIceServer[]
+      } catch {
+        /* malformed → fall through */
+      }
+    }
+    if (hostIce?.iceServers && hostIce.iceServers.length > 0) return hostIce.iceServers
+    return [{ urls: 'stun:stun.l.google.com:19302' }]
+  })()
+
+  return { iceServers, relayOnly: env.relayOnly === '1' || (hostIce?.relayOnly ?? false) }
 }
 
 const resolveBrowserPeerFactory = (hostIce?: HostIceConfig): RtcPeerConnectionFactory => {
@@ -191,29 +226,9 @@ const resolveBrowserPeerFactory = (hostIce?: HostIceConfig): RtcPeerConnectionFa
   }
   // The native peer is structurally an RtcPeerConnectionLike; wrap it to add the non-trickle gather step —
   // wait for ICE gathering, then return the candidate-rich local description so the answer carries them.
-  // STUN (symmetric with the producer) yields a server-reflexive candidate; without it the browser offers
-  // only an mDNS-obfuscated host candidate (`<uuid>.local`) the non-browser producer cannot resolve. Across
-  // real networks/NAT a TURN relay is still required for the strict-NAT minority.
-  // ICE servers are build-time overridable (VITE_LIVESTREAK_ICE_SERVERS = JSON
-  // array) so the viewer can use a TURN relay for a Dockerized/remote producer.
-  const iceServers: RTCIceServer[] = (() => {
-    const raw = (import.meta as unknown as { env?: Record<string, string | undefined> }).env
-      ?.VITE_LIVESTREAK_ICE_SERVERS
-    if (raw !== undefined && raw.trim() !== '') {
-      try {
-        return JSON.parse(raw) as RTCIceServer[]
-      } catch {
-        /* malformed → fall through */
-      }
-    }
-    // No build-time env → use the host's self-described ICE (its embedded TURN); else STUN default.
-    if (hostIce?.iceServers && hostIce.iceServers.length > 0) return hostIce.iceServers
-    return [{ urls: 'stun:stun.l.google.com:19302' }]
-  })()
+  // Across real networks/NAT a TURN relay is still required for the strict-NAT minority.
+  const { iceServers, relayOnly } = resolveViewerIce(hostIce)
   return () => {
-    const relayOnly =
-      (import.meta as unknown as { env?: Record<string, string | undefined> }).env
-        ?.VITE_LIVESTREAK_ICE_RELAY_ONLY === '1' || (hostIce?.relayOnly ?? false)
     const peer = new Ctor(relayOnly ? { iceServers, iceTransportPolicy: 'relay' } : { iceServers })
     const like = peer as unknown as ReturnType<RtcPeerConnectionFactory>
     like.localDescriptionWithCandidates = async (fallback) => {
