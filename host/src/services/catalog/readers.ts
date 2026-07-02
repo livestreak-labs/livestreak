@@ -14,8 +14,18 @@ import {
   type OptionsVaultSnapshot
 } from "@livestreak/options";
 import type { WalletInit } from "@livestreak/schema";
+import type { SuiNetwork } from "@livestreak/wallet";
 import type { CatalogChain } from "./types.js";
 import type { CatalogReaderProvider } from "./catalog.js";
+
+// Normalize the Sui network from the host's canonical env var at this edge (localnet default).
+const resolveSuiNetworkFromEnv = (): SuiNetwork => {
+  const value = process.env.LIVESTREAK_SUI_NETWORK;
+  if (value === "mainnet" || value === "testnet" || value === "devnet" || value === "localnet") {
+    return value;
+  }
+  return "localnet";
+};
 
 // host/src/services/catalog -> host root is three levels up.
 const CATALOG_DIR = resolve(fileURLToPath(import.meta.url), "..");
@@ -132,8 +142,11 @@ const buildSuiReader = (): OptionsReader | null => {
   const seed =
     process.env.LIVESTREAK_SUI_SPONSOR_MNEMONIC ??
     "cargo town galaxy wonder animal digital buddy member object detect home chapter";
+  // Host reads the Sui network at its env edge and passes it IN — @livestreak/wallet no longer
+  // reads it ambiently. Defaults to localnet when unset/invalid.
+  const network = resolveSuiNetworkFromEnv();
   try {
-    const config = createOptionsSuiConfig({ deployment, seed, rpcUrl });
+    const config = createOptionsSuiConfig({ deployment, seed, rpcUrl, network });
     return createOptionsChain(config).reader;
   } catch (error) {
     console.warn(`[catalog]: Sui reader unavailable — ${String(error)}`);
