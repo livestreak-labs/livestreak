@@ -35,6 +35,9 @@ const dropHostAction = (kind: string): void => {
 
 export interface CreateStewardConsoleEdgeInput {
   readonly packageInit: PackageRuntimeInit;
+  /** Test seam: substitute the action-plan sink so the operator flow can be driven without a live
+   *  contract executor. Production builds the real contract-backed sink. */
+  readonly actionPlanSink?: StewardActionPlanSink;
 }
 
 const readConfigure = (args: unknown): { marketId?: string; vaultId?: string } => {
@@ -59,11 +62,12 @@ export const createStewardConsoleEdge = (input: CreateStewardConsoleEdgeInput): 
 
   // The on-chain executor + sink are stable for the session; only the watched subjects change on
   // configure, so the runtime/bridge are rebuilt over the new subjects (executor reused).
-  const executor = createStewardContractExecutor(stewardChainConfigFromPackageInit(input.packageInit));
-  const actionPlanSink: StewardActionPlanSink = createActionPlanSink({
-    contract: executor,
-    host: { runHostAction: (action) => dropHostAction(action.kind) }
-  });
+  const actionPlanSink: StewardActionPlanSink =
+    input.actionPlanSink ??
+    createActionPlanSink({
+      contract: createStewardContractExecutor(stewardChainConfigFromPackageInit(input.packageInit)),
+      host: { runHostAction: (action) => dropHostAction(action.kind) }
+    });
 
   let watched: { marketId?: string; vaultId?: string } = {};
   const boardListeners = new Set<(board: unknown) => void>();

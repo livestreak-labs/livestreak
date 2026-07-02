@@ -7,7 +7,7 @@ import {
   type BridgeCaller,
   type CallActionEnvelope
 } from "@livestreak/bookmaker";
-import type { IdempotencyPersistencePort } from "@livestreak/bookmaker";
+import type { BookmakerChain, IdempotencyPersistencePort } from "@livestreak/bookmaker";
 import type { FunctionDescriptor, PackageRuntimeInit } from "@livestreak/schema";
 import { localOperatorCaller } from "../gateway/auth/caller.js";
 import type { ConsoleEdge } from "../gateway/console/edge.js";
@@ -19,6 +19,9 @@ export interface CreateBookmakerEdgeInput {
   readonly usdcAddress: `0x${string}`;
   /** File-backed persistence for settled + pending-userOp state (survives a gateway restart). */
   readonly idempotencyPersistence?: IdempotencyPersistencePort;
+  /** Test seam: substitute the on-chain writer so the operator flow can be driven without a live chain
+   *  (mirrors createBookmakerRuntime's own `chain` injection). Production leaves this undefined. */
+  readonly chain?: BookmakerChain;
 }
 
 // The runtime starts UNCONFIGURED: an empty marketId is the explicit "not configured yet" state
@@ -85,6 +88,7 @@ export const createBookmakerEdge = (input: CreateBookmakerEdgeInput): ConsoleEdg
           // with a fabricated 127.0.0.1 placeholder that would surface as a dead watch ref.
           watchSource: { marketId }
         }).runtimeConfig,
+        ...(input.chain === undefined ? {} : { chain: input.chain }),
         ...(input.idempotencyPersistence === undefined
           ? {}
           : { idempotencyPersistence: input.idempotencyPersistence })

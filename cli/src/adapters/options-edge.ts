@@ -11,7 +11,7 @@ import {
   projectOptionsPanel,
   readUserOptionsSnapshot
 } from "@livestreak/options";
-import type { PausedLanesPort } from "@livestreak/options";
+import type { OptionsChain, PausedLanesPort } from "@livestreak/options";
 import { localOperatorCaller } from "../gateway/auth/caller.js";
 import type { ConsoleEdge } from "../gateway/console/edge.js";
 
@@ -21,6 +21,9 @@ export interface CreateOptionsConsoleEdgeInput {
   readonly userAddress: UserAddress;
   /** File-backed persistence for the paused-lane registry (survives a gateway restart). */
   readonly pausedLanes?: PausedLanesPort;
+  /** Test seam: substitute the reader/writer so the operator flow can be driven without a live chain
+   *  (mirrors createOptionsRuntime's own `chain` injection). Production leaves this undefined. */
+  readonly chain?: OptionsChain;
 }
 
 export const createOptionsConsoleEdge = (input: CreateOptionsConsoleEdgeInput): ConsoleEdge => {
@@ -33,7 +36,7 @@ export const createOptionsConsoleEdge = (input: CreateOptionsConsoleEdgeInput): 
     user: input.userAddress
   });
 
-  const chain = createOptionsChain(chainConfig);
+  const chain = input.chain ?? createOptionsChain(chainConfig);
   const runtime = createOptionsRuntime({
     chain,
     chainConfig,
