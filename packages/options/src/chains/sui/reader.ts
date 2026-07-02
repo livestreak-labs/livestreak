@@ -695,32 +695,30 @@ const readCollected = async (ctx: ReaderContext, vaultId: VaultId): Promise<bool
   }
 };
 
+// Parity with EVM readAccountVaultIds: the APPEND-ONLY share ledger (Move vault::get_account_vault_ids),
+// NOT the active marketDriver lanes. The account key is the tokenId (u256), mirroring EVM where the NFT
+// tokenId IS the vault account. Deriving from lanes dropped vaults the account funded then fully exited
+// (held positions), so the position model was Sui-incomplete — see project_position_model.
 const readAccountVaultIds = async (
   ctx: ReaderContext,
   tokenId: TokenId
 ): Promise<readonly VaultId[]> => {
-  const laneCount = await readLaneCount(ctx, tokenId);
-  const vaultIds: VaultId[] = [];
-
-  for (let i = 0; i < laneCount; i += 1) {
+  try {
     const tx = new Transaction();
     tx.moveCall({
-      target: target(ctx.packageId, MODULES.marketDriver, "lane_vault_at"),
-      arguments: [
-        tx.object(ctx.ids.marketDriverRegistry),
-        tx.pure.u256(tokenId),
-        tx.pure.u64(i)
-      ]
+      target: target(ctx.packageId, MODULES.vault, "get_account_vault_ids"),
+      typeArguments: [ctx.coinType],
+      arguments: [tx.object(ctx.ids.vaultRegistry), tx.pure.u256(tokenId)]
     });
     const results = await inspect(ctx, tx);
     const val = results[0]?.[0];
-    if (val !== undefined) {
-      const rawBytes = bcs.vector(bcs.u8()).parse(Uint8Array.from(val[0])) as number[];
-      vaultIds.push(asVaultId(bytesVecToHex(rawBytes)));
-    }
+    if (val === undefined) return [];
+    // Returns vector<vector<u8>> — the same shape as market get_vault_ids.
+    return decodeVaultIdsList(val);
+  } catch (error) {
+    if (error instanceof LiveStreakConfigError) throw error;
+    throw suiReadFailed("account vault ids", error);
   }
-
-  return vaultIds;
 };
 
 const readLaneCount = async (ctx: ReaderContext, tokenId: TokenId): Promise<number> => {
