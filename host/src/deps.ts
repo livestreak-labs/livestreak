@@ -374,7 +374,7 @@ const buildWalrusDeps = (
 };
 
 const readSuiNetwork = (): "mainnet" | "testnet" | "devnet" | "localnet" => {
-  const value = process.env.LIVESTREAK_SUI_NETWORK ?? process.env.SUI_NETWORK ?? "localnet";
+  const value = process.env.LIVESTREAK_SUI_NETWORK ?? "localnet";
   if (value === "mainnet" || value === "testnet" || value === "devnet" || value === "localnet") {
     return value;
   }
