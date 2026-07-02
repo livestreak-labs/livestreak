@@ -12,7 +12,6 @@ import { createServer } from "node:http";
 import { bootstrapHostServer } from "./server.js";
 import { attachRemoteWss } from "./infrastructure/ws/server.js";
 import { attachLiveWss } from "./infrastructure/ws/live-server.js";
-import { readTurnConfig, startTurnServer } from "./services/webrtc/turn.js";
 
 // The AA config assembly loads the deploy snapshot as read-only INPUT (config/aa/deploy-env.ts) —
 // env is never mutated here. LIVESTREAK_AA_FROM_DEPLOY=0 / LIVESTREAK_DEPLOY_SNAPSHOT are honored there.
@@ -33,29 +32,15 @@ httpServer.on("upgrade", (req, socket) => {
   socket.destroy();
 });
 
-// The host IS the WebRTC media relay: embed a STUN/TURN server so producers/viewers behind NAT route media
-// through us (no separate coturn). `GET /webrtc/ice` advertises how to reach it. Disable with LIVESTREAK_TURN_ENABLED=0.
-const turnConfig = readTurnConfig();
-const turn = startTurnServer(turnConfig);
-
+// Live video is an encode-once fMP4 byte fan-out over WS (/live/ingest → ring buffer → /live/watch), so
+// there is NO media relay to embed — no coturn, no TURN/ICE. The producer opens one ingest socket; viewers
+// live-tail over plain WS. Bandwidth is linear in viewers; nothing traverses UDP relay.
 httpServer.listen(config.bindPort, config.bindHost, () => {
   console.log(`[host]: listening on http://${config.bindHost}:${config.bindPort}`);
-  if (turn !== null) {
-    console.log(
-      `  turn/relay listening on 0.0.0.0:${turnConfig.port} relay-ip=${turnConfig.relayIp} realm=${turnConfig.realm} (advertised at GET /webrtc/ice)`
-    );
-  } else {
-    console.log("  turn/relay DISABLED (LIVESTREAK_TURN_ENABLED=0)");
-  }
+  console.log("  live/fmp4 ingest ws /live/ingest/:streamId  watch ws /live/watch/:streamId");
   for (const chain of deps.aa.aa.chains) {
     console.log(
       `  aa/${chain.routeKey} chainId=${chain.chainId} bundler=/aa/bundler/${chain.routeKey} paymaster=/aa/paymaster/${chain.routeKey}`
     );
   }
 });
-
-const shutdownTurn = (): void => {
-  if (turn !== null) turn.stop();
-};
-process.once("SIGINT", shutdownTurn);
-process.once("SIGTERM", shutdownTurn);
