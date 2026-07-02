@@ -12,6 +12,18 @@ export interface UserOperationReceiptReader {
   getUserOperationReceipt(hash: string): Promise<unknown>;
 }
 
+// Thrown when inclusion polling exhausts its deadline. Carries the userOpHash so callers can
+// recognize the timeout via `instanceof` (bookmaker keys its pending-recovery path on this) rather
+// than string-matching the message. Message text is unchanged from the previous plain Error.
+export class UserOperationPollTimeoutError extends Error {
+  readonly userOpHash: string;
+  constructor(userOpHash: string, message: string) {
+    super(message);
+    this.name = "UserOperationPollTimeoutError";
+    this.userOpHash = userOpHash;
+  }
+}
+
 export interface PollUserOperationOptions {
   readonly timeoutMs?: number; // default 60_000 (was effectively 2_000 — the bug)
   readonly intervalMs?: number; // default 1_000 (first delay)
@@ -144,7 +156,8 @@ export const pollUntilUserOperationIncluded = async (
 
     if (Date.now() >= deadline) {
       const base = `Timed out waiting for UserOperation receipt for ${userOpHash}`;
-      throw new Error(
+      throw new UserOperationPollTimeoutError(
+        userOpHash,
         lastError instanceof Error ? `${base} (last error: ${lastError.message})` : base
       );
     }

@@ -5,6 +5,7 @@ import {
   createWalletManager,
   pollUntilUserOperationIncluded as pollUntilUserOperationIncludedShared,
   readUserOperationSuccess,
+  UserOperationPollTimeoutError,
   type EvmErc4337WalletConfig
 } from "@livestreak/wallet";
 import { encodeFunctionData, type Abi } from "viem";
@@ -182,11 +183,10 @@ const pollUntilUserOperationIncluded = async (
   try {
     await pollUntilUserOperationIncludedShared(readOnly, userOpHash, { timeoutMs: 60_000 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("Timed out waiting for UserOperation receipt")) {
+    if (error instanceof UserOperationPollTimeoutError) {
       throw receiptTimeoutError(userOpHash);
     }
-    throw receiptFailure(message);
+    throw receiptFailure(error instanceof Error ? error.message : String(error));
   }
 };
 
