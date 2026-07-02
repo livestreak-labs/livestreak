@@ -21,10 +21,11 @@ export interface CreateBookmakerEdgeInput {
   readonly idempotencyPersistence?: IdempotencyPersistencePort;
 }
 
-// The bookmaker runtime REQUIRES a non-empty marketId, so we seed this sentinel just to construct it.
-// describeFunctions treats the sentinel as "no market" so createVault stays hidden until a real
-// `configure` sets one (board-first reveal, like observe register).
-const PLACEHOLDER_MARKET = `0x${"00".repeat(31)}01` as const;
+// The runtime starts UNCONFIGURED: an empty marketId is the explicit "not configured yet" state
+// the package models (see validateBookmakerRuntimeConfig's unconfigured path). No fabricated
+// sentinel id is injected. createVault stays hidden until a real `configure` supplies a market
+// (board-first reveal, like observe register); `close` resets back to unconfigured.
+const NO_MARKET = "" as const;
 const nowMs = (): number => Date.now();
 
 const DAY_MS = 86_400_000;
@@ -69,7 +70,7 @@ export const createBookmakerEdge = (input: CreateBookmakerEdgeInput): ConsoleEdg
   const observeRunId = input.packageInit.runId ?? "remote";
   const caller = localOperatorCaller();
 
-  let marketId: string = PLACEHOLDER_MARKET;
+  let marketId: string = NO_MARKET;
   const buildBridge = () =>
     createBookmakerBridge({
       runtime: createBookmakerRuntime({
@@ -78,11 +79,11 @@ export const createBookmakerEdge = (input: CreateBookmakerEdgeInput): ConsoleEdg
           readRpcUrl: input.readRpcUrl,
           marketId,
           observeRunId,
-          watchSource: {
-            marketId,
-            watchUrl: "http://127.0.0.1/remote",
-            webrtcUrl: "http://127.0.0.1/remote"
-          }
+          // watchSource.marketId tracks marketId (empty = unconfigured). The remote bookmaker
+          // console has NO real watch/webrtc endpoint to offer — the market's streaming endpoints
+          // live on the observe/host side — so those optional urls are omitted rather than filled
+          // with a fabricated 127.0.0.1 placeholder that would surface as a dead watch ref.
+          watchSource: { marketId }
         }).runtimeConfig,
         ...(input.idempotencyPersistence === undefined
           ? {}
@@ -115,7 +116,7 @@ export const createBookmakerEdge = (input: CreateBookmakerEdgeInput): ConsoleEdg
   };
 
   // Rebuild the bridge over a new market and emit a board so the gateway re-projects the catalog.
-  // configure sets a real market (createVault reveals); close resets to the sentinel (createVault
+  // configure sets a real market (createVault reveals); close resets to unconfigured (createVault
   // hides, board clears) — Close is the exact inverse of Configure.
   const applyMarket = async (next: string): Promise<void> => {
     marketId = next;
@@ -130,22 +131,21 @@ export const createBookmakerEdge = (input: CreateBookmakerEdgeInput): ConsoleEdg
     package: "bookmaker",
 
     describeFunctions: async (): Promise<readonly FunctionDescriptor[]> => {
+      // The board already carries the honest marketId ("" while unconfigured), so the
+      // descriptor projection keeps createVault hidden until a real configure lands.
       const panel = await bridge.readBoard(caller, nowMs());
-      // Sentinel market = "not configured yet" → present an empty marketId so createVault stays hidden.
-      const shown =
-        marketId === PLACEHOLDER_MARKET ? { ...panel, marketId: "" } : panel;
-      return projectBookmakerDescriptors(shown);
+      return projectBookmakerDescriptors(panel);
     },
 
     dispatch: async (remoteCaller: BridgeCaller, envelope: CallActionEnvelope) => {
       if (envelope.action === "configure") {
-        await applyMarket(readConfigure(envelope.args).marketId || PLACEHOLDER_MARKET);
-        const configured = marketId === PLACEHOLDER_MARKET ? "bookmaker" : marketId;
+        await applyMarket(readConfigure(envelope.args).marketId || NO_MARKET);
+        const configured = marketId === NO_MARKET ? "bookmaker" : marketId;
         return { txId: `configured-${configured}` };
       }
-      // Close = deconfigure: reset to the sentinel so createVault hides and the board clears.
+      // Close = deconfigure: reset to unconfigured so createVault hides and the board clears.
       if (envelope.action === "close") {
-        await applyMarket(PLACEHOLDER_MARKET);
+        await applyMarket(NO_MARKET);
         return { txId: "closed" };
       }
       const args =
