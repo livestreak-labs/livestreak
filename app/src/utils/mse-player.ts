@@ -99,6 +99,11 @@ export function openMsePlayer(input: OpenMsePlayerInput): MsePlayerHandle {
   // Fragments that arrive before the SourceBuffer exists / while it is updating queue here in order.
   const queue: Uint8Array[] = []
   let objectUrl: string | undefined
+  // Live fMP4 fragments carry a nonzero baseMediaDecodeTime (observed ~251s), so the first buffered range is
+  // e.g. [251,315] while `currentTime` is still 0 → HAVE_METADATA stall, blank player. We seek the playhead
+  // into the buffered range once appends land. `initialSeekDone` gates the one-shot live-edge jump so we do
+  // not fight the user's own seeks afterward; the post-eviction catch-up below is a separate, always-on guard.
+  let initialSeekDone = false
 
   const fail = (error: Error): void => {
     input.onError?.(error)
@@ -122,6 +127,42 @@ export function openMsePlayer(input: OpenMsePlayerInput): MsePlayerHandle {
     }
   }
 
+  // Keep the playhead inside the buffered range. Two cases, both fired from `updateend` once bytes have
+  // buffered:
+  //   1) initial attach — currentTime is 0 (or before buffered.start), and no seek has happened yet. The
+  //      fragments start at a nonzero PTS, so we jump to buffered.start once. Guarded by `initialSeekDone`
+  //      so a later user seek is never overridden.
+  //   2) post-eviction — trimPlayed() removed the range under a lagging playhead, leaving currentTime behind
+  //      the new buffered.start. Catch the playhead up so it never stalls behind an evicted range. This can
+  //      recur, so it is not gated by the one-shot flag; it only fires when currentTime is strictly behind.
+  // We seek to buffered.start rather than the live edge: the pump/trim path already keeps only a ~2s tail
+  // behind the playhead, so buffered.start IS near the live edge and starting there avoids a gap-induced stall.
+  const seekIntoBuffer = (): void => {
+    if (sourceBuffer === undefined || sourceBuffer.buffered.length === 0) return
+    const start = sourceBuffer.buffered.start(0)
+    const end = sourceBuffer.buffered.end(0)
+    const current = input.video.currentTime
+    if (current >= start && current <= end) {
+      // Playhead is inside the buffered range — nothing to do; do not fight the user's position.
+      initialSeekDone = true
+      return
+    }
+    if (!initialSeekDone) {
+      input.video.currentTime = start
+      initialSeekDone = true
+      return
+    }
+    // After the initial seek: only rescue a playhead that has fallen behind an evicted range.
+    if (current < start) {
+      input.video.currentTime = start
+    }
+  }
+
+  const onUpdateEnd = (): void => {
+    seekIntoBuffer()
+    pump()
+  }
+
   const trimPlayed = (): void => {
     if (sourceBuffer === undefined || sourceBuffer.buffered.length === 0) return
     const start = sourceBuffer.buffered.start(0)
@@ -141,7 +182,7 @@ export function openMsePlayer(input: OpenMsePlayerInput): MsePlayerHandle {
     if (closed || sourceBuffer !== undefined) return
     try {
       sourceBuffer = mediaSource.addSourceBuffer(FMP4_MIME)
-      sourceBuffer.addEventListener('updateend', pump)
+      sourceBuffer.addEventListener('updateend', onUpdateEnd)
       pump()
     } catch (error) {
       fail(error instanceof Error ? error : new Error(String(error)))

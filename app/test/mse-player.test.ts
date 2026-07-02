@@ -173,6 +173,57 @@ describe('MSE live player', () => {
     expect(sb.appended.map((a) => [...a])).toEqual([[1]])
   })
 
+  it('seeks the playhead to the buffered start when it stalls behind a nonzero-PTS range', () => {
+    const sb = makeSourceBuffer()
+    const ms = makeMediaSource(sb)
+    const socket = makeSocket()
+    // currentTime 0 but fragments start at PTS ~251 → HAVE_METADATA stall until we seek.
+    const video = { src: '', currentTime: 0, play: () => Promise.resolve() } as unknown as HTMLVideoElement
+
+    openMsePlayer({
+      baseUrl: 'http://h',
+      streamId: 's',
+      video,
+      socketFactory: () => socket,
+      mediaSourceFactory: () => ms,
+    })
+
+    ms.fireSourceOpen()
+    socket.fire('message', { data: frame(FRAME_INIT, [9, 9]) })
+    sb.fireUpdateEnd()
+    socket.fire('message', { data: frame(FRAME_FRAGMENT, [1]) })
+    // The first media fragment landed at [251, 315]; the updateend seek jumps the playhead to the start.
+    sb.setBuffered(251, 315)
+    sb.fireUpdateEnd()
+
+    expect(video.currentTime).toBe(251)
+  })
+
+  it('does not fight a playhead already inside the buffered range', () => {
+    const sb = makeSourceBuffer()
+    const ms = makeMediaSource(sb)
+    const socket = makeSocket()
+    // currentTime already inside the buffered range — the seek guard must leave it untouched.
+    const video = { src: '', currentTime: 300, play: () => Promise.resolve() } as unknown as HTMLVideoElement
+
+    openMsePlayer({
+      baseUrl: 'http://h',
+      streamId: 's',
+      video,
+      socketFactory: () => socket,
+      mediaSourceFactory: () => ms,
+    })
+
+    ms.fireSourceOpen()
+    socket.fire('message', { data: frame(FRAME_INIT, [9, 9]) })
+    sb.fireUpdateEnd()
+    socket.fire('message', { data: frame(FRAME_FRAGMENT, [1]) })
+    sb.setBuffered(251, 315)
+    sb.fireUpdateEnd()
+
+    expect(video.currentTime).toBe(300)
+  })
+
   it('ends the media stream on the host end signal', () => {
     const sb = makeSourceBuffer()
     const ms = makeMediaSource(sb)
