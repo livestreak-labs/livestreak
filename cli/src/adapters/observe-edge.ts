@@ -106,8 +106,9 @@ export const createObserveConsoleEdge = (input: CreateObserveConsoleEdgeInput): 
   };
 
   // Run-execution lifecycle (prepare/start/stop) is OBSERVE's domain: the runtime derives the run config
-  // from the configured board and wires the local WebRTC sink itself. The edge supplies only the host base
-  // URL it owns (for the sink's signaling) and routes the scope — no observe board/config/sink knowledge.
+  // from the configured board and wires the encode-once fMP4 live sink itself. The edge supplies only the
+  // host base URL it owns (for the sink's ingest transport) and routes the scope — no observe
+  // board/config/sink knowledge.
   const prepareLiveRun = async (runtime: ObserveRuntime): Promise<{ txId: string }> => {
     await ensureT0Run(runtime);
     await Effect.runPromise(runtime.prepareConfiguredRun(runId, { hostBaseUrl }));
