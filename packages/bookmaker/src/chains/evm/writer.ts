@@ -3,6 +3,7 @@
 import { LiveStreakConfigError, LiveStreakRuntimeError } from "@livestreak/core";
 import {
   createWalletManager,
+  isPaymasterSideFailure,
   pollUntilUserOperationIncluded as pollUntilUserOperationIncludedShared,
   readUserOperationSuccess,
   UserOperationPollTimeoutError,
@@ -212,14 +213,8 @@ const receiptFailure = (message: string): LiveStreakRuntimeError =>
 
 const classifySendFailure = (error: unknown): LiveStreakRuntimeError => {
   const message = error instanceof Error ? error.message : String(error);
-  const lower = message.toLowerCase();
 
-  if (
-    lower.includes("paymaster") ||
-    lower.includes("sponsor") ||
-    lower.includes("validuntil") ||
-    lower.includes("validafter")
-  ) {
+  if (isPaymasterSideFailure(error)) {
     return new LiveStreakRuntimeError({
       message: `Paymaster-side write failure: ${message}`
     });

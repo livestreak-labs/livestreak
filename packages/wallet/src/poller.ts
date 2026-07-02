@@ -98,6 +98,19 @@ export const readUserOperationSuccess = (receipt: unknown): boolean | undefined 
   return undefined;
 };
 
+// Heuristic: does a userOp send failure originate on the paymaster/sponsor side (rather than being a
+// plain send/transport failure)? Sniffs the message for paymaster/sponsor/validity-window markers.
+// Effect-free — each caller keeps its own error wrapper + wording; this only decides the branch.
+export const isPaymasterSideFailure = (error: unknown): boolean => {
+  const lower = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return (
+    lower.includes("paymaster") ||
+    lower.includes("sponsor") ||
+    lower.includes("validuntil") ||
+    lower.includes("validafter")
+  );
+};
+
 // Throws on a present-but-reverted receipt or a receipt missing a readable success field.
 export const assertUserOperationSucceeded = (receipt: unknown): void => {
   if (!isRecord(receipt)) {

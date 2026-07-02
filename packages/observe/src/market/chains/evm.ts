@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import { LiveStreakConfigError, LiveStreakRuntimeError, type LiveStreakError } from "@livestreak/core";
 import {
   createWalletManager,
+  isPaymasterSideFailure,
   pollUntilUserOperationIncluded as pollUntilUserOperationIncludedShared
 } from "@livestreak/wallet";
 import { evm } from "@livestreak/contracts";
@@ -264,15 +265,8 @@ const receiptFailure = (message: string): LiveStreakRuntimeError =>
   });
 
 const classifySendFailure = (error: unknown): LiveStreakRuntimeError => {
-  const message = error instanceof Error ? error.message : String(error);
-  const lower = message.toLowerCase();
-
-  if (
-    lower.includes("paymaster") ||
-    lower.includes("sponsor") ||
-    lower.includes("validuntil") ||
-    lower.includes("validafter")
-  ) {
+  if (isPaymasterSideFailure(error)) {
+    const message = error instanceof Error ? error.message : String(error);
     return new LiveStreakRuntimeError({
       message: `Paymaster-side registration failure: ${message}`
     });
