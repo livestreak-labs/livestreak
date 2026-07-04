@@ -71,6 +71,7 @@ jobs:
               - 'packages/wallet/**'
               - 'packages/contracts/**'
               - 'packages/host/**'
+              - 'packages/options/**'
               - 'package.json'
               - 'package-lock.json'
               - 'tsconfig.base.json'

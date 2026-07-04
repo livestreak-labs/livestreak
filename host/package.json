@@ -15,6 +15,7 @@
   "dependencies": {
     "@livestreak/core": "file:../packages/core",
     "@livestreak/host": "file:../packages/host",
+    "@livestreak/options": "file:../packages/options",
     "@livestreak/schema": "file:../packages/schema",
     "@livestreak/wallet": "file:../packages/wallet",
     "@mysten-incubation/memwal": "^0.0.7",
