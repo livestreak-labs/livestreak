@@ -275,7 +275,11 @@ const OPTIONS_INPUT_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
     { name: "tokenId", value: tokenIdStr("Position NFT id."), help: "NFT to approve." }
   ]),
   setApprovalForAll: obj([
-    { name: "operator", value: str("Operator address."), help: "Address to grant/revoke." },
+    {
+      name: "operator",
+      value: { type: "string", description: "Operator address. Defaults to the MarketDriver." },
+      help: "Leave blank to approve the protocol MarketDriver."
+    },
     { name: "approved", value: bool("Grant (true) or revoke (false)."), help: "Approval flag." }
   ])
 };
