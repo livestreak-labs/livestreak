@@ -2,6 +2,8 @@ import {
   bridgeActionScope,
   createActionPlanSink,
   createContractFactSource,
+  createMemoryFactSource,
+  createMemorySink,
   createObserveFactSource,
   createStewardBridge,
   createStewardContractExecutor,
@@ -13,7 +15,8 @@ import {
   type CallActionEnvelope,
   type ContractVaultReader,
   type ObserveBoardReader,
-  type StewardActionPlanSink
+  type StewardActionPlanSink,
+  type StewardMemoryClient
 } from "@livestreak/steward";
 import type { FunctionDescriptor, PackageRuntimeInit } from "@livestreak/schema";
 import type { ConsoleEdge } from "../gateway/console/edge.js";
@@ -42,6 +45,8 @@ export interface CreateStewardConsoleEdgeInput {
   readonly contractVaultReader?: ContractVaultReader;
   /** Real board reads for observe facts (the gateway shares its observe runtime). */
   readonly observeBoardReader?: ObserveBoardReader;
+  /** Durable memory (the gateway builds an HTTP client over the host's /memory/records). */
+  readonly memoryClient?: StewardMemoryClient;
 }
 
 export const createStewardConsoleEdge = (input: CreateStewardConsoleEdgeInput): ConsoleEdge => {
@@ -70,8 +75,12 @@ export const createStewardConsoleEdge = (input: CreateStewardConsoleEdgeInput): 
       input.observeBoardReader === undefined
         ? { readFacts: noopFacts }
         : createObserveFactSource(input.observeBoardReader),
-    memoryFactSource: { readFacts: noopFacts },
-    memorySink: noopMemorySink,
+    memoryFactSource:
+      input.memoryClient === undefined
+        ? { readFacts: noopFacts }
+        : createMemoryFactSource(input.memoryClient),
+    memorySink:
+      input.memoryClient === undefined ? noopMemorySink : createMemorySink(input.memoryClient),
     actionPlanSink
   });
   const bridge = createStewardBridge({ runtime });

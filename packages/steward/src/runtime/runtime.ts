@@ -118,7 +118,11 @@ class StewardRuntimeFacade implements StewardRuntime {
         }
       });
 
+      // Nothing-to-remember means no write — a polling refresh must not spam empty rows.
       for (const group of result.perSubject) {
+        if (group.findings.length === 0 && group.decisions.length === 0) {
+          continue;
+        }
         await this.memorySink.remember(group);
       }
 

@@ -77,7 +77,7 @@ export const createApp = (deps: HostRouteDeps): Express => {
   // stub at its path prefix (disabled) so callers can tell "off" from "missing".
   mountModule(app, deps.config, "aa", "/aa", () => createAaRouter(deps.aa));
   mountModule(app, deps.config, "media", "/media", () => createMediaRouter(deps));
-  mountModule(app, deps.config, "walrus_memory", "/memory", () => createMemoryRouter(deps));
+  mountModule(app, deps.config, "memory", "/memory", () => createMemoryRouter(deps));
   mountModule(app, deps.config, "walrus_content", "/content", () => createContentRouter(deps));
   mountModule(app, deps.config, "discovery", "/discovery", () => createDiscoveryRouter(deps));
   mountModule(app, deps.config, "remote", "/remote", () => createRemoteRouter(deps));

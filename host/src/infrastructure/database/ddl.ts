@@ -47,4 +47,18 @@ CREATE TABLE IF NOT EXISTS resolutions (
   no_total    TEXT NOT NULL DEFAULT '0',
   resolved_at INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS steward_memory (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  subject_kind     TEXT NOT NULL,
+  subject_id       TEXT NOT NULL,
+  market_id        TEXT,
+  vault_id         TEXT,
+  finding_ids      TEXT NOT NULL DEFAULT '[]',
+  decision_actions TEXT NOT NULL DEFAULT '[]',
+  evidence_refs    TEXT,
+  at_ms            INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_steward_memory_subject ON steward_memory (subject_kind, subject_id);
 `;

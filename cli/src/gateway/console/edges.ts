@@ -4,7 +4,11 @@
 import { Effect } from "effect";
 import { openObserveConsoleRuntime, type ObserveRuntime } from "@livestreak/observe";
 import { asUserAddress, asVaultId, createOptionsChain, optionsChainConfigFromPackageInit } from "@livestreak/options";
-import type { ContractVaultReader, ObserveBoardReader } from "@livestreak/steward";
+import type {
+  ContractVaultReader,
+  ObserveBoardReader,
+  StewardMemoryClient
+} from "@livestreak/steward";
 import type { SessionWallet, SettingsDoc } from "@livestreak/schema";
 import { createBookmakerEdge } from "../../adapters/bookmaker-edge.js";
 import { createObserveConsoleEdge } from "../../adapters/observe-edge.js";
@@ -70,7 +74,8 @@ export const createConsoleEdges = async (input: {
     createStewardConsoleEdge({
       packageInit: inits.steward,
       contractVaultReader: buildStewardVaultReader(inits.options, rpc),
-      observeBoardReader: buildStewardBoardReader(observeRuntime, input.runId)
+      observeBoardReader: buildStewardBoardReader(observeRuntime, input.runId),
+      memoryClient: buildStewardMemoryClient(input.settings.host.url)
     })
   ];
 };
@@ -86,6 +91,54 @@ const buildStewardBoardReader = (runtime: ObserveRuntime, runId: string): Observ
     }
   }
 });
+
+// Durable memory over the host's DB-backed records API. Failures are the caller's to handle:
+// the fact source tolerates a throw (lastError on the board); remember is awaited by refresh.
+const buildStewardMemoryClient = (hostUrl: string): StewardMemoryClient => {
+  const base = hostUrl.replace(/\/$/, "");
+  return {
+    recall: async (subject) => {
+      const query = new URLSearchParams({ subjectKind: subject.kind, subjectId: subject.id });
+      const response = await fetch(`${base}/memory/records?${query.toString()}`);
+      if (!response.ok) {
+        throw new Error(`memory recall failed (${response.status})`);
+      }
+      const body = (await response.json()) as {
+        records?: readonly {
+          id: number;
+          findingIds: readonly string[];
+          decisionActions: readonly string[];
+          atMs: number;
+          evidenceRefs?: readonly string[];
+        }[];
+      };
+      return (body.records ?? []).map((record) => ({
+        key: `steward.memory.${record.id}`,
+        value: { findingIds: record.findingIds, decisionActions: record.decisionActions },
+        ...(record.evidenceRefs === undefined ? {} : { evidenceRefs: record.evidenceRefs }),
+        observedAtMs: record.atMs
+      }));
+    },
+    remember: async (record) => {
+      const response = await fetch(`${base}/memory/records`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          subjectKind: record.subject.kind,
+          subjectId: record.subject.id,
+          ...(record.subject.marketId === undefined ? {} : { marketId: record.subject.marketId }),
+          ...(record.subject.vaultId === undefined ? {} : { vaultId: record.subject.vaultId }),
+          findingIds: record.findingIds,
+          decisionActions: record.decisionActions,
+          atMs: record.atMs
+        })
+      });
+      if (!response.ok) {
+        throw new Error(`memory remember failed (${response.status})`);
+      }
+    }
+  };
+};
 
 const buildStewardVaultReader = (
   optionsInit: Parameters<typeof optionsChainConfigFromPackageInit>[0],
