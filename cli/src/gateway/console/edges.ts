@@ -1,4 +1,10 @@
-import { asUserAddress } from "@livestreak/options";
+// Gateway composition root: builds every package edge over one settings/wallet/runId context and
+// cross-wires package surfaces (observe board + options vault reads feed steward's fact ports).
+
+import { Effect } from "effect";
+import { openObserveConsoleRuntime, type ObserveRuntime } from "@livestreak/observe";
+import { asUserAddress, asVaultId, createOptionsChain, optionsChainConfigFromPackageInit } from "@livestreak/options";
+import type { ContractVaultReader, ObserveBoardReader } from "@livestreak/steward";
 import type { SessionWallet, SettingsDoc } from "@livestreak/schema";
 import { createBookmakerEdge } from "../../adapters/bookmaker-edge.js";
 import { createObserveConsoleEdge } from "../../adapters/observe-edge.js";
@@ -28,15 +34,19 @@ export const createConsoleEdges = async (input: {
     loadIdempotencyPersistencePort()
   ]);
 
-  const optionsEdge = createOptionsConsoleEdge({
-    packageInit: inits.options,
-    readRpcUrl: rpc,
-    userAddress,
-    pausedLanes
-  });
+  const observeRuntime = (
+    await Effect.runPromise(
+      openObserveConsoleRuntime({ sessionInit: inits.observe, runId: input.runId })
+    )
+  ).runtime;
 
   return [
-    optionsEdge,
+    createOptionsConsoleEdge({
+      packageInit: inits.options,
+      readRpcUrl: rpc,
+      userAddress,
+      pausedLanes
+    }),
     createBookmakerEdge({
       packageInit: inits.bookmaker,
       readRpcUrl: rpc,
@@ -47,8 +57,49 @@ export const createConsoleEdges = async (input: {
     createObserveConsoleEdge({
       packageInit: inits.observe,
       runId: input.runId,
+      runtime: observeRuntime,
       hostBaseUrl: input.settings.host.url
     }),
-    createStewardConsoleEdge({ packageInit: inits.steward })
+    createStewardConsoleEdge({
+      packageInit: inits.steward,
+      contractVaultReader: buildStewardVaultReader(inits.options, rpc),
+      observeBoardReader: buildStewardBoardReader(observeRuntime, input.runId)
+    })
   ];
+};
+
+// --- steward fact readers (gateway composition: packages own the reads, steward owns the facts) ---
+
+const buildStewardBoardReader = (runtime: ObserveRuntime, runId: string): ObserveBoardReader => ({
+  readBoard: async () => {
+    try {
+      return await Effect.runPromise(runtime.readBoard(runId));
+    } catch {
+      return null;
+    }
+  }
+});
+
+const buildStewardVaultReader = (
+  optionsInit: Parameters<typeof optionsChainConfigFromPackageInit>[0],
+  readRpcUrl: string
+): ContractVaultReader => {
+  const reader = createOptionsChain(
+    optionsChainConfigFromPackageInit(optionsInit, { readRpcUrl })
+  ).reader;
+  return {
+    chain: optionsInit.chain.startsWith("eip155") ? "evm" : "sui",
+    readVaultFacts: async (subject) => {
+      if (subject.vaultId === undefined) {
+        return [];
+      }
+      const vault = await reader.readVault(asVaultId(subject.vaultId));
+      return [
+        { key: "vault.status", value: vault.status },
+        { key: "vault.outcome", value: vault.outcome },
+        { key: "vault.pools", value: vault.pools },
+        { key: "vault.steward", value: vault.steward }
+      ];
+    }
+  };
 };

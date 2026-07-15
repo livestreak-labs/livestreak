@@ -19,159 +19,51 @@ export interface CreateBookmakerEdgeInput {
   readonly usdcAddress: `0x${string}`;
   /** File-backed persistence for settled + pending-userOp state (survives a gateway restart). */
   readonly idempotencyPersistence?: IdempotencyPersistencePort;
-  /** Test seam: substitute the on-chain writer so the operator flow can be driven without a live chain
-   *  (mirrors createBookmakerRuntime's own `chain` injection). Production leaves this undefined. */
+  /** Test seam: substitute the on-chain writer so the operator flow can be driven without a live chain. */
   readonly chain?: BookmakerChain;
 }
-
-// The runtime starts UNCONFIGURED: an empty marketId is the explicit "not configured yet" state
-// the package models (see validateBookmakerRuntimeConfig's unconfigured path). No fabricated
-// sentinel id is injected. createVault stays hidden until a real `configure` supplies a market
-// (board-first reveal, like observe register); `close` resets back to unconfigured.
-const NO_MARKET = "" as const;
-const nowMs = (): number => Date.now();
-
-const DAY_MS = 86_400_000;
-
-// createVault requires resolutionSource (non-empty string) + resolutionWindowExpiresAtMs (finite number > 0).
-// The auto-form sends strings (and the window is optional), so default + coerce here: blank source → "manual",
-// blank/invalid window → now + 24h, string window → number. Without this the bridge rejects every createVault.
-const coerceCreateVaultArgs = (args: unknown): unknown => {
-  if (typeof args !== "object" || args === null || Array.isArray(args)) {
-    return args;
-  }
-  const record = args as Record<string, unknown>;
-  const source =
-    typeof record.resolutionSource === "string" && record.resolutionSource.trim().length > 0
-      ? record.resolutionSource.trim()
-      : "manual";
-  const raw = record.resolutionWindowExpiresAtMs;
-  const asNumber =
-    typeof raw === "number"
-      ? raw
-      : typeof raw === "string" && raw.trim().length > 0
-        ? Number(raw)
-        : Number.NaN;
-  const expiresAt = Number.isFinite(asNumber) && asNumber > 0 ? asNumber : nowMs() + DAY_MS;
-  return { ...record, resolutionSource: source, resolutionWindowExpiresAtMs: expiresAt };
-};
-
-const readConfigure = (args: unknown): { marketId: string } => {
-  if (typeof args !== "object" || args === null || Array.isArray(args)) {
-    return { marketId: "" };
-  }
-  const record = args as Record<string, unknown>;
-  return {
-    marketId:
-      typeof record.marketId === "string" && record.marketId.trim().length > 0
-        ? record.marketId.trim()
-        : ""
-  };
-};
 
 export const createBookmakerEdge = (input: CreateBookmakerEdgeInput): ConsoleEdge => {
   const observeRunId = input.packageInit.runId ?? "remote";
   const caller = localOperatorCaller();
 
-  let marketId: string = NO_MARKET;
-  const buildBridge = () =>
-    createBookmakerBridge({
-      runtime: createBookmakerRuntime({
-        config: createBookmakerRuntimeBootstrap(input.packageInit, {
-          runtimeId: "cli-bookmaker-remote",
-          readRpcUrl: input.readRpcUrl,
-          marketId,
-          observeRunId,
-          // watchSource.marketId tracks marketId (empty = unconfigured). The remote bookmaker
-          // console has NO real watch/webrtc endpoint to offer — the market's streaming endpoints
-          // live on the observe/host side — so those optional urls are omitted rather than filled
-          // with a fabricated 127.0.0.1 placeholder that would surface as a dead watch ref.
-          watchSource: { marketId }
-        }).runtimeConfig,
-        ...(input.chain === undefined ? {} : { chain: input.chain }),
-        ...(input.idempotencyPersistence === undefined
-          ? {}
-          : { idempotencyPersistence: input.idempotencyPersistence })
-      })
-    });
-
-  let bridge = buildBridge();
-  const boardListeners = new Set<(board: unknown) => void>();
-  let boardUnsub: (() => void) | undefined;
-
-  const resubscribeBoard = (): void => {
-    boardUnsub?.();
-    boardUnsub = bridge.subscribeBoard(
-      caller,
-      (panel) => {
-        for (const listener of boardListeners) {
-          listener(panel);
-        }
-      },
-      nowMs()
-    );
-  };
-
-  const emitBoard = async (): Promise<void> => {
-    const panel = await bridge.readBoard(caller, nowMs());
-    for (const listener of boardListeners) {
-      listener(panel);
-    }
-  };
-
-  // Rebuild the bridge over a new market and emit a board so the gateway re-projects the catalog.
-  // configure sets a real market (createVault reveals); close resets to unconfigured (createVault
-  // hides, board clears) — Close is the exact inverse of Configure.
-  const applyMarket = async (next: string): Promise<void> => {
-    marketId = next;
-    bridge = buildBridge();
-    if (boardListeners.size > 0) {
-      resubscribeBoard();
-    }
-    await emitBoard();
-  };
+  // Starts UNCONFIGURED (empty marketId): createVault stays hidden until configure supplies a
+  // market; the runtime lens swaps markets in place (configure/close are bridge actions).
+  const runtime = createBookmakerRuntime({
+    config: createBookmakerRuntimeBootstrap(input.packageInit, {
+      runtimeId: "cli-bookmaker-remote",
+      readRpcUrl: input.readRpcUrl,
+      marketId: "",
+      observeRunId,
+      watchSource: { marketId: "" }
+    }).runtimeConfig,
+    ...(input.chain === undefined ? {} : { chain: input.chain }),
+    ...(input.idempotencyPersistence === undefined
+      ? {}
+      : { idempotencyPersistence: input.idempotencyPersistence })
+  });
+  const bridge = createBookmakerBridge({ runtime, now: () => Date.now() });
 
   return {
     package: "bookmaker",
 
-    describeFunctions: async (): Promise<readonly FunctionDescriptor[]> => {
-      // The board already carries the honest marketId ("" while unconfigured), so the
-      // descriptor projection keeps createVault hidden until a real configure lands.
-      const panel = await bridge.readBoard(caller, nowMs());
-      return projectBookmakerDescriptors(panel);
-    },
+    describeFunctions: async (): Promise<readonly FunctionDescriptor[]> =>
+      projectBookmakerDescriptors(await bridge.readBoard(caller)),
 
     dispatch: async (remoteCaller: BridgeCaller, envelope: CallActionEnvelope) => {
-      if (envelope.action === "configure") {
-        await applyMarket(readConfigure(envelope.args).marketId || NO_MARKET);
-        const configured = marketId === NO_MARKET ? "bookmaker" : marketId;
-        return { txId: `configured-${configured}` };
-      }
-      // Close = deconfigure: reset to unconfigured so createVault hides and the board clears.
-      if (envelope.action === "close") {
-        await applyMarket(NO_MARKET);
-        return { txId: "closed" };
-      }
-      const args =
-        envelope.action === "createVault" ? coerceCreateVaultArgs(envelope.args) : envelope.args;
-      const result = await bridge.callAction(
-        remoteCaller,
-        { scope: bridgeActionScope, action: envelope.action, args },
-        nowMs()
-      );
-      return { txId: String(result.txId), tokenId: String(result.vaultId) };
-    },
-
-    subscribeBoard: (listener) => {
-      boardListeners.add(listener);
-      if (boardUnsub === undefined) {
-        resubscribeBoard();
-      }
-      return () => {
-        boardListeners.delete(listener);
+      const result = await bridge.callAction(remoteCaller, {
+        scope: bridgeActionScope,
+        action: envelope.action,
+        args: envelope.args
+      });
+      return {
+        txId: String(result.txId),
+        ...(result.vaultId === undefined ? {} : { tokenId: String(result.vaultId) })
       };
     },
 
-    readBoard: () => bridge.readBoard(caller, nowMs())
+    subscribeBoard: (listener) => bridge.subscribeBoard(caller, listener),
+
+    readBoard: () => bridge.readBoard(caller)
   };
 };

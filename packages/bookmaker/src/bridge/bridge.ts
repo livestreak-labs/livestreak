@@ -1,11 +1,11 @@
 // --- exports ---
 
-import { LiveStreakConfigError } from "@livestreak/core";
+import { authorizeBridgeCaller, LiveStreakConfigError } from "@livestreak/core";
 
-import type { CreateVaultActionResult } from "./types.js";
+import type { BookmakerActionResult } from "./types.js";
 import type { CreateVaultIntent } from "../model/write-intent.js";
+import { asTxId } from "../chains/types.js";
 import { validateCreateVaultIntent } from "../model/validate.js";
-import { authorizeBridgeCaller } from "./scope.js";
 import type {
   BookmakerBridge,
   CreateBookmakerBridgeInput
@@ -18,12 +18,14 @@ import {
 } from "./types.js";
 
 export type {
+  BookmakerActionResult,
   BookmakerBridge,
   BridgeCaller,
   CallActionEnvelope,
   CapabilityGrant,
   CapabilityScope,
-  CreateBookmakerBridgeInput
+  CreateBookmakerBridgeInput,
+  CreateVaultActionResult
 } from "./types.js";
 
 export {
@@ -35,19 +37,21 @@ export {
 
 export { authorizeBridgeCaller, requireAnyScope } from "./scope.js";
 
+const DAY_MS = 86_400_000;
+
 export const createBookmakerBridge = (input: CreateBookmakerBridgeInput): BookmakerBridge => {
-  const { runtime } = input;
+  const { runtime, now } = input;
 
   return {
     runtime,
 
-    readBoard: async (caller, nowMs) => {
-      authorizeBridgeCaller(caller, bridgeBoardReadScope, nowMs);
+    readBoard: async (caller) => {
+      authorizeBridgeCaller(caller, bridgeBoardReadScope, now());
       return runtime.readPanel();
     },
 
-    readControls: async (caller, nowMs) => {
-      authorizeBridgeCaller(caller, bridgeControlsReadScope, nowMs);
+    readControls: async (caller) => {
+      authorizeBridgeCaller(caller, bridgeControlsReadScope, now());
       const panel = runtime.readPanel();
       return {
         runtimeId: panel.runtimeId,
@@ -63,8 +67,8 @@ export const createBookmakerBridge = (input: CreateBookmakerBridgeInput): Bookma
       };
     },
 
-    callAction: async (caller, envelope, nowMs) => {
-      authorizeBridgeCaller(caller, bridgeActionScope, nowMs);
+    callAction: async (caller, envelope) => {
+      authorizeBridgeCaller(caller, bridgeActionScope, now());
 
       if (envelope.scope !== bridgeActionScope) {
         throw new LiveStreakConfigError({
@@ -73,11 +77,11 @@ export const createBookmakerBridge = (input: CreateBookmakerBridgeInput): Bookma
         });
       }
 
-      return dispatchWriterAction(runtime, envelope.action, envelope.args, nowMs);
+      return dispatchWriterAction(runtime, envelope.action, envelope.args, now());
     },
 
-    subscribeBoard: (caller, listener, nowMs) => {
-      authorizeBridgeCaller(caller, bridgeBoardSubscribeScope, nowMs);
+    subscribeBoard: (caller, listener) => {
+      authorizeBridgeCaller(caller, bridgeBoardSubscribeScope, now());
       return runtime.subscribeSnapshots(() => {
         listener(runtime.readPanel());
       });
@@ -92,7 +96,17 @@ const dispatchWriterAction = async (
   action: string,
   args: unknown,
   nowMs: number
-): Promise<CreateVaultActionResult> => {
+): Promise<BookmakerActionResult> => {
+  if (action === "configure") {
+    const marketId = readConfigureMarketId(args);
+    runtime.configure({ marketId });
+    return { txId: asTxId(`configured-${marketId === "" ? "bookmaker" : marketId}`) };
+  }
+  if (action === "close") {
+    runtime.close();
+    return { txId: asTxId("closed") };
+  }
+
   if (action !== "createVault") {
     throw new LiveStreakConfigError({
       message: `Unsupported bookmaker bridge action: ${action}`,
@@ -109,8 +123,15 @@ const dispatchWriterAction = async (
 
   const intent = parseCreateVaultIntentFromArgs(args as Record<string, unknown>, nowMs);
   const result = await runtime.createVaultOnce(intent, nowMs);
-  // P1: return the vaultId the runtime already produced (previously dropped).
   return { txId: result.result.txId, vaultId: result.result.vaultId };
+};
+
+const readConfigureMarketId = (args: unknown): string => {
+  if (typeof args !== "object" || args === null || Array.isArray(args)) {
+    return "";
+  }
+  const marketId = (args as Record<string, unknown>).marketId;
+  return typeof marketId === "string" ? marketId.trim() : "";
 };
 
 const coerceBigIntArg = (value: unknown): bigint | undefined => {
@@ -126,6 +147,21 @@ const coerceBigIntArg = (value: unknown): bigint | undefined => {
 const parseCreateVaultIntentFromArgs = (args: Record<string, unknown>, nowMs: number): CreateVaultIntent => {
   const creatorStake = coerceBigIntArg(args.creatorStake);
   const seedRate = coerceBigIntArg(args.seedRate);
+
+  // Console auto-form defaults: blank resolution source → "manual"; blank/invalid window → +24h.
+  const source =
+    typeof args.resolutionSource === "string" && args.resolutionSource.trim().length > 0
+      ? args.resolutionSource.trim()
+      : "manual";
+  const rawWindow = args.resolutionWindowExpiresAtMs;
+  const windowNumber =
+    typeof rawWindow === "number"
+      ? rawWindow
+      : typeof rawWindow === "string" && rawWindow.trim().length > 0
+        ? Number(rawWindow)
+        : Number.NaN;
+  const expiresAt = Number.isFinite(windowNumber) && windowNumber > 0 ? windowNumber : nowMs + DAY_MS;
+
   const validated = validateCreateVaultIntent(
     {
       action: "createVault",
@@ -134,8 +170,8 @@ const parseCreateVaultIntentFromArgs = (args: Record<string, unknown>, nowMs: nu
       creatorSide: args.creatorSide,
       ...(creatorStake === undefined ? {} : { creatorStake }),
       ...(seedRate === undefined ? {} : { seedRate }),
-      resolutionSource: args.resolutionSource,
-      resolutionWindowExpiresAtMs: args.resolutionWindowExpiresAtMs
+      resolutionSource: source,
+      resolutionWindowExpiresAtMs: expiresAt
     },
     nowMs
   );

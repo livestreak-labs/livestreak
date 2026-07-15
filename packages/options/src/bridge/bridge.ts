@@ -2,7 +2,8 @@
 
 import { LiveStreakConfigError } from "@livestreak/core";
 
-import type { MintResult, TxId } from "../chains/types.js";
+import { asMarketId } from "../model/ids.js";
+import { asTxId, type MintResult, type TxId } from "../chains/types.js";
 import { projectOptionsControls } from "./panel/project.js";
 import type { OptionsControlsView } from "./panel/types.js";
 import { authorizeBridgeCaller } from "./scope.js";
@@ -82,7 +83,21 @@ export const createOptionsBridge = (input: CreateOptionsBridgeInput): OptionsBri
         });
       }
 
-      return dispatchWriterAction(runtime, envelope.action, envelope.args);
+      const result = await dispatchWriterAction(runtime, envelope.action, envelope.args);
+
+      // Reflect a chain write on the board immediately (configure/close publish themselves).
+      if (envelope.action !== "configure" && envelope.action !== "close") {
+        const active = runtime.activeMarketId();
+        if (active !== undefined && runtime.config.user !== undefined) {
+          try {
+            await runtime.refreshUser(runtime.config.user, active);
+          } catch {
+            // best-effort: the write already succeeded
+          }
+        }
+      }
+
+      return result;
     },
 
     subscribeBoard: (caller, listener) => {
@@ -102,9 +117,22 @@ export const createOptionsBridge = (input: CreateOptionsBridgeInput): OptionsBri
 const dispatchWriterAction = async (
   runtime: CreateOptionsBridgeInput["runtime"],
   action: string,
-  args: unknown
+  rawArgs: unknown
 ): Promise<TxId | MintResult> => {
   const writer = runtime.chain.writer;
+
+  // Configure/close are runtime lens verbs, not chain writes.
+  if (action === "configure") {
+    const marketId = asMarketId(readStringField(readArgs(rawArgs), "marketId"));
+    await runtime.configure({ marketId });
+    return asTxId(`configured-${marketId}`);
+  }
+  if (action === "close") {
+    runtime.close();
+    return asTxId("closed");
+  }
+
+  const args = coerceActionArgs(action, rawArgs);
 
   switch (action) {
     case "mint":
@@ -113,12 +141,6 @@ const dispatchWriterAction = async (
       return writer.mintWithSalt(readArgs(args));
     case "fund":
       return runtime.fundStream(readArgs(args));
-    case "streamLane":
-      return runtime.streamLane(readArgs(args));
-    case "pauseLane":
-      return runtime.pauseLane(readArgs(args));
-    case "resumeLane":
-      return runtime.resumeLane(readArgs(args));
     case "setLanes":
       return writer.setLanes(readArgs(args));
     case "addFunds":
@@ -157,6 +179,73 @@ const dispatchWriterAction = async (
         metadata: { details: action }
       });
   }
+};
+
+// The console auto-form (and any JSON transport) sends numeric fields as decimal strings — the
+// descriptors type them "string" because JSON has no bigint. The bridge is the coercion boundary:
+// writers below always see real bigints.
+const BIGINT_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  mintWithSalt: ["salt"],
+  fund: ["tokenId", "deposit", "rate"],
+  setLanes: ["tokenId", "addDeposit"],
+  addFunds: ["tokenId", "deposit"],
+  stopFunding: ["tokenId"],
+  stopAllFunding: ["tokenId"],
+  withdraw: ["tokenId"],
+  withdrawMany: ["tokenId"],
+  claimLossLvst: ["tokenId"],
+  stakeLvst: ["amount"],
+  unstakeLvst: ["amount"],
+  transferNft: ["tokenId"],
+  approveNft: ["tokenId"]
+};
+
+const coerceActionArgs = (action: string, args: unknown): unknown => {
+  if (args === null || typeof args !== "object" || Array.isArray(args)) {
+    return args;
+  }
+  const fields = BIGINT_FIELDS[action];
+  if (fields === undefined) {
+    return args;
+  }
+  const record = { ...(args as Record<string, unknown>) };
+  for (const field of fields) {
+    if (record[field] !== undefined) {
+      record[field] = toBigIntField(record[field], field);
+    }
+  }
+  if (action === "setLanes" && Array.isArray(record.lanes)) {
+    record.lanes = record.lanes.map((lane) =>
+      lane !== null && typeof lane === "object" && !Array.isArray(lane)
+        ? { ...lane, rate: toBigIntField((lane as Record<string, unknown>).rate, "lanes[].rate") }
+        : lane
+    );
+  }
+  return record;
+};
+
+const toBigIntField = (value: unknown, field: string): bigint => {
+  if (typeof value === "bigint") {
+    return value;
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    return BigInt(value);
+  }
+  throw new LiveStreakConfigError({
+    message: `${field} must be a bigint-compatible value`,
+    metadata: { details: String(value) }
+  });
+};
+
+const readStringField = (record: Record<string, unknown>, field: string): string => {
+  const value = record[field];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new LiveStreakConfigError({
+      message: `Options bridge action requires ${field}`,
+      metadata: { details: String(value) }
+    });
+  }
+  return value.trim();
 };
 
 const readArgs = <T>(args: unknown): T => {
