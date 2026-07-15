@@ -13,6 +13,7 @@ import { createOptionsConsoleEdge } from "../../adapters/options-edge.js";
 import { chainSettingsFor } from "../../prefs/settings.js";
 import {
   loadIdempotencyPersistencePort,
+  loadObserveBoardsPort,
   loadPausedLanesPort
 } from "../state/runtime-persistence.js";
 import { buildPackageInits } from "./init.js";
@@ -28,15 +29,21 @@ export const createConsoleEdges = async (input: {
   const userAddress = asUserAddress(input.sessionWallet.operatorAddress as `0x${string}`);
   const usdc = (inits.bookmaker.contracts.usdc ?? "") as `0x${string}`;
 
-  // File-backed runtime state (survives a gateway restart): pending-userOp recovery + paused lanes.
-  const [pausedLanes, idempotencyPersistence] = await Promise.all([
+  // File-backed runtime state (survives a gateway restart): pending-userOp recovery, paused lanes,
+  // and the observe console board (configured cells restore; active run status resets honestly).
+  const [pausedLanes, idempotencyPersistence, observeBoards] = await Promise.all([
     loadPausedLanesPort(),
-    loadIdempotencyPersistencePort()
+    loadIdempotencyPersistencePort(),
+    loadObserveBoardsPort()
   ]);
 
   const observeRuntime = (
     await Effect.runPromise(
-      openObserveConsoleRuntime({ sessionInit: inits.observe, runId: input.runId })
+      openObserveConsoleRuntime({
+        sessionInit: inits.observe,
+        runId: input.runId,
+        boardPersistence: observeBoards
+      })
     )
   ).runtime;
 

@@ -151,6 +151,7 @@ export {
   type BridgeStopRunInput,
   type CreateObserveBridgeInput,
   type ObserveBridge,
+  type ObserveBoardPersistencePort,
   type ObserveConsoleRuntimeHandle
 } from "./bridge/index.js";
 

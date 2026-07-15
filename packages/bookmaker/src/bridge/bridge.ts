@@ -134,12 +134,18 @@ const readConfigureMarketId = (args: unknown): string => {
   return typeof marketId === "string" ? marketId.trim() : "";
 };
 
+// A non-coercible field is DROPPED (undefined) so the intent validator reports it as missing —
+// bookmaker's validation flow, distinct from options' throw-at-the-walker.
 const coerceBigIntArg = (value: unknown): bigint | undefined => {
   if (typeof value === "bigint") {
     return value;
   }
   if (typeof value === "string" || typeof value === "number") {
-    return BigInt(value);
+    try {
+      return BigInt(value);
+    } catch {
+      return undefined;
+    }
   }
   return undefined;
 };

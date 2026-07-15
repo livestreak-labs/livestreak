@@ -1,9 +1,11 @@
 // --- exports ---
 
 import { LiveStreakConfigError } from "@livestreak/core";
+import { coerceArgsBySchema, SchemaCoercionError } from "@livestreak/schema";
 
 import { asMarketId } from "../model/ids.js";
 import { asTxId, type MintResult, type TxId } from "../chains/types.js";
+import { optionsActionInputSchema } from "./panel/descriptors.js";
 import { projectOptionsControls } from "./panel/project.js";
 import type { OptionsControlsView } from "./panel/types.js";
 import { authorizeBridgeCaller } from "./scope.js";
@@ -181,60 +183,17 @@ const dispatchWriterAction = async (
   }
 };
 
-// The console auto-form (and any JSON transport) sends numeric fields as decimal strings — the
-// descriptors type them "string" because JSON has no bigint. The bridge is the coercion boundary:
-// writers below always see real bigints.
-const BIGINT_FIELDS: Readonly<Record<string, readonly string[]>> = {
-  mintWithSalt: ["salt"],
-  fund: ["tokenId", "deposit", "rate"],
-  setLanes: ["tokenId", "addDeposit"],
-  addFunds: ["tokenId", "deposit"],
-  stopFunding: ["tokenId"],
-  stopAllFunding: ["tokenId"],
-  withdraw: ["tokenId"],
-  withdrawMany: ["tokenId"],
-  claimLossLvst: ["tokenId"],
-  stakeLvst: ["amount"],
-  unstakeLvst: ["amount"],
-  transferNft: ["tokenId"],
-  approveNft: ["tokenId"]
-};
-
+// JSON transports have no bigint — the action's own descriptor (format:"bigint") drives coercion,
+// so the console form, CLI, and any agent are coerced by one source of truth.
 const coerceActionArgs = (action: string, args: unknown): unknown => {
-  if (args === null || typeof args !== "object" || Array.isArray(args)) {
-    return args;
-  }
-  const fields = BIGINT_FIELDS[action];
-  if (fields === undefined) {
-    return args;
-  }
-  const record = { ...(args as Record<string, unknown>) };
-  for (const field of fields) {
-    if (record[field] !== undefined) {
-      record[field] = toBigIntField(record[field], field);
+  try {
+    return coerceArgsBySchema(optionsActionInputSchema(action), args);
+  } catch (error) {
+    if (error instanceof SchemaCoercionError) {
+      throw new LiveStreakConfigError({ message: error.message });
     }
+    throw error;
   }
-  if (action === "setLanes" && Array.isArray(record.lanes)) {
-    record.lanes = record.lanes.map((lane) =>
-      lane !== null && typeof lane === "object" && !Array.isArray(lane)
-        ? { ...lane, rate: toBigIntField((lane as Record<string, unknown>).rate, "lanes[].rate") }
-        : lane
-    );
-  }
-  return record;
-};
-
-const toBigIntField = (value: unknown, field: string): bigint => {
-  if (typeof value === "bigint") {
-    return value;
-  }
-  if (typeof value === "string" || typeof value === "number") {
-    return BigInt(value);
-  }
-  throw new LiveStreakConfigError({
-    message: `${field} must be a bigint-compatible value`,
-    metadata: { details: String(value) }
-  });
 };
 
 const readStringField = (record: Record<string, unknown>, field: string): string => {
