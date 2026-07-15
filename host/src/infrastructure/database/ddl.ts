@@ -61,4 +61,20 @@ CREATE TABLE IF NOT EXISTS steward_memory (
 );
 
 CREATE INDEX IF NOT EXISTS idx_steward_memory_subject ON steward_memory (subject_kind, subject_id);
+
+CREATE TABLE IF NOT EXISTS forum_messages (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind         TEXT NOT NULL,
+  subject_kind TEXT NOT NULL,
+  subject_id   TEXT NOT NULL,
+  market_id    TEXT,
+  vault_id     TEXT,
+  steward_id   TEXT,
+  finding_id   TEXT,
+  title        TEXT,
+  message      TEXT,
+  at_ms        INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_forum_messages_subject ON forum_messages (subject_kind, subject_id);
 `;

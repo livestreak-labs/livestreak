@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createApp, createHostRouteDeps } from "#server.js";
 import { handleFindSimilar, handleIndexVault } from "#api/controllers/discovery.js";
 import { handleMemoryRecall, handleMemoryRemember } from "#services/memory/records.js";
+import { handleForumList, handleForumPost } from "#services/forum/messages.js";
 import { handlePolicyEvaluate } from "#services/media/policy-routes.js";
 import {
   handleCacheReceipt,
@@ -80,7 +81,7 @@ describe("host route handlers", () => {
     await request(app).post("/media/policy/evaluate").send({}).expect(400);
     await request(app).post("/discovery/vaults").send(validIndexVaultBody).expect(201);
     await request(app).post("/discovery/find").send(validFindSimilarBody).expect(200);
-    // Memory is DB-backed (no Walrus gate): a valid record persists regardless of Walrus config.
+    // Memory + forum are DB-backed (no Walrus gate): valid writes persist regardless of Walrus config.
     await request(app)
       .post("/memory/records")
       .send({
@@ -88,6 +89,16 @@ describe("host route handlers", () => {
         subjectId: "0xvault1",
         findingIds: [],
         decisionActions: [],
+        atMs: 1
+      })
+      .expect(201);
+    await request(app)
+      .post("/forum/messages")
+      .send({
+        kind: "thread",
+        subjectKind: "vault",
+        subjectId: "0xvault1",
+        title: "review",
         atMs: 1
       })
       .expect(201);
@@ -638,6 +649,48 @@ describe("memory records routes", () => {
     const host = createTestHost();
 
     const response = await handleMemoryRecall({}, host.deps.memory);
+
+    expect(response.ok).toBe(false);
+    if (!response.ok) {
+      expect(response.status).toBe(400);
+    }
+  });
+});
+
+describe("forum message routes", () => {
+  it("posts then lists a subject's thread oldest-first", async () => {
+    const host = createTestHost();
+
+    const opened = await handleForumPost(
+      { kind: "thread", subjectKind: "vault", subjectId: "0xv1", title: "review", atMs: 1 },
+      host.deps.forum
+    );
+    const appended = await handleForumPost(
+      { kind: "message", subjectKind: "vault", subjectId: "0xv1", message: "looks off", atMs: 2 },
+      host.deps.forum
+    );
+
+    expect(opened.ok).toBe(true);
+    expect(appended.ok).toBe(true);
+
+    const listed = await handleForumList(
+      { subjectKind: "vault", subjectId: "0xv1" },
+      host.deps.forum
+    );
+
+    expect(listed.ok).toBe(true);
+    if (listed.ok) {
+      expect(listed.result.messages.map((m) => m.kind)).toEqual(["thread", "message"]);
+    }
+  });
+
+  it("rejects an invalid kind", async () => {
+    const host = createTestHost();
+
+    const response = await handleForumPost(
+      { kind: "nope", subjectKind: "vault", subjectId: "0xv1", atMs: 1 },
+      host.deps.forum
+    );
 
     expect(response.ok).toBe(false);
     if (!response.ok) {

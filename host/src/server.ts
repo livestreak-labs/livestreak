@@ -17,6 +17,7 @@ import { createDescriptorRouter } from "./api/routes/descriptor.js";
 import { createDiscoveryRouter } from "./api/routes/discovery.js";
 import { createMediaRouter } from "./api/routes/media.js";
 import { createMemoryRouter } from "./api/routes/memory.js";
+import { createForumRouter } from "./api/routes/forum.js";
 import { createRemoteRouter } from "./api/routes/remote.js";
 import {
   createCorsMiddleware,
@@ -78,6 +79,7 @@ export const createApp = (deps: HostRouteDeps): Express => {
   mountModule(app, deps.config, "aa", "/aa", () => createAaRouter(deps.aa));
   mountModule(app, deps.config, "media", "/media", () => createMediaRouter(deps));
   mountModule(app, deps.config, "memory", "/memory", () => createMemoryRouter(deps));
+  mountModule(app, deps.config, "forum", "/forum", () => createForumRouter(deps));
   mountModule(app, deps.config, "walrus_content", "/content", () => createContentRouter(deps));
   mountModule(app, deps.config, "discovery", "/discovery", () => createDiscoveryRouter(deps));
   mountModule(app, deps.config, "remote", "/remote", () => createRemoteRouter(deps));

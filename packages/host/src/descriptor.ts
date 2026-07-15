@@ -14,6 +14,7 @@ export const HostModuleToken = Schema.Literal(
   "aa",
   "media",
   "memory",
+  "forum",
   "walrus_content",
   "discovery",
   // Remote Bridge Console relay router (Objective 4, P4). Canonicalized here from

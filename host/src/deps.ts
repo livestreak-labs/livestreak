@@ -49,6 +49,10 @@ import {
   createMemoryRepository,
   type MemoryRepository
 } from "./infrastructure/database/memory-repository.js";
+import {
+  createForumRepository,
+  type ForumRepository
+} from "./infrastructure/database/forum-repository.js";
 import type { ResolvedWalrus } from "./infrastructure/walrus/network.js";
 
 // --- exports ---
@@ -131,6 +135,7 @@ export const bootstrapHostRouteDeps = async (
     },
     walrus,
     memory: { repo: createMemoryRepository(catalogStack.db.db) },
+    forum: { repo: createForumRepository(catalogStack.db.db) },
     aa,
     remote: buildRemoteService(config),
     ...stackToDeps(catalogStack),
@@ -144,6 +149,7 @@ export interface HostRouteDeps {
   readonly discovery: DiscoveryRouteDeps;
   readonly walrus: WalrusRouteDeps;
   readonly memory: MemoryRouteDeps;
+  readonly forum: ForumRouteDeps;
   readonly aa: AaRouteDeps;
   readonly remote: RemoteService;
   readonly catalog: CatalogService;
@@ -181,6 +187,10 @@ export interface WalrusRouteDeps {
 
 export interface MemoryRouteDeps {
   readonly repo: MemoryRepository;
+}
+
+export interface ForumRouteDeps {
+  readonly repo: ForumRepository;
 }
 
 export interface ContentRouteDeps {
@@ -284,6 +294,7 @@ export const createHostRouteDeps = (
     },
     walrus,
     memory: { repo: createMemoryRepository(catalogStack.db.db) },
+    forum: { repo: createForumRepository(catalogStack.db.db) },
     aa: createAaRouteDeps(config, options),
     remote: buildRemoteService(config),
     ...stackToDeps(catalogStack),

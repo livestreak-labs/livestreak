@@ -75,11 +75,27 @@ export interface StewardMemoryTable {
   at_ms: number;
 }
 
+// Steward forum: openThread/appendMessage/annotate host actions land as messages about a subject.
+export interface ForumMessagesTable {
+  id: Generated<number>;
+  kind: string; // thread | message | annotation
+  subject_kind: string;
+  subject_id: string;
+  market_id: ColumnType<string | null, string | null, string | null>;
+  vault_id: ColumnType<string | null, string | null, string | null>;
+  steward_id: ColumnType<string | null, string | null, string | null>;
+  finding_id: ColumnType<string | null, string | null, string | null>;
+  title: ColumnType<string | null, string | null, string | null>;
+  message: ColumnType<string | null, string | null, string | null>;
+  at_ms: number;
+}
+
 export interface DB {
   markets: MarketsTable;
   vaults: VaultsTable;
   resolutions: ResolutionsTable;
   steward_memory: StewardMemoryTable;
+  forum_messages: ForumMessagesTable;
 }
 
 // Re-export for the migration runner so a future table that needs an auto-increment id

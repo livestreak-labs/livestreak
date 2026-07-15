@@ -57,6 +57,7 @@ const allModules: readonly HostModuleToken[] = [
   "aa",
   "media",
   "memory",
+  "forum",
   "walrus_content",
   "discovery",
   "remote"

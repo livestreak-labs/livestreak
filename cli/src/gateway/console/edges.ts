@@ -7,6 +7,7 @@ import { asUserAddress, asVaultId, createOptionsChain, optionsChainConfigFromPac
 import type {
   ContractVaultReader,
   ObserveBoardReader,
+  StewardHostActionExecutor,
   StewardMemoryClient
 } from "@livestreak/steward";
 import type { SessionWallet, SettingsDoc } from "@livestreak/schema";
@@ -75,7 +76,8 @@ export const createConsoleEdges = async (input: {
       packageInit: inits.steward,
       contractVaultReader: buildStewardVaultReader(inits.options, rpc),
       observeBoardReader: buildStewardBoardReader(observeRuntime, input.runId),
-      memoryClient: buildStewardMemoryClient(input.settings.host.url)
+      memoryClient: buildStewardMemoryClient(input.settings.host.url),
+      hostActionExecutor: buildStewardForumExecutor(input.settings.host.url)
     })
   ];
 };
@@ -91,6 +93,45 @@ const buildStewardBoardReader = (runtime: ObserveRuntime, runId: string): Observ
     }
   }
 });
+
+// Forum actions over the host's DB-backed messages API. Fail-open: a forum outage must not
+// fail the action plan whose contract leg already executed.
+const buildStewardForumExecutor = (hostUrl: string): StewardHostActionExecutor => {
+  const base = hostUrl.replace(/\/$/, "");
+  return {
+    runHostAction: async (action) => {
+      const { subject } = action.payload;
+      const body = {
+        kind:
+          action.kind === "openThread"
+            ? "thread"
+            : action.kind === "appendMessage"
+              ? "message"
+              : "annotation",
+        subjectKind: subject.kind,
+        subjectId: subject.id,
+        ...(subject.marketId === undefined ? {} : { marketId: subject.marketId }),
+        ...(subject.vaultId === undefined ? {} : { vaultId: subject.vaultId }),
+        ...(action.payload.stewardId === undefined ? {} : { stewardId: action.payload.stewardId }),
+        ...("findingId" in action.payload && action.payload.findingId !== undefined
+          ? { findingId: action.payload.findingId }
+          : {}),
+        ...("title" in action.payload ? { title: action.payload.title } : {}),
+        ...("message" in action.payload ? { message: action.payload.message } : {}),
+        atMs: Date.now()
+      };
+      try {
+        await fetch(`${base}/forum/messages`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body)
+        });
+      } catch {
+        /* fail-open */
+      }
+    }
+  };
+};
 
 // Durable memory over the host's DB-backed records API. Failures are the caller's to handle:
 // the fact source tolerates a throw (lastError on the board); remember is awaited by refresh.

@@ -16,6 +16,7 @@ import {
   type ContractVaultReader,
   type ObserveBoardReader,
   type StewardActionPlanSink,
+  type StewardHostActionExecutor,
   type StewardMemoryClient
 } from "@livestreak/steward";
 import type { FunctionDescriptor, PackageRuntimeInit } from "@livestreak/schema";
@@ -25,8 +26,8 @@ import { localOperatorCaller } from "../gateway/auth/caller.js";
 const noopFacts = async () => [] as readonly unknown[];
 const noopMemorySink = { remember: () => {} };
 
-// The steward forum (host) client is not wired into the CLI edge yet, so host actions
-// (openThread/appendMessage/annotate) are DROPPED — warn once per action kind.
+// Fallback when no forum executor is injected (tests): host actions are DROPPED — warn once
+// per action kind. Production wires the host /forum/messages client at the composition root.
 const warnedHostKinds = new Set<string>();
 const dropHostAction = (kind: string): void => {
   if (warnedHostKinds.has(kind)) return;
@@ -47,6 +48,8 @@ export interface CreateStewardConsoleEdgeInput {
   readonly observeBoardReader?: ObserveBoardReader;
   /** Durable memory (the gateway builds an HTTP client over the host's /memory/records). */
   readonly memoryClient?: StewardMemoryClient;
+  /** Forum actions (the gateway builds an HTTP client over the host's /forum/messages). */
+  readonly hostActionExecutor?: StewardHostActionExecutor;
 }
 
 export const createStewardConsoleEdge = (input: CreateStewardConsoleEdgeInput): ConsoleEdge => {
@@ -57,7 +60,7 @@ export const createStewardConsoleEdge = (input: CreateStewardConsoleEdgeInput): 
     input.actionPlanSink ??
     createActionPlanSink({
       contract: createStewardContractExecutor(stewardChainConfigFromPackageInit(input.packageInit)),
-      host: { runHostAction: (action) => dropHostAction(action.kind) }
+      host: input.hostActionExecutor ?? { runHostAction: (action) => dropHostAction(action.kind) }
     });
 
   const runtime = createStewardRuntime({
