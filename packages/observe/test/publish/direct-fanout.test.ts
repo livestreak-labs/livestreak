@@ -96,4 +96,32 @@ describe("direct fan-out", () => {
     expect(a.closed.value).toBe(true);
     expect(fanout.admit(makeViewer("late").viewer)).toEqual({ ok: false, reason: "ended" });
   });
+
+  it("drained() resolves only after every viewer pipeline shipped its queue + end signal", async () => {
+    const fanout = createDirectFanout({ maxViewers: 2, ringFragments: 8, ringBytes: 1024, viewerBacklog: 8 });
+    fanout.setInit(bytes(0));
+    const slow = makeViewer("slow", 10);
+    fanout.admit(slow.viewer);
+    await tick();
+    fanout.push({ seq: 1, data: bytes(1) });
+    fanout.push({ seq: 2, data: bytes(2) });
+
+    let drainedResolved = false;
+    const drained = fanout.drained().then(() => {
+      drainedResolved = true;
+    });
+    fanout.end("stream_ended");
+    // The slow viewer still has queued fragments — drain must NOT have resolved yet.
+    expect(drainedResolved).toBe(false);
+    await drained;
+
+    expect(slow.frames.filter((f) => f.kind === "fragment").map((f) => (f as { seq: number }).seq)).toEqual([1, 2]);
+    expect(slow.frames.at(-1)).toEqual({ kind: "end", reason: "stream_ended" });
+  });
+
+  it("drained() resolves immediately when end() finds no viewers", async () => {
+    const fanout = createDirectFanout({ maxViewers: 2, ringFragments: 2, ringBytes: 1024, viewerBacklog: 8 });
+    fanout.end();
+    await fanout.drained();
+  });
 });

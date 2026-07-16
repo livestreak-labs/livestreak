@@ -43,7 +43,10 @@ export const createApp = (deps: HostRouteDeps): Express => {
   const app = express();
 
   // Part C: security headers + CORS allowlist on every request.
-  app.set("trust proxy", true);
+  // Trust only LOCAL proxy hops (Caddy on the same box), never `true`: with `true`, any direct
+  // caller could spoof X-Forwarded-For to fake req.ip — turning the reachability echo into a
+  // third-party port scanner and making the per-IP rate limits trivially evadable.
+  app.set("trust proxy", "loopback, linklocal, uniquelocal");
   app.use(securityHeaders);
   app.use(createCorsMiddleware(deps.config));
 

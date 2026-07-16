@@ -5,7 +5,10 @@ import { LiveStreakConfigError } from "@livestreak/core";
 //   echo      dial the broadcaster back from OUTSIDE — the reachability truth its go-live gate needs
 //   announce  publish the broadcaster's watch URL so viewers can find the direct door
 //
-// Auth posture mirrors the live ingest/watch legs: an always-on, stream-id-scoped open surface.
+// Announce ownership: the first announce for a stream mints a key returned ONLY to the announcer;
+// while the record is fresh, refreshing or withdrawing it requires that key — one curl cannot
+// redirect a live stream's viewers. Records expire (TTL) unless the broadcaster heartbeats, so a
+// crashed broadcaster's dead door disappears instead of stranding viewers forever.
 // The echo only ever dials the CALLER's own observed address — it cannot be pointed at third
 // parties, so it is not a port-scan/SSRF primitive.
 
@@ -13,32 +16,75 @@ export interface DirectAnnounce {
   readonly streamId: string;
   readonly watchUrl: string;
   readonly announcedAtMs: number;
+  readonly expiresAtMs: number;
 }
 
+export type AnnounceOutcome =
+  | { readonly ok: true; readonly record: DirectAnnounce; readonly key: string; readonly refreshed: boolean }
+  | { readonly ok: false; readonly reason: "conflict" };
+
 export interface DirectAnnounceStore {
-  readonly announce: (streamId: string, watchUrl: string) => DirectAnnounce;
+  readonly announce: (streamId: string, watchUrl: string, key?: string) => AnnounceOutcome;
   readonly lookup: (streamId: string) => DirectAnnounce | undefined;
-  readonly withdraw: (streamId: string) => boolean;
+  readonly withdraw: (streamId: string, key?: string) => { withdrawn: boolean; denied: boolean };
 }
 
 const MAX_ANNOUNCES = 500;
+export const ANNOUNCE_TTL_MS = 90_000;
 
-export const createDirectAnnounceStore = (): DirectAnnounceStore => {
-  const announces = new Map<string, DirectAnnounce>();
+interface AnnounceRecord extends DirectAnnounce {
+  readonly key: string;
+}
+
+const publicRecord = ({ key: _key, ...record }: AnnounceRecord): DirectAnnounce => record;
+
+export const createDirectAnnounceStore = (now: () => number = Date.now): DirectAnnounceStore => {
+  const announces = new Map<string, AnnounceRecord>();
+
+  const fresh = (streamId: string): AnnounceRecord | undefined => {
+    const record = announces.get(streamId);
+    if (record === undefined) return undefined;
+    if (record.expiresAtMs <= now()) {
+      announces.delete(streamId);
+      return undefined;
+    }
+    return record;
+  };
+
   return {
-    announce: (streamId, watchUrl) => {
+    announce: (streamId, watchUrl, key) => {
+      const existing = fresh(streamId);
+      if (existing !== undefined && existing.key !== key) {
+        return { ok: false, reason: "conflict" };
+      }
       // Bounded: evict the oldest announce rather than grow without limit (announces are
-      // live-session ephemera; a stale one just means that stream re-announces on go-live).
-      if (!announces.has(streamId) && announces.size >= MAX_ANNOUNCES) {
+      // live-session ephemera protected by the TTL anyway).
+      if (existing === undefined && announces.size >= MAX_ANNOUNCES) {
         const oldest = announces.keys().next().value;
         if (oldest !== undefined) announces.delete(oldest);
       }
-      const record: DirectAnnounce = { streamId, watchUrl, announcedAtMs: Date.now() };
+      const atMs = now();
+      const record: AnnounceRecord = {
+        streamId,
+        watchUrl,
+        announcedAtMs: existing?.announcedAtMs ?? atMs,
+        expiresAtMs: atMs + ANNOUNCE_TTL_MS,
+        key: existing?.key ?? globalThis.crypto.randomUUID()
+      };
       announces.set(streamId, record);
-      return record;
+      return { ok: true, record: publicRecord(record), key: record.key, refreshed: existing !== undefined };
     },
-    lookup: (streamId) => announces.get(streamId),
-    withdraw: (streamId) => announces.delete(streamId)
+    lookup: (streamId) => {
+      const record = fresh(streamId);
+      return record === undefined ? undefined : publicRecord(record);
+    },
+    withdraw: (streamId, key) => {
+      const record = fresh(streamId);
+      if (record === undefined) return { withdrawn: false, denied: false };
+      if (record.key !== key) return { withdrawn: false, denied: true };
+      announces.delete(streamId);
+      return { withdrawn: true, denied: false };
+    }
   };
 };
 
@@ -56,15 +102,27 @@ export const handleDirectAnnounce = (
   streamId: string,
   body: unknown,
   store: DirectAnnounceStore
-): DirectRouteResponse<DirectAnnounce> => {
+): DirectRouteResponse<DirectAnnounce & { readonly key: string }> => {
   if (streamId.trim().length === 0) {
     return failure(400, "streamId is required");
   }
-  const watchUrl = (body as { watchUrl?: unknown } | null)?.watchUrl;
-  if (typeof watchUrl !== "string" || !/^wss?:\/\//.test(watchUrl)) {
+  const record = (body ?? {}) as { watchUrl?: unknown; key?: unknown };
+  if (typeof record.watchUrl !== "string" || !/^wss?:\/\//.test(record.watchUrl)) {
     return failure(400, "watchUrl must be a ws:// or wss:// URL");
   }
-  return { ok: true, status: 201, result: store.announce(streamId.trim(), watchUrl) };
+  if (record.key !== undefined && typeof record.key !== "string") {
+    return failure(400, "key must be a string when present");
+  }
+  const outcome = store.announce(streamId.trim(), record.watchUrl, record.key);
+  if (!outcome.ok) {
+    return failure(409, `Stream "${streamId}" is already announced by another broadcaster`);
+  }
+  // The key rides only in this response (the announcer's receipt); lookups never expose it.
+  return {
+    ok: true,
+    status: outcome.refreshed ? 200 : 201,
+    result: { ...outcome.record, key: outcome.key }
+  };
 };
 
 export const handleDirectLookup = (
@@ -80,12 +138,16 @@ export const handleDirectLookup = (
 
 export const handleDirectWithdraw = (
   streamId: string,
+  body: unknown,
   store: DirectAnnounceStore
-): DirectRouteResponse<{ readonly withdrawn: boolean }> => ({
-  ok: true,
-  status: 200,
-  result: { withdrawn: store.withdraw(streamId) }
-});
+): DirectRouteResponse<{ readonly withdrawn: boolean }> => {
+  const key = (body ?? {}) as { key?: unknown };
+  const outcome = store.withdraw(streamId, typeof key.key === "string" ? key.key : undefined);
+  if (outcome.denied) {
+    return failure(403, `Withdrawing stream "${streamId}" requires the announce key`);
+  }
+  return { ok: true, status: 200, result: { withdrawn: outcome.withdrawn } };
+};
 
 export interface ReachabilityEchoResult {
   readonly reachable: boolean;

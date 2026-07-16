@@ -117,8 +117,11 @@ const makeFakes = (probe: {
 
   const signal: DirectSignalClient = {
     verifyReachable: async () => probe.verified,
-    announce: async (_streamId, watchUrl) => void announces.push(watchUrl),
-    withdraw: async (streamId) => void withdraws.push(streamId)
+    announce: async (_streamId, watchUrl) => {
+      announces.push(watchUrl);
+      return { status: "ok", key: "announce-key-1" };
+    },
+    withdraw: async (streamId, key) => void withdraws.push(`${streamId}:${key}`)
   };
 
   return {
@@ -190,7 +193,26 @@ describe("direct sink lifecycle", () => {
     // init first, then fragments in order, then the end signal.
     expect(fakes.viewerFrames[0]?.kind).toBe("init");
     expect(fakes.viewerFrames.at(-1)).toEqual({ kind: "end", reason: "stream_ended" });
-    expect(fakes.withdraws).toEqual(["m1"]);
+    // The withdraw carries the announce ownership key minted at attach.
+    expect(fakes.withdraws).toEqual(["m1:announce-key-1"]);
+    expect(fakes.serverClosed.value).toBe(true);
+    expect(fakes.probeClosed.value).toBe(true);
+  });
+
+  it("gates go-live: an announce CONFLICT fails attach (another broadcaster owns the stream)", async () => {
+    const fakes = makeFakes({ grade: "upnp", verified: true, ip: "84.12.9.3" });
+    const conflictSignal: DirectSignalClient = {
+      verifyReachable: async () => true,
+      announce: async () => ({ status: "conflict" }),
+      withdraw: async () => {}
+    };
+    const exit = await Effect.runPromiseExit(
+      Effect.scoped(
+        createDirectSinkDriver({ ...fakes.options, signalFactory: () => conflictSignal }).attach(attachConfig)
+      )
+    );
+    expect(exit._tag).toBe("Failure");
+    expect(String(exit)).toContain("already announced by another broadcaster");
     expect(fakes.serverClosed.value).toBe(true);
     expect(fakes.probeClosed.value).toBe(true);
   });

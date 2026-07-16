@@ -70,6 +70,18 @@ export interface DirectSinkDriverOptions {
 const attachmentId = "direct-fmp4";
 const defaultFragmentSeconds = 1;
 export const DEFAULT_DIRECT_PORT = 48700;
+// Host announces expire (TTL) unless refreshed — heartbeat well inside the host's window so a
+// crashed broadcaster's door disappears but a live one never flickers out of the lookup.
+const ANNOUNCE_HEARTBEAT_MS = 30_000;
+// Bound the end-of-stream drain: give viewer pipelines a moment to ship the queued tail + end
+// signal before the server force-closes sockets, but never let one dead peer hold teardown.
+const DRAIN_TIMEOUT_MS = 3_000;
+
+const delay = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    (timer as { unref?: () => void }).unref?.();
+  });
 
 const configError = (message: string): LiveStreakConfigError =>
   new LiveStreakConfigError({ message });
@@ -143,6 +155,8 @@ interface ServeState {
   readonly fanout: DirectFanout;
   readonly watchUrl: string;
   readonly grade: string;
+  /** Ownership receipt from the first announce; heartbeats and the final withdraw carry it. */
+  readonly announceKey: string | undefined;
   readonly closeServer: () => Promise<void>;
   readonly closeProbe: () => Promise<void>;
 }
@@ -183,6 +197,19 @@ export const createDirectSinkDriver = (
       let fragmentSeq = 0;
       let finalized = false;
 
+      // Keep the host announce fresh while serving; a successful refresh can re-mint the key
+      // (e.g. the host restarted and lost the record).
+      let announceKey = serve.announceKey;
+      const heartbeat =
+        signal === undefined
+          ? undefined
+          : setInterval(() => {
+              void signal.announce(config.streamId, serve.watchUrl, announceKey).then((result) => {
+                if (result.status === "ok" && result.key !== undefined) announceKey = result.key;
+              });
+            }, ANNOUNCE_HEARTBEAT_MS);
+      (heartbeat as { unref?: () => void } | undefined)?.unref?.();
+
       const shipChunk = (chunk: { kind: "init" | "fragment"; data: Uint8Array }): void => {
         if (chunk.kind === "init") {
           serve.fanout.setInit(chunk.data);
@@ -194,12 +221,17 @@ export const createDirectSinkDriver = (
       const teardown = Effect.gen(function* () {
         if (finalized) return;
         finalized = true;
+        if (heartbeat !== undefined) clearInterval(heartbeat);
         if (encoder !== undefined) {
           yield* encoder.finalize.pipe(Effect.catchAll(() => Effect.void));
         }
         serve.fanout.end("stream_ended");
+        // Let viewer pipelines ship the queued tail + end signal before sockets are force-closed.
+        yield* Effect.promise(() =>
+          Promise.race([serve.fanout.drained(), delay(DRAIN_TIMEOUT_MS)])
+        );
         if (signal !== undefined) {
-          yield* Effect.promise(() => signal.withdraw(config.streamId).catch(() => undefined));
+          yield* Effect.promise(() => signal.withdraw(config.streamId, announceKey).catch(() => undefined));
         }
         yield* Effect.promise(() => serve.closeServer().catch(() => undefined));
         yield* Effect.promise(() => serve.closeProbe().catch(() => undefined));
@@ -291,13 +323,17 @@ const openDoorAndServe = (
     if (config.reachability === "lan") {
       const host = (yield* Effect.promise(() => localIpv4())) ?? "127.0.0.1";
       const watchUrl = directWatchUrl(host, server.port, config.streamId);
-      if (input.signal !== undefined) {
-        yield* Effect.promise(() => input.signal!.announce(config.streamId, watchUrl));
-      }
+      const announceKey = yield* announceOrFail({
+        signal: input.signal,
+        streamId: config.streamId,
+        watchUrl,
+        cleanup: () => Promise.allSettled([server.close()])
+      });
       return {
         fanout,
         watchUrl,
         grade: "lan",
+        announceKey,
         closeServer: server.close,
         closeProbe: async () => {}
       };
@@ -333,16 +369,48 @@ const openDoorAndServe = (
     }
 
     const watchUrl = directWatchUrl(probe.publicIp, probe.publicPort ?? server.port, config.streamId);
-    if (input.signal !== undefined) {
-      yield* Effect.promise(() => input.signal!.announce(config.streamId, watchUrl));
-    }
+    const announceKey = yield* announceOrFail({
+      signal: input.signal,
+      streamId: config.streamId,
+      watchUrl,
+      cleanup: () => Promise.allSettled([server.close(), probe.close()])
+    });
     return {
       fanout,
       watchUrl,
       grade: probe.grade,
+      announceKey,
       closeServer: server.close,
       closeProbe: probe.close
     };
+  });
+
+// Announce is fail-open on host unavailability (a reachable broadcaster still goes live), but a
+// CONFLICT is a gate failure: another broadcaster owns this stream's announce, and going live
+// anyway would leave viewers watching someone else's bytes.
+const announceOrFail = (input: {
+  readonly signal: DirectSignalClient | undefined;
+  readonly streamId: string;
+  readonly watchUrl: string;
+  readonly cleanup: () => Promise<unknown>;
+}): Effect.Effect<string | undefined, LiveStreakError> =>
+  Effect.gen(function* () {
+    if (input.signal === undefined) {
+      return undefined;
+    }
+    const announced = yield* Effect.promise(() =>
+      input.signal!.announce(input.streamId, input.watchUrl)
+    );
+    if (announced.status === "conflict") {
+      yield* Effect.promise(input.cleanup);
+      return yield* Effect.fail(
+        configError(
+          `Not eligible to go live on the direct lane: stream "${input.streamId}" is already ` +
+            "announced by another broadcaster. Stop the other node or wait for its announce to expire."
+        )
+      );
+    }
+    return announced.status === "ok" ? announced.key : undefined;
   });
 
 const describeDirectSinkCell = (

@@ -45,6 +45,8 @@ export interface DirectFanout {
   admit(viewer: DirectViewer): AdmitResult;
   remove(viewerId: string): void;
   end(reason?: string): void;
+  /** Resolves once end() was called AND every viewer pipeline finished (queue + end signal shipped). */
+  drained(): Promise<void>;
   viewerCount(): number;
 }
 
@@ -66,6 +68,16 @@ export const createDirectFanout = (
   let init: Uint8Array | undefined;
   let ended = false;
   let endReason: string | undefined;
+  let drainWaiters: (() => void)[] = [];
+
+  const maybeDrained = (): void => {
+    if (!ended || viewers.size > 0) {
+      return;
+    }
+    const waiters = drainWaiters;
+    drainWaiters = [];
+    for (const resolve of waiters) resolve();
+  };
 
   const trimRing = (): void => {
     while (ring.length > config.ringFragments || ringBytes > config.ringBytes) {
@@ -80,6 +92,7 @@ export const createDirectFanout = (
   const drop = (state: ViewerState): void => {
     viewers.delete(state.viewer.id);
     state.viewer.close();
+    maybeDrained();
   };
 
   // The end signal rides the same per-viewer pipeline so it can never overtake queued fragments.
@@ -179,6 +192,7 @@ export const createDirectFanout = (
 
     remove: (viewerId) => {
       viewers.delete(viewerId);
+      maybeDrained();
     },
 
     end: (reason) => {
@@ -191,7 +205,17 @@ export const createDirectFanout = (
       for (const state of viewers.values()) {
         pump(state);
       }
+      maybeDrained();
     },
+
+    drained: () =>
+      new Promise<void>((resolve) => {
+        if (ended && viewers.size === 0) {
+          resolve();
+          return;
+        }
+        drainWaiters.push(resolve);
+      }),
 
     viewerCount: () => viewers.size
   };

@@ -2,13 +2,21 @@
 //   echo    POST /reachability/echo        dial the broadcaster from OUTSIDE (the eligibility truth)
 //   announce POST/DELETE /live/direct/:id  publish the broadcaster's watch URL so viewers can find it
 // No media byte ever touches the host on this lane.
+//
+// Announce ownership: the first announce mints a key (the announcer's receipt); heartbeat re-announces
+// and the final withdraw carry it. "conflict" means another broadcaster owns the stream's announce —
+// the driver treats that as a go-live gate failure; network errors stay fail-open.
+
+export type AnnounceResult =
+  | { readonly status: "ok"; readonly key?: string }
+  | { readonly status: "conflict" }
+  | { readonly status: "unavailable" };
 
 export interface DirectSignalClient {
   /** True when the host dialed the advertised port back successfully (TCP handshake from outside). */
   readonly verifyReachable: (port: number) => Promise<boolean>;
-  /** Fail-open: an announce failure must never stop a reachable broadcaster from going live. */
-  readonly announce: (streamId: string, watchUrl: string) => Promise<void>;
-  readonly withdraw: (streamId: string) => Promise<void>;
+  readonly announce: (streamId: string, watchUrl: string, key?: string) => Promise<AnnounceResult>;
+  readonly withdraw: (streamId: string, key?: string) => Promise<void>;
 }
 
 export const createDirectSignalClient = (hostBaseUrl: string): DirectSignalClient => {
@@ -28,16 +36,26 @@ export const createDirectSignalClient = (hostBaseUrl: string): DirectSignalClien
         return false;
       }
     },
-    announce: async (streamId, watchUrl) => {
-      await fetch(`${base}/live/direct/${encodeURIComponent(streamId)}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ watchUrl })
-      }).catch(() => undefined);
+    announce: async (streamId, watchUrl, key) => {
+      try {
+        const response = await fetch(`${base}/live/direct/${encodeURIComponent(streamId)}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ watchUrl, ...(key === undefined ? {} : { key }) })
+        });
+        if (response.status === 409) return { status: "conflict" };
+        if (!response.ok) return { status: "unavailable" };
+        const body = (await response.json()) as { key?: unknown };
+        return { status: "ok", ...(typeof body.key === "string" ? { key: body.key } : {}) };
+      } catch {
+        return { status: "unavailable" };
+      }
     },
-    withdraw: async (streamId) => {
+    withdraw: async (streamId, key) => {
       await fetch(`${base}/live/direct/${encodeURIComponent(streamId)}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(key === undefined ? {} : { key })
       }).catch(() => undefined);
     }
   };

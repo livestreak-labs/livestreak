@@ -38,6 +38,8 @@ export interface ProbeInput {
   readonly mappingDescription?: string;
 }
 
+const UPNP_LEASE_SECONDS = 7_200;
+
 export const probeReachability = async (input: ProbeInput): Promise<ReachabilityResult> => {
   const noop = async (): Promise<void> => {};
   const protocol = input.protocol ?? "UDP";
@@ -46,13 +48,21 @@ export const probeReachability = async (input: ProbeInput): Promise<Reachability
   try {
     const location = await discoverGatewayLocation();
     const gateway = await resolveGateway(location);
-    await addPortMapping({
+    const mapping = {
       gateway,
       externalPort: input.port,
       internalPort: input.port,
       protocol,
-      description: input.mappingDescription ?? "livestreak-direct"
-    });
+      description: input.mappingDescription ?? "livestreak-direct",
+      ttlSeconds: UPNP_LEASE_SECONDS
+    };
+    await addPortMapping(mapping);
+    // Renew at half-lease so a stream longer than the lease never loses its public door
+    // (AddPortMapping with identical parameters refreshes the lease in place).
+    const renew = setInterval(() => {
+      void addPortMapping(mapping).catch(() => {});
+    }, (UPNP_LEASE_SECONDS / 2) * 1_000);
+    renew.unref?.();
     const ip = await externalIp(gateway);
     const verified = input.verify === undefined ? false : await failFalse(input.verify(ip, input.port));
     return {
@@ -61,7 +71,10 @@ export const probeReachability = async (input: ProbeInput): Promise<Reachability
       publicPort: input.port,
       verified,
       detail: `UPnP mapping ${ip}:${input.port} (${protocol.toLowerCase()})`,
-      close: () => releaseMapping(gateway, input.port, protocol)
+      close: () => {
+        clearInterval(renew);
+        return releaseMapping(gateway, input.port, protocol);
+      }
     };
   } catch {
     // fall through to STUN observation

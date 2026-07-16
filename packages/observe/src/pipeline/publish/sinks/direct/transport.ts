@@ -44,10 +44,18 @@ interface WsLikeServer {
 
 const WS_OPEN = 1;
 
+// Every viewer receives the SAME bytes — tag each fragment once and share the buffer across the
+// fan-out instead of memcpy'ing it per viewer (init and fragments are distinct objects, so keying
+// the cache on the body alone is safe).
+const tagCache = new WeakMap<Uint8Array, Uint8Array>();
+
 const tagFrame = (tag: number, body: Uint8Array): Uint8Array => {
+  const cached = tagCache.get(body);
+  if (cached !== undefined) return cached;
   const out = new Uint8Array(1 + body.byteLength);
   out[0] = tag;
   out.set(body, 1);
+  tagCache.set(body, out);
   return out;
 };
 
