@@ -18,6 +18,7 @@ import { createDiscoveryRouter } from "./api/routes/discovery.js";
 import { createMediaRouter } from "./api/routes/media.js";
 import { createMemoryRouter } from "./api/routes/memory.js";
 import { createForumRouter } from "./api/routes/forum.js";
+import { createLiveRouter } from "./api/routes/live.js";
 import { createRemoteRouter } from "./api/routes/remote.js";
 import {
   createCorsMiddleware,
@@ -62,6 +63,8 @@ export const createApp = (deps: HostRouteDeps): Express => {
   // (The live video fan-out is a WS transport — /live/ingest + /live/watch — attached to the http.Server
   // in main.ts, not an Express router.)
   app.use(createCatalogRouter(deps));
+  // Direct-stream signaling (reachability echo + announce) — always-on for the same reason.
+  app.use(createLiveRouter(deps));
   // Page-shaped discovery endpoints (/homepage, /agents, /stream/:id) served from the DB
   // read-model — always-on, one fetch per page.
   app.use(createPagesRouter(deps));

@@ -156,8 +156,8 @@ const configureCall = (
           },
           [publishId]: {
             create: {
-              label: payload.publish === "live" ? "Live Stream" : "File Export",
-              catalog: payload.publish === "live" ? "sink:live" : "sink:file",
+              label: publishCellLabel(payload.publish),
+              catalog: publishCellCatalog(payload.publish),
               status: ["idle", null, nowMs],
               settings: {
                 subscribe: ["publish.video.rendered"],
@@ -234,6 +234,18 @@ const decodeConfigurePayload = (
     return { chain, capture, process: null, publish };
   });
 
+const publishCellLabel = (publish: string): string => {
+  if (publish === "live") return "Live Stream";
+  if (publish === "direct") return "Direct Stream";
+  return "File Export";
+};
+
+const publishCellCatalog = (publish: string): string => {
+  if (publish === "live") return "sink:live";
+  if (publish === "direct") return "sink:direct";
+  return "sink:file";
+};
+
 const requireNonEmptyString = (
   value: unknown,
   field: string
@@ -289,10 +301,10 @@ export const systemConfigCatalogFunctions = (): Readonly<
           value: {
             type: "enum",
             description: "Publish sink instance id.",
-            values: ["file-export", "live"],
+            values: ["file-export", "live", "direct"],
             required: true
           },
-          help: "file-export writes MP4; live streams the fMP4 feed to viewers via the host."
+          help: "file-export writes MP4; live streams the fMP4 feed via the host; direct serves viewers straight from the broadcaster (host does signaling only)."
         }
       ]
     }

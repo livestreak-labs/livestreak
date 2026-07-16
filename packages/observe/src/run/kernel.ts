@@ -288,6 +288,10 @@ const resolveSinkInstanceId = (config: ObserveRun["config"]): string => {
     return "live";
   }
 
+  if (config.sink.driverId === "direct") {
+    return "direct";
+  }
+
   return "file-export";
 };
 

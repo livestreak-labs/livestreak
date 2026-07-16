@@ -39,6 +39,7 @@ import {
 } from "./infrastructure/cron/catalog-sync.js";
 import { registerCronJobs, type CronHandle } from "./infrastructure/cron/index.js";
 import { createLiveRingStore, type LiveRingStore } from "./services/live/ring.js";
+import { createDirectAnnounceStore, type DirectAnnounceStore } from "./services/live/direct.js";
 import { createRemoteService, type RemoteService } from "./services/remote/index.js";
 import { createEvidenceStore } from "./services/media/evidence.js";
 import { createManifestStore } from "./services/media/manifest.js";
@@ -139,7 +140,8 @@ export const bootstrapHostRouteDeps = async (
     aa,
     remote: buildRemoteService(config),
     ...stackToDeps(catalogStack),
-    live: createLiveRingStore()
+    live: createLiveRingStore(),
+    direct: createDirectAnnounceStore()
   };
 };
 
@@ -160,6 +162,8 @@ export interface HostRouteDeps {
   readonly catalogIndexer: CatalogIndexer;
   readonly catalogCron: CronHandle;
   readonly live: LiveRingStore;
+  // Direct-stream signaling (announce/lookup); media bytes never transit the host on this lane.
+  readonly direct: DirectAnnounceStore;
 }
 
 export interface CatalogStack {
@@ -298,7 +302,8 @@ export const createHostRouteDeps = (
     aa: createAaRouteDeps(config, options),
     remote: buildRemoteService(config),
     ...stackToDeps(catalogStack),
-    live: createLiveRingStore()
+    live: createLiveRingStore(),
+    direct: createDirectAnnounceStore()
   };
 };
 
