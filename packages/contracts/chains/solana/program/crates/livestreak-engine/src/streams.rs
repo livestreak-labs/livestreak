@@ -131,3 +131,102 @@ mod tests {
         assert_eq!(stream_range(&cfg2, 100, 500, 260, 240), (260, 260));
     }
 }
+
+// ── Cycle accumulation (Move process_cycles) ────────────────────────────────────
+
+/// Walk cycles [from, to), folding deltas into a running per-cycle rate and total.
+pub fn process_cycles(
+    amt_deltas: &alloc::collections::BTreeMap<(AccountId, u64), AmtDelta>,
+    account_id: AccountId,
+    from_cycle: u64,
+    to_cycle: u64,
+    received_amt: u128,
+    amt_per_cycle: i128,
+) -> (u128, i128) {
+    let mut acc_received = received_amt;
+    let mut acc_rate = amt_per_cycle;
+    for cycle in from_cycle..to_cycle {
+        if let Some(delta) = amt_deltas.get(&(account_id, cycle)) {
+            acc_rate += delta.this_cycle;
+            acc_received += u128::try_from(acc_rate).expect("negative cycle rate");
+            acc_rate += delta.next_cycle;
+        } else {
+            acc_received += u128::try_from(acc_rate).expect("negative cycle rate");
+        }
+    }
+    (acc_received, acc_rate)
+}
+
+// ── Hash chain (Move hash_streams / hash_streams_history) ───────────────────────
+//
+// blake2b-256 like the Move source. The preimage encoding is this engine's own
+// canonical fixed-width layout, NOT Sui's BCS: these hashes never leave the chain
+// they were written on — they only need to be internally consistent + collision
+// resistant. (EVM uses keccak/abi for the same role; the chains never compare.)
+
+use blake2::digest::consts::U32;
+use blake2::{Blake2b, Digest};
+
+type Blake2b256 = Blake2b<U32>;
+
+pub fn hash_streams(receivers: &[StreamReceiver]) -> alloc::vec::Vec<u8> {
+    if receivers.is_empty() {
+        return alloc::vec::Vec::new();
+    }
+    let mut h = Blake2b256::new();
+    for r in receivers {
+        h.update(r.account_id.to_be_bytes());
+        h.update(r.config.stream_id.to_le_bytes());
+        h.update(r.config.amt_per_sec.to_be_bytes());
+        h.update(r.config.start.to_le_bytes());
+        h.update(r.config.duration.to_le_bytes());
+    }
+    h.finalize().to_vec()
+}
+
+pub fn hash_streams_history(
+    old_streams_history_hash: &[u8],
+    streams_hash: &[u8],
+    update_time: u64,
+    max_end: u64,
+) -> alloc::vec::Vec<u8> {
+    let mut h = Blake2b256::new();
+    h.update(old_streams_history_hash);
+    h.update(streams_hash);
+    h.update(update_time.to_le_bytes());
+    h.update(max_end.to_le_bytes());
+    h.finalize().to_vec()
+}
+
+// ── Config preprocessing (Move build_configs) ───────────────────────────────────
+
+impl StreamsRegistry {
+    /// Validate ordering + min rate, window each receiver to the future, skip expired.
+    pub fn build_configs(
+        &self,
+        receivers: &[StreamReceiver],
+        now: u64,
+    ) -> StreamsResult<alloc::vec::Vec<ProcessedConfig>> {
+        if receivers.len() > MAX_STREAMS_RECEIVERS {
+            return Err(StreamsError::TooManyReceivers);
+        }
+        let mut configs = alloc::vec::Vec::new();
+        for (i, receiver) in receivers.iter().enumerate() {
+            if i > 0 && !is_ordered(&receivers[i - 1], receiver) {
+                return Err(StreamsError::ReceiversNotSorted);
+            }
+            if receiver.config.amt_per_sec < self.min_amt_per_sec {
+                return Err(StreamsError::AmtPerSecTooLow);
+            }
+            let (start, end) = stream_range_in_future(receiver, now, MAX_U64, now);
+            if start != end {
+                configs.push(ProcessedConfig {
+                    amt_per_sec: receiver.config.amt_per_sec,
+                    start,
+                    end,
+                });
+            }
+        }
+        Ok(configs)
+    }
+}

@@ -8,3 +8,4 @@ description = "LiveStreak streaming/cycle engine — pure-logic 1:1 port of chai
 [dependencies]
 livestreak-math = { path = "../livestreak-math" }
 ethnum = { version = "1.5", default-features = false }
+blake2 = { version = "0.10", default-features = false }
