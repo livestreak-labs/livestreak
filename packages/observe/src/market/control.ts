@@ -225,6 +225,13 @@ const buildMarketConfig = (
             suiRegistry: JSON.parse(deps.sessionInit.contracts.suiMarketRegistry) as NonNullable<
               ObserveRunMarketConfig["suiRegistry"]
             >
+          }),
+      ...(deps.sessionInit?.contracts?.solanaMarketRegistry === undefined
+        ? {}
+        : {
+            solanaRegistry: JSON.parse(deps.sessionInit.contracts.solanaMarketRegistry) as NonNullable<
+              ObserveRunMarketConfig["solanaRegistry"]
+            >
           })
     };
   });

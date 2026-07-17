@@ -153,7 +153,13 @@ const flattenSolanaDeployment = (): Record<string, string> => {
     programId: d.programId,
     usdcMint: d.accounts.usdcMint,
     registry: d.accounts.registry,
-    defaultSteward: d.accounts.defaultSteward
+    defaultSteward: d.accounts.defaultSteward,
+    // observe's Solana market registrar consumes ONE JSON-encoded contract key
+    // (control.ts parses contracts.solanaMarketRegistry -> { programId, usdcMint }).
+    solanaMarketRegistry: JSON.stringify({
+      programId: d.programId,
+      usdcMint: d.accounts.usdcMint
+    })
   };
 };
 
