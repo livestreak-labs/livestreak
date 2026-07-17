@@ -230,3 +230,42 @@ impl StreamsRegistry {
         Ok(configs)
     }
 }
+
+// ── Hash verification (Move verify_streams_receivers / verify_streams_history) ──
+
+pub fn verify_streams_receivers(
+    receivers: &[StreamReceiver],
+    state: &StreamsState,
+) -> StreamsResult<()> {
+    if hash_streams(receivers) != state.streams_hash {
+        return Err(StreamsError::InvalidStreamsReceivers);
+    }
+    Ok(())
+}
+
+/// Verify a history chain; returns the hash valid BEFORE each entry (for squeezing).
+pub fn verify_streams_history(
+    history_hash: alloc::vec::Vec<u8>,
+    streams_history: &[StreamsHistory],
+    final_history_hash: &[u8],
+) -> StreamsResult<alloc::vec::Vec<alloc::vec::Vec<u8>>> {
+    let mut history_hashes = alloc::vec::Vec::new();
+    let mut current_hash = history_hash;
+    for entry in streams_history {
+        let streams_hash = if !entry.receivers.is_empty() {
+            if !entry.streams_hash.is_empty() {
+                return Err(StreamsError::EntryWithHashAndReceivers);
+            }
+            hash_streams(&entry.receivers)
+        } else {
+            entry.streams_hash.clone()
+        };
+        history_hashes.push(current_hash.clone());
+        current_hash =
+            hash_streams_history(&current_hash, &streams_hash, entry.update_time, entry.max_end);
+    }
+    if current_hash != final_history_hash {
+        return Err(StreamsError::InvalidStreamsHistory);
+    }
+    Ok(history_hashes)
+}
