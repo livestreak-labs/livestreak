@@ -30,12 +30,12 @@ solana-keccak-hasher = "3.0"
 livestreak-math = { path = "../../crates/livestreak-math" }
 
 [dev-dependencies]
-litesvm = "0.10.0"
-litesvm-token = "0.10.0"
-solana-message = "3.0.1"
-solana-transaction = "3.0.2"
-solana-signer = "3.0.0"
-solana-keypair = "3.0.1"
+litesvm = "0.14.0"
+litesvm-token = "0.14.0"
+solana-message = "4.1"
+solana-transaction = "4.1"
+solana-signer = "3.0"
+solana-keypair = "3.1"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

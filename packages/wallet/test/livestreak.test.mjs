@@ -18,6 +18,7 @@ import {
   buildResolveIx,
   buildSetEndedIx,
   buildSetMarketStewardIx,
+  buildSetDefaultStewardIx,
   buildStopAllIx,
   buildStopSeedIx,
   buildWithdrawIx,
@@ -73,6 +74,8 @@ const built = {
     buildSetEndedIx({ programId: PROGRAM_ID, marketId: ID_A, creator: USER, scheme: 1, pointer: new Uint8Array([3]) }),
   set_market_steward: () =>
     buildSetMarketStewardIx({ programId: PROGRAM_ID, marketId: ID_A, authority: USER, steward: STEWARD }),
+  set_default_steward: () =>
+    buildSetDefaultStewardIx({ programId: PROGRAM_ID, authority: USER, steward: STEWARD }),
   create_vault_seeded: () =>
     buildCreateVaultSeededIx({
       programId: PROGRAM_ID,
@@ -147,7 +150,7 @@ describe('livestreak instruction builders', () => {
     }
   })
 
-  it('coverage: all 16 IDL instructions are exercised', () => {
+  it('coverage: all IDL instructions are exercised', () => {
     assert.equal(Object.keys(built).length, livestreakIdl.instructions.length)
   })
 

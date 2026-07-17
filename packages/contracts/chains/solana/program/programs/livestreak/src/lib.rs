@@ -46,6 +46,10 @@ pub mod livestreak {
         instructions::steward::handle_set_market_steward(ctx, steward)
     }
 
+    pub fn set_default_steward(ctx: Context<SetDefaultSteward>, steward: Pubkey) -> Result<()> {
+        instructions::steward::handle_set_default_steward(ctx, steward)
+    }
+
     pub fn init_protocol(ctx: Context<InitProtocol>, capacity: u16) -> Result<()> {
         instructions::protocol::handle_init_protocol(ctx, capacity)
     }

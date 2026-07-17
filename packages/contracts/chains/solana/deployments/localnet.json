@@ -1,11 +1,11 @@
 {
   "chain": "localnet",
   "rpc": "http://127.0.0.1:8899",
-  "deployedAt": "2026-07-17T18:12:46.831Z",
+  "deployedAt": "2026-07-17T20:30:03.985Z",
   "deployer": "5QgNMwSCV3fCLhgnxvNgeRnffCWjY7Hqbb1TCq6Jfw2U",
   "programId": "CZnAfgbnbVtuXDRQynwL9XMHqeQ7wngbodRihGLbErK8",
   "accounts": {
-    "usdcMint": "Cuzvn5YeJ2Wdn6gVsybkKvyDgMJFjBWNxZyGiZmAnB7Z",
+    "usdcMint": "H3AJ7CxLvSMkrJG5H4bZDjh1m2oHbBAWjo82RUHJbTGN",
     "registry": "GgDkEWEaxPGpqi8DkFuH6EVUTL7k9g2YL9wG2Ahj6PNv",
     "defaultSteward": "5QgNMwSCV3fCLhgnxvNgeRnffCWjY7Hqbb1TCq6Jfw2U"
   }

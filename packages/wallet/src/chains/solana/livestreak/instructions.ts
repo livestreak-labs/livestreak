@@ -212,6 +212,21 @@ export async function buildSetMarketStewardIx(input: SetMarketStewardInput): Pro
   }
 }
 
+export interface SetDefaultStewardInput extends Base {
+  authority: Address
+  steward: Address
+}
+
+/** set_default_steward: hand over the registry-wide default steward (current-steward gated). */
+export async function buildSetDefaultStewardIx(input: SetDefaultStewardInput): Promise<Instruction> {
+  const registry = first(await findRegistryPda(input.programId))
+  return {
+    programAddress: input.programId,
+    accounts: [readonlySigner(input.authority), writable(registry)],
+    data: encodeData('set_default_steward', enc(pubkey, input.steward)),
+  }
+}
+
 export interface ResolveInput extends MarketScoped {
   steward: Address
   vaultId: Hex32

@@ -76,6 +76,7 @@
     "deploy": "tsx chains/evm/deploy/main.ts",
     "deploy:sui": "tsx chains/sui/deploy/publish.ts",
     "deploy:solana": "tsx chains/solana/deploy/main.ts",
+    "wire:solana": "tsx chains/solana/deploy/wire.ts",
     "build:solana:idl": "node chains/solana/scripts/sync-idl.mjs",
     "e2e": "tsx chains/evm/deploy/e2e.ts",
     "e2e:sui": "tsx chains/sui/deploy/e2e.ts",

@@ -540,6 +540,52 @@ export type Livestreak = {
       ]
     },
     {
+      "name": "setDefaultSteward",
+      "discriminator": [
+        147,
+        90,
+        32,
+        234,
+        146,
+        51,
+        12,
+        85
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "steward",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "setEnded",
       "discriminator": [
         138,
