@@ -1689,6 +1689,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "livestreak-engine"
+version = "0.1.0"
+dependencies = [
+ "ethnum",
+ "livestreak-math",
+]
+
+[[package]]
 name = "livestreak-math"
 version = "0.1.0"
 dependencies = [
