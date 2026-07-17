@@ -2,7 +2,8 @@
 //! Pure logic over BTreeMaps; `usdc_held` models the registry's Balance<T> the way
 //! drips models its Coin vault. Events are the program layer's job.
 
-use ethnum::U256;
+use ruint::aliases::U256;
+use serde::{Deserialize, Serialize};
 
 extern crate alloc;
 use alloc::collections::BTreeMap;
@@ -42,7 +43,7 @@ pub enum VaultError {
 
 pub type VaultResult<T> = Result<T, VaultError>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VaultData {
     pub id: VaultId,
     pub market_id: [u8; 32],
@@ -54,7 +55,7 @@ pub struct VaultData {
     pub exists: bool,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Board {
     pub pool: U256,
     pub side_rate: U256,
@@ -63,7 +64,7 @@ pub struct Board {
     pub side_shares: U256,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Position {
     pub rate: U256,
     pub g_paid: U256,
@@ -74,14 +75,14 @@ pub struct Position {
     pub lost_usdc: U256,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Boundary {
     pub max_end: u64,
     pub account: AccountId,
 }
 
 /// Registry state (Move VaultRegistry<T>, flat tables -> maps).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VaultRegistry {
     /// Balance<T> the registry actually holds (program layer binds to escrow ATA).
     pub usdc_held: u128,

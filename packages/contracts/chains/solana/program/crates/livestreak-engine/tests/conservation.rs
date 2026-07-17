@@ -6,7 +6,7 @@
 //! Exactness (not tolerance) is the point: the floor-pair streamed_amt makes
 //! every split lossless, so conservation must hold to the unit.
 
-use ethnum::U256;
+use ruint::aliases::U256;
 use livestreak_engine::*;
 
 const CYCLE: u64 = 10;

@@ -50,3 +50,22 @@ pub struct MarketSteward {
     pub steward: Pubkey,
     pub bump: u8,
 }
+
+/// Per-market protocol engine state: a postcard blob of livestreak_engine::Protocol.
+/// v1 mirrors Sui's registry-object shape (one state object per market) — the
+/// documented alternative to PDA-per-entity sharding; realloc grows it as needed.
+#[account]
+pub struct ProtocolState {
+    pub market_id: [u8; 32],
+    pub bump: u8,
+    pub data: Vec<u8>,
+}
+
+/// Ownership record for a minted position (the engine's token_id is opaque bytes).
+#[account]
+#[derive(InitSpace)]
+pub struct PositionOwner {
+    pub token_id: [u8; 32],
+    pub owner: Pubkey,
+    pub bump: u8,
+}

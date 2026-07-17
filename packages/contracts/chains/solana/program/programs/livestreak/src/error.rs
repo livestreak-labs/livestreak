@@ -19,4 +19,12 @@ pub enum LivestreakError {
     StreamLocked,
     #[msg("unknown storage pointer scheme")]
     BadScheme,
+    #[msg("protocol state failed to decode")]
+    EngineState,
+    #[msg("protocol state account is full")]
+    StateFull,
+    #[msg("engine operation failed (see logs)")]
+    EngineOp,
+    #[msg("caller is not the effective steward")]
+    NotSteward,
 }

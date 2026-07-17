@@ -4,7 +4,8 @@
 //! construction, so a "missed widening site" cannot exist. u128 is the storage format
 //! only; the ONLY way back down is `narrow()`, which aborts at a named boundary.
 
-pub use ethnum::{I256, U256};
+pub use ethnum::I256;
+pub use ruint::aliases::U256;
 
 /// Promote a stored value into wide math.
 #[inline]
@@ -17,7 +18,7 @@ pub fn w(x: u128) -> U256 {
 #[inline]
 pub fn narrow(x: U256, what: &str) -> u128 {
     assert!(x <= U256::from(u128::MAX), "narrow overflow: {}", what);
-    x.as_u128()
+    x.to::<u128>()
 }
 
 #[cfg(test)]
@@ -36,6 +37,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "narrow overflow")]
     fn narrow_aborts_loudly() {
-        narrow(U256::from(u128::MAX) + U256::ONE, "test");
+        narrow(U256::from(u128::MAX) + U256::from(1u8), "test");
     }
 }

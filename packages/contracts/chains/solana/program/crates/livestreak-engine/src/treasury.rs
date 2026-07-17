@@ -3,7 +3,8 @@
 //! anti-dupe), MasterChef-style staking dividends. Pure ledger: the program layer
 //! does the SPL mint/transfer CPIs with the amounts this module returns.
 
-use ethnum::U256;
+use ruint::aliases::U256;
+use serde::{Deserialize, Serialize};
 
 extern crate alloc;
 use alloc::collections::BTreeMap;
@@ -28,7 +29,7 @@ pub enum TreasuryError {
 
 pub type TreasuryResult<T> = Result<T, TreasuryError>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TreasuryRegistry {
     pub skim_bps: u128,
     pub mint_start: U256,

@@ -3,7 +3,8 @@
 //! token account (SPL ATA) and keeps the two in lockstep. Events are the program
 //! layer's job. Invariant: streams_balance + collectable_balance <= held.
 
-use ethnum::U256;
+use ruint::aliases::U256;
+use serde::{Deserialize, Serialize};
 
 extern crate alloc;
 use alloc::collections::BTreeMap;
@@ -32,7 +33,7 @@ impl From<crate::state::StreamsError> for DripsError {
 
 pub type DripsResult<T> = Result<T, DripsError>;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DripsRegistry {
     pub streams_balance: u128,
     pub collectable_balance: u128,

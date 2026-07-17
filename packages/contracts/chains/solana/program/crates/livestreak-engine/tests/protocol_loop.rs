@@ -3,7 +3,7 @@
 //! treasury + dividends) -> withdraw winners -> loss-mint LVST for the loser ->
 //! global conservation across every escrow.
 
-use ethnum::U256;
+use ruint::aliases::U256;
 use livestreak_engine::*;
 
 const USD: u128 = 1_000_000;
@@ -143,4 +143,25 @@ fn set_lanes_reshape_and_hedge_flow() {
     let refunded = p.stop_all(token, t0 + 20).unwrap();
     assert!(refunded > 0);
     assert_eq!(p.lane_count(token), 0);
+}
+
+/// The program layer persists Protocol as a postcard blob — a populated state
+/// (every map non-empty) must round-trip byte-exactly.
+#[test]
+fn protocol_state_round_trips_through_postcard() {
+    let mut p = Protocol::default();
+    let market_id = [3u8; 32];
+    let vault_id = p
+        .create_vault_seeded(market_id, b"rt".to_vec(), CREATOR, SIDE_NO, U256::from(USD), 50 * USD, 100)
+        .unwrap();
+    let token = p.mint_with_salt(market_id, true, BETTOR, 1).unwrap();
+    p.fund(token, &vault_id, SIDE_YES, U256::from(USD), 25 * USD, 100).unwrap();
+    p.treasury.stake_lvst(STAKER, 42).unwrap();
+
+    let bytes = p.to_bytes();
+    let q = Protocol::from_bytes(&bytes).unwrap();
+    assert_eq!(q.to_bytes(), bytes);
+    assert_eq!(q.lane_count(token), 1);
+    assert_eq!(q.vault.get_board(&vault_id, SIDE_YES), p.vault.get_board(&vault_id, SIDE_YES));
+    assert_eq!(q.drips.held, p.drips.held);
 }

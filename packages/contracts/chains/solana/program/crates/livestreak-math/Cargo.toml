@@ -8,6 +8,7 @@ description = "LiveStreak fixed-point math core (bonding curve + ln kernel). Wid
 [dependencies]
 # U256 + I256 in one no_std crate — the Move u256/i256 sites transliterate 1:1.
 ethnum = { version = "1.5", default-features = false }
+ruint = { version = "1", default-features = false, features = ["alloc", "serde"] }
 
 [lib]
 crate-type = ["lib"]

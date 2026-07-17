@@ -10,7 +10,8 @@
 //! - receiver accounts: driver_id << 224 | pool_id (per vault-side), seed
 //!   accounts add bit 127 + a keccak tag — byte-for-byte the Move scheme.
 
-use ethnum::U256;
+use ruint::aliases::U256;
+use serde::{Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
 
 extern crate alloc;
@@ -65,21 +66,21 @@ impl From<crate::state::StreamsError> for DriverError {
 
 pub type DriverResult<T> = Result<T, DriverError>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Lane {
     pub vault_id: VaultId,
     pub side: u8,
     pub rate: U256,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SeedLane {
     pub side: u8,
     pub rate: U256,
     pub active: bool,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VaultDriverState {
     pub driver_id: u32,
     pub next_pool_id: u64,
@@ -87,7 +88,7 @@ pub struct VaultDriverState {
     pub seeds: BTreeMap<(VaultId, [u8; 32]), SeedLane>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MarketDriverState {
     pub driver_id: u32,
     pub minted_tokens: u64,
@@ -98,7 +99,7 @@ pub struct MarketDriverState {
 }
 
 /// The whole per-market protocol state: this is what the program serializes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Protocol {
     pub streams: StreamsRegistry,
     pub drips: DripsRegistry,
@@ -140,7 +141,7 @@ fn keccak(parts: &[&[u8]]) -> [u8; 32] {
 }
 
 fn u256_from_hash(hash: [u8; 32]) -> U256 {
-    U256::from_be_bytes(hash)
+    U256::from_be_bytes::<32>(hash)
 }
 
 impl VaultDriverState {
@@ -684,5 +685,16 @@ impl Protocol {
             self.vault.on_stop(token_id, vault_id, lane.side, now)?;
         }
         Ok(())
+    }
+}
+
+impl Protocol {
+    /// Program-layer codec (postcard: compact, deterministic, no_std).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        postcard::to_allocvec(self).expect("protocol serialize")
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        postcard::from_bytes(bytes).ok()
     }
 }

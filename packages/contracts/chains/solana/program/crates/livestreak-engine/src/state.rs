@@ -1,6 +1,7 @@
 //! Engine state — transliterated from streams.move STORAGE & TYPES.
 
-use ethnum::U256;
+use ruint::aliases::U256;
+use serde::{Deserialize, Serialize};
 
 extern crate alloc;
 use alloc::collections::BTreeMap;
@@ -12,7 +13,7 @@ pub const AMT_PER_SEC_MULTIPLIER: u128 = 1_000_000_000;
 pub type AccountId = U256;
 
 /// Registry state for one token. Move: StreamsRegistry<T> with flat tables.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamsRegistry {
     pub cycle_secs: u64,
     /// ceil(AMT_PER_SEC_MULTIPLIER / cycle_secs) — 1 token per cycle.
@@ -24,7 +25,7 @@ pub struct StreamsRegistry {
     pub next_squeezed: BTreeMap<(AccountId, AccountId, u64), u64>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StreamsState {
     pub streams_history_hash: Vec<u8>,
     pub streams_hash: Vec<u8>,
@@ -36,19 +37,19 @@ pub struct StreamsState {
 }
 
 /// Cycle delta buckets. Move: AmtDelta { this_cycle: I128, next_cycle: I128 }.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AmtDelta {
     pub this_cycle: i128,
     pub next_cycle: i128,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StreamReceiver {
     pub account_id: AccountId,
     pub config: StreamConfig,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StreamConfig {
     pub stream_id: u64,
     pub amt_per_sec: U256,
@@ -56,7 +57,7 @@ pub struct StreamConfig {
     pub duration: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StreamsHistory {
     pub streams_hash: Vec<u8>,
     pub receivers: Vec<StreamReceiver>,
@@ -65,7 +66,7 @@ pub struct StreamsHistory {
 }
 
 /// Preprocessed config window for balance/max_end math.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessedConfig {
     pub amt_per_sec: U256,
     pub start: u64,

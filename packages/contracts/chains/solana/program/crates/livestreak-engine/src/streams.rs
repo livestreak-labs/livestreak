@@ -1,7 +1,7 @@
 //! Engine core — 1:1 port of streams.move (constructors, core utilities so far;
 //! receive/squeeze/set_streams land in the following sections of the port).
 
-use ethnum::U256;
+use ruint::aliases::U256;
 
 extern crate alloc;
 
@@ -16,7 +16,8 @@ impl StreamsRegistry {
             return Err(StreamsError::CycleSecsTooLow);
         }
         let multiplier = U256::from(AMT_PER_SEC_MULTIPLIER);
-        let min_amt_per_sec = (multiplier + U256::from(cycle_secs) - 1) / U256::from(cycle_secs);
+        let min_amt_per_sec =
+            (multiplier + U256::from(cycle_secs) - U256::from(1u8)) / U256::from(cycle_secs);
         Ok(Self {
             cycle_secs,
             min_amt_per_sec,
@@ -38,9 +39,22 @@ impl StreamsRegistry {
 }
 
 /// floor(end * rate / M) - floor(start * rate / M) — the engine's fundamental quantum.
+///
+/// Hot-path narrowing (doctrine: only WITH the conservation net green): when the
+/// products provably fit u128 (checked_mul — no silent assumption), compute narrow;
+/// the U256 fallback stays for the max_end binary search's u64::MAX-scale probes.
+/// Both paths are the identical floor-pair expression.
 pub fn streamed_amt(amt_per_sec: U256, start: u64, end: u64) -> U256 {
     if end <= start {
         return U256::ZERO;
+    }
+    if amt_per_sec <= U256::from(u128::MAX) {
+        let aps = amt_per_sec.to::<u128>();
+        if let (Some(pe), Some(ps)) =
+            ((end as u128).checked_mul(aps), (start as u128).checked_mul(aps))
+        {
+            return U256::from(pe / AMT_PER_SEC_MULTIPLIER - ps / AMT_PER_SEC_MULTIPLIER);
+        }
     }
     let m = U256::from(AMT_PER_SEC_MULTIPLIER);
     let amt_end = U256::from(end) * amt_per_sec / m;
@@ -122,10 +136,10 @@ mod tests {
 
     #[test]
     fn stream_range_caps_and_zero_start_uses_update_time() {
-        let cfg = StreamConfig { stream_id: 0, amt_per_sec: U256::ONE, start: 0, duration: 0 };
+        let cfg = StreamConfig { stream_id: 0, amt_per_sec: U256::from(1u8), start: 0, duration: 0 };
         // start=0 → update_time; duration=0 → forever → capped at max_end.
         assert_eq!(stream_range(&cfg, 100, 500, 0, MAX_U64), (100, 500));
-        let cfg2 = StreamConfig { stream_id: 0, amt_per_sec: U256::ONE, start: 200, duration: 50 };
+        let cfg2 = StreamConfig { stream_id: 0, amt_per_sec: U256::from(1u8), start: 200, duration: 50 };
         assert_eq!(stream_range(&cfg2, 100, 500, 220, 240), (220, 240));
         // end below start clamps to start (empty range).
         assert_eq!(stream_range(&cfg2, 100, 500, 260, 240), (260, 260));
@@ -175,9 +189,9 @@ pub fn hash_streams(receivers: &[StreamReceiver]) -> alloc::vec::Vec<u8> {
     }
     let mut h = Blake2b256::new();
     for r in receivers {
-        h.update(r.account_id.to_be_bytes());
+        h.update(r.account_id.to_be_bytes::<32>());
         h.update(r.config.stream_id.to_le_bytes());
-        h.update(r.config.amt_per_sec.to_be_bytes());
+        h.update(r.config.amt_per_sec.to_be_bytes::<32>());
         h.update(r.config.start.to_le_bytes());
         h.update(r.config.duration.to_le_bytes());
     }

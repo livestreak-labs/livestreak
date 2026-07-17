@@ -3,7 +3,7 @@
 //! market_driver's mechanical role (drips streams to the vault receivers + on_fund),
 //! mirroring the Sui run_conservation_seed shape at engine level.
 
-use ethnum::U256;
+use ruint::aliases::U256;
 use livestreak_engine::*;
 
 const CYCLE: u64 = 10;
@@ -165,9 +165,9 @@ fn account_vault_ledger_is_append_only_and_deduped() {
     let v1 = vault_reg.create_vault([1u8; 32], b"q1".to_vec(), [1u8; 32], 10).unwrap();
     let v2 = vault_reg.create_vault([1u8; 32], b"q2".to_vec(), [1u8; 32], 10).unwrap();
 
-    vault_reg.on_fund(acct(7), &v1, SIDE_YES, U256::ONE, 100, 10).unwrap();
-    vault_reg.on_fund(acct(7), &v1, SIDE_NO, U256::ONE, 100, 10).unwrap();
-    vault_reg.on_fund(acct(7), &v2, SIDE_YES, U256::ONE, 100, 10).unwrap();
+    vault_reg.on_fund(acct(7), &v1, SIDE_YES, U256::from(1u8), 100, 10).unwrap();
+    vault_reg.on_fund(acct(7), &v1, SIDE_NO, U256::from(1u8), 100, 10).unwrap();
+    vault_reg.on_fund(acct(7), &v2, SIDE_YES, U256::from(1u8), 100, 10).unwrap();
 
     // Both sides of v1 dedupe to one ledger entry.
     assert_eq!(vault_reg.get_account_vault_ids(acct(7)), vec![v1, v2]);
