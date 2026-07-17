@@ -7,6 +7,7 @@ export * from './ids.js'
 export * from './pdas.js'
 export * from './instructions.js'
 export * from './accounts.js'
+export * from './spl.js'
 export { buildLivestreakTransaction } from './transaction.js'
 
 // Kit primitives consumers need to address ids, type instructions, and send. ProtocolState

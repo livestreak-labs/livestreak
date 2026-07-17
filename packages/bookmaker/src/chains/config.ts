@@ -1,9 +1,13 @@
 // --- exports ---
 
-import { LiveStreakConfigError, contractsNotDeployedError } from "@livestreak/core";
+import { LiveStreakConfigError } from "@livestreak/core";
 import type { WalletInit } from "@livestreak/schema";
 
-import { validateBookmakerSuiObjectIds, type BookmakerContractAddresses } from "./addresses.js";
+import {
+  validateBookmakerSolanaAddresses,
+  validateBookmakerSuiObjectIds,
+  type BookmakerContractAddresses
+} from "./addresses.js";
 import type { BookmakerChainConfig } from "./types.js";
 import { validateBookmakerContractAddresses } from "./evm/addresses.js";
 
@@ -38,14 +42,12 @@ export const validateBookmakerChainConfig = (input: unknown): BookmakerChainConf
     });
   }
 
-  if (walletInit.chain === "solana") {
-    throw contractsNotDeployedError("solana", "the bookmaker chain");
-  }
-
   const addresses =
     walletInit.chain === "sui"
       ? validateBookmakerSuiObjectIds(input.addresses)
-      : validateBookmakerContractAddresses(input.addresses as unknown as BookmakerContractAddresses);
+      : walletInit.chain === "solana"
+        ? validateBookmakerSolanaAddresses(input.addresses)
+        : validateBookmakerContractAddresses(input.addresses as unknown as BookmakerContractAddresses);
 
   const readRpcUrl =
     input.readRpcUrl === undefined
