@@ -607,3 +607,238 @@ impl StreamsRegistry {
         received_amt
     }
 }
+
+// ── Squeezing (Move squeeze_streams / squeeze_streams_result / squeezed_amt) ────
+
+impl StreamsRegistry {
+    /// (amt, squeezed_indexes oldest-to-newest, history_hashes, curr_cycle_configs).
+    pub fn squeeze_streams_result(
+        &self,
+        account_id: AccountId,
+        sender_id: AccountId,
+        history_hash: alloc::vec::Vec<u8>,
+        streams_history: &[StreamsHistory],
+        now: u64,
+    ) -> StreamsResult<(u128, alloc::vec::Vec<u64>, alloc::vec::Vec<alloc::vec::Vec<u8>>, u64)>
+    {
+        let final_history_hash = self
+            .states
+            .get(&sender_id)
+            .map(|s| s.streams_history_hash.clone())
+            .unwrap_or_default();
+
+        let history_hashes =
+            verify_streams_history(history_hash, streams_history, &final_history_hash)?;
+
+        let curr_cycle_start_ts = self.curr_cycle_start(now);
+        let curr_cycle_configs = match self.states.get(&sender_id) {
+            Some(sender_state) if sender_state.update_time >= curr_cycle_start_ts => {
+                sender_state.curr_cycle_configs
+            }
+            _ => 1,
+        };
+
+        let mut amt: u128 = 0;
+        let mut squeezed_indexes = alloc::vec::Vec::new();
+        let mut squeeze_end_cap = now;
+
+        // Newest to oldest, at most curr_cycle_configs entries.
+        let history_len = streams_history.len() as u64;
+        let mut i: u64 = 1;
+        while i <= history_len && i <= curr_cycle_configs {
+            let entry = &streams_history[(history_len - i) as usize];
+            if !entry.receivers.is_empty() {
+                let next_squeezed_ts = self
+                    .next_squeezed
+                    .get(&(account_id, sender_id, curr_cycle_configs - i))
+                    .copied()
+                    .unwrap_or(0);
+                let squeeze_start_cap =
+                    next_squeezed_ts.max(curr_cycle_start_ts).max(entry.update_time);
+                if squeeze_start_cap < squeeze_end_cap {
+                    squeezed_indexes.push(i);
+                    amt += squeezed_amt(account_id, entry, squeeze_start_cap, squeeze_end_cap);
+                }
+            }
+            squeeze_end_cap = entry.update_time;
+            i += 1;
+        }
+
+        squeezed_indexes.reverse();
+        Ok((amt, squeezed_indexes, history_hashes, curr_cycle_configs))
+    }
+
+    /// Squeeze the running cycle from one sender; marks squeezed windows and applies
+    /// the compensating negative delta so receive_streams can't double-count.
+    pub fn squeeze_streams(
+        &mut self,
+        account_id: AccountId,
+        sender_id: AccountId,
+        history_hash: alloc::vec::Vec<u8>,
+        streams_history: &[StreamsHistory],
+        now: u64,
+    ) -> StreamsResult<u128> {
+        let (amt, squeezed_indexes, _hashes, curr_cycle_configs) =
+            self.squeeze_streams_result(account_id, sender_id, history_hash, streams_history, now)?;
+
+        let cycle_secs = self.cycle_secs;
+        self.ensure_state_exists(account_id);
+
+        for idx in &squeezed_indexes {
+            let config_index = curr_cycle_configs - idx;
+            self.next_squeezed.insert((account_id, sender_id, config_index), now);
+        }
+
+        if amt > 0 {
+            let cycle_start = self.curr_cycle_start(now);
+            let neg_amt_per_sec = -(I256::from(amt) * I256::from(AMT_PER_SEC_MULTIPLIER));
+            add_delta_range(
+                &mut self.amt_deltas,
+                account_id,
+                cycle_start,
+                cycle_start + 1,
+                neg_amt_per_sec,
+                cycle_secs,
+            );
+        }
+
+        Ok(amt)
+    }
+}
+
+/// One history entry's squeezable amount for account_id (receivers sorted by id —
+/// binary search to the first match, then walk the run).
+fn squeezed_amt(
+    account_id: AccountId,
+    history_entry: &StreamsHistory,
+    squeeze_start_cap: u64,
+    squeeze_end_cap: u64,
+) -> u128 {
+    let receivers = &history_entry.receivers;
+    let mut idx = receivers.partition_point(|r| r.account_id < account_id);
+
+    let mut amt = U256::ZERO;
+    while idx < receivers.len() {
+        let receiver = &receivers[idx];
+        if receiver.account_id != account_id {
+            break;
+        }
+        let (start, end) = stream_range(
+            &receiver.config,
+            history_entry.update_time,
+            history_entry.max_end,
+            squeeze_start_cap,
+            squeeze_end_cap,
+        );
+        amt += streamed_amt(receiver.config.amt_per_sec, start, end);
+        idx += 1;
+    }
+    livestreak_math::wide::narrow(amt, "squeezed amt")
+}
+
+// ── Set streams (Move set_streams — the main configuration entry point) ─────────
+
+impl StreamsRegistry {
+    /// Returns the actually-applied balance delta (withdrawals cap at the balance).
+    #[allow(clippy::too_many_arguments)]
+    pub fn set_streams(
+        &mut self,
+        account_id: AccountId,
+        curr_receivers: &[StreamReceiver],
+        balance_delta: i128,
+        new_receivers: &[StreamReceiver],
+        max_end_hint1: u64,
+        max_end_hint2: u64,
+        now: u64,
+    ) -> StreamsResult<i128> {
+        let cycle_secs = self.cycle_secs;
+
+        let (curr_balance, last_update, curr_max_end, old_history_hash, old_curr_cycle_configs) =
+            match self.states.get(&account_id) {
+                None => (0u128, 0u64, 0u64, alloc::vec::Vec::new(), 0u64),
+                Some(state) => {
+                    verify_streams_receivers(curr_receivers, state)?;
+                    if now < state.update_time {
+                        return Err(StreamsError::TimestampBeforeUpdate);
+                    }
+                    let balance = calc_balance(
+                        state.balance,
+                        state.update_time,
+                        state.max_end,
+                        curr_receivers,
+                        now,
+                    );
+                    (
+                        balance,
+                        state.update_time,
+                        state.max_end,
+                        state.streams_history_hash.clone(),
+                        state.curr_cycle_configs,
+                    )
+                }
+            };
+
+        // Withdrawals cap at the whole balance (Move i128 compare + neg_from).
+        let neg_curr_balance = -i128::try_from(curr_balance).expect("balance exceeds i128");
+        let real_balance_delta = balance_delta.max(neg_curr_balance);
+
+        let new_balance = if real_balance_delta >= 0 {
+            curr_balance + real_balance_delta as u128
+        } else {
+            curr_balance - real_balance_delta.unsigned_abs()
+        };
+
+        let new_max_end =
+            self.calc_max_end(new_balance, new_receivers, max_end_hint1, max_end_hint2, now)?;
+
+        self.ensure_state_exists(account_id);
+        self.update_receiver_states(
+            curr_receivers,
+            last_update,
+            curr_max_end,
+            new_receivers,
+            new_max_end,
+            now,
+        );
+
+        let new_streams_hash = hash_streams(new_receivers);
+        let state = self.states.get_mut(&account_id).unwrap();
+        state.update_time = now;
+        state.max_end = new_max_end;
+        state.balance = new_balance;
+
+        // History exists + crossed a cycle boundary → reset to 2, else increment.
+        state.curr_cycle_configs = if !old_history_hash.is_empty()
+            && cycle_of_secs(last_update, cycle_secs) != cycle_of_secs(now, cycle_secs)
+        {
+            2
+        } else {
+            old_curr_cycle_configs + 1
+        };
+
+        state.streams_history_hash =
+            hash_streams_history(&old_history_hash, &new_streams_hash, now, new_max_end);
+        if new_streams_hash != state.streams_hash {
+            state.streams_hash = new_streams_hash;
+        }
+
+        Ok(real_balance_delta)
+    }
+
+    /// View: (streams_hash, history_hash, update_time, balance, max_end).
+    pub fn streams_state(
+        &self,
+        account_id: AccountId,
+    ) -> (alloc::vec::Vec<u8>, alloc::vec::Vec<u8>, u64, u128, u64) {
+        match self.states.get(&account_id) {
+            None => Default::default(),
+            Some(s) => (
+                s.streams_hash.clone(),
+                s.streams_history_hash.clone(),
+                s.update_time,
+                s.balance,
+                s.max_end,
+            ),
+        }
+    }
+}
