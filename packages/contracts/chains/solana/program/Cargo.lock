@@ -1788,6 +1788,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "livestreak-wasm"
+version = "0.1.0"
+dependencies = [
+ "livestreak-engine",
+ "livestreak-math",
+ "ruint",
+ "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
