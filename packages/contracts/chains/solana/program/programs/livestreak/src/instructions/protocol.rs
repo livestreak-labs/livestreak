@@ -188,6 +188,7 @@ pub fn handle_create_vault_seeded(
         .map_err(engine_err)?;
     let len = ctx.accounts.protocol_state.to_account_info().data_len();
     store(&mut ctx.accounts.protocol_state, &p, len)?;
+    assert_conserved(&mut ctx.accounts.escrow, &p)?;
     Ok(vault_id.to_vec())
 }
 
@@ -351,6 +352,7 @@ pub fn handle_fund(
     .map_err(engine_err)?;
     let len = ctx.accounts.protocol_state.to_account_info().data_len();
     store(&mut ctx.accounts.protocol_state, &p, len)?;
+    assert_conserved(&mut ctx.accounts.escrow, &p)?;
     Ok(())
 }
 
@@ -362,6 +364,7 @@ pub fn handle_stop_all(ctx: Context<PositionEngineOp>) -> Result<()> {
     ctx.accounts.as_user_op().pay(refunded)?;
     let len = ctx.accounts.protocol_state.to_account_info().data_len();
     store(&mut ctx.accounts.protocol_state, &p, len)?;
+    assert_conserved(&mut ctx.accounts.escrow, &p)?;
     Ok(())
 }
 
@@ -373,6 +376,7 @@ pub fn handle_withdraw(ctx: Context<PositionEngineOp>, vault_id: [u8; 32]) -> Re
     ctx.accounts.as_user_op().pay(paid)?;
     let len = ctx.accounts.protocol_state.to_account_info().data_len();
     store(&mut ctx.accounts.protocol_state, &p, len)?;
+    assert_conserved(&mut ctx.accounts.escrow, &p)?;
     Ok(())
 }
 
@@ -386,6 +390,7 @@ pub fn handle_stop_seed(ctx: Context<UserEngineOp>, vault_id: [u8; 32]) -> Resul
     ctx.accounts.pay(refunded)?;
     let len = ctx.accounts.protocol_state.to_account_info().data_len();
     store(&mut ctx.accounts.protocol_state, &p, len)?;
+    assert_conserved(&mut ctx.accounts.escrow, &p)?;
     Ok(())
 }
 
@@ -397,6 +402,7 @@ pub fn handle_withdraw_seed(ctx: Context<UserEngineOp>, vault_id: [u8; 32]) -> R
     ctx.accounts.pay(paid)?;
     let len = ctx.accounts.protocol_state.to_account_info().data_len();
     store(&mut ctx.accounts.protocol_state, &p, len)?;
+    assert_conserved(&mut ctx.accounts.escrow, &p)?;
     Ok(())
 }
 
@@ -410,6 +416,9 @@ pub struct EngineOp<'info> {
         bump = protocol_state.bump
     )]
     pub protocol_state: Account<'info, ProtocolState>,
+    /// Read-only: present so the conservation guard can verify the invariant.
+    #[account(seeds = [ESCROW_SEED, &protocol_state.market_id], bump)]
+    pub escrow: Account<'info, TokenAccount>,
 }
 
 pub fn handle_advance(
@@ -423,6 +432,7 @@ pub fn handle_advance(
     p.vault.advance(&vault_id, side, max_steps, now_secs()?).map_err(engine_err)?;
     let len = ctx.accounts.protocol_state.to_account_info().data_len();
     store(&mut ctx.accounts.protocol_state, &p, len)?;
+    assert_conserved(&mut ctx.accounts.escrow, &p)?;
     Ok(())
 }
 
@@ -432,6 +442,7 @@ pub fn handle_collect(ctx: Context<EngineOp>, vault_id: [u8; 32]) -> Result<()> 
     p.collect_vault(&vault_id, now_secs()?).map_err(engine_err)?;
     let len = ctx.accounts.protocol_state.to_account_info().data_len();
     store(&mut ctx.accounts.protocol_state, &p, len)?;
+    assert_conserved(&mut ctx.accounts.escrow, &p)?;
     Ok(())
 }
 
@@ -471,7 +482,19 @@ pub fn handle_resolve(ctx: Context<Resolve>, vault_id: [u8; 32], winning_side: u
     Ok(())
 }
 
-fn engine_err<E: core::fmt::Debug>(e: E) -> anchor_lang::error::Error {
+fn engine_err<E: core::fmt::Debug + Into<LivestreakError>>(e: E) -> anchor_lang::error::Error {
     msg!("engine: {:?}", e);
-    error!(LivestreakError::EngineOp)
+    anchor_lang::error::Error::from(e.into())
+}
+
+/// The conservation invariant, live: the escrow token account must exactly equal
+/// the sum of the three engine ledgers after every money-moving instruction.
+/// A logic/codec/width bug aborts the transaction instead of corrupting a market.
+fn assert_conserved(escrow: &mut Account<TokenAccount>, p: &Protocol) -> Result<()> {
+    escrow.reload()?;
+    require!(
+        escrow.amount as u128 == p.drips.held + p.vault.usdc_held + p.treasury.usdc_held,
+        LivestreakError::ConservationViolated
+    );
+    Ok(())
 }

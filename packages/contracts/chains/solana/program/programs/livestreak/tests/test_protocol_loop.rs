@@ -286,7 +286,7 @@ fn onchain_keynote_loop_with_real_tokens() {
     let ix = Instruction::new_with_bytes(
         h.program_id,
         &livestreak::instruction::Collect { vault_id }.data(),
-        livestreak::accounts::EngineOp { protocol_state }.to_account_metas(None),
+        livestreak::accounts::EngineOp { protocol_state, escrow }.to_account_metas(None),
     );
     h.send(ix, &[&h.payer.insecure_clone()]).unwrap();
 
