@@ -1704,6 +1704,7 @@ dependencies = [
  "blake2",
  "ethnum",
  "livestreak-math",
+ "sha3",
 ]
 
 [[package]]
