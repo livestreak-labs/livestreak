@@ -183,9 +183,11 @@ const buildObserveRuntime = (
         // Re-preparing a finished run reclaims its terminal handle (so reads route to the fresh bus,
         // not the dead run's); an ACTIVE run refuses re-prepare.
         yield* reclaimTerminalRunHandle(store, runId);
+        // Config derives from the BUS board (canonical) — the stored run's board copy can lag
+        // behind configure calls that haven't been synced back yet.
         const config = yield* runConfigFromBoard({
           runId,
-          board: run.board,
+          board: yield* readStoredRunBoard(store, runId),
           hostBaseUrl: options.hostBaseUrl
         });
         const sinkDriver = streamingSinkFor(config.sink.driverId);
