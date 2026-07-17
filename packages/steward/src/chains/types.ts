@@ -27,14 +27,28 @@ export interface StewardSuiObjectIds {
   readonly vaultRegistry: string;
 }
 
+export interface StewardSolanaAddresses {
+  readonly programId: string;
+  readonly usdcMint: string;
+  // DIVERGENCE (Solana-only): the program partitions vaults by market — protocol_state and the
+  // per-market steward override are PDAs seeded by market_id — so `resolve` needs a marketId that
+  // the chain-agnostic StewardContractCall (`[vaultId, outcome]`) does not carry. EVM/Sui key a
+  // GLOBAL registry by vaultId and need none. It rides the config because a steward executor is
+  // single-market (mirrors the steward runtime's own market scoping).
+  readonly marketId: string;
+}
+
 export interface StewardChainConfig {
   readonly walletInit: WalletInit;
   readonly seed: string | Uint8Array;
-  readonly addresses: StewardEvmAddresses | StewardSuiObjectIds;
+  readonly addresses: StewardEvmAddresses | StewardSuiObjectIds | StewardSolanaAddresses;
 }
 
 const EVM_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const SUI_OBJECT_ID_RE = /^0x[0-9a-fA-F]{64}$/;
+// base58, 32-44 chars (excludes 0 O I l) — the canonical Solana pubkey shape.
+const SOLANA_ADDRESS_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const HEX32_RE = /^0x[0-9a-fA-F]{64}$/;
 
 export const validateStewardEvmAddresses = (input: unknown): StewardEvmAddresses => {
   const record = (typeof input === "object" && input !== null ? input : {}) as Record<string, unknown>;
@@ -64,5 +78,24 @@ export const validateStewardSuiObjectIds = (input: unknown): StewardSuiObjectIds
     packageId: require("packageId"),
     stewardRegistry: require("stewardRegistry"),
     vaultRegistry: require("vaultRegistry")
+  };
+};
+
+export const validateStewardSolanaAddresses = (input: unknown): StewardSolanaAddresses => {
+  const record = (typeof input === "object" && input !== null ? input : {}) as Record<string, unknown>;
+  const require = (key: keyof StewardSolanaAddresses, re: RegExp, kind: string): string => {
+    const value = typeof record[key] === "string" ? (record[key] as string).trim() : "";
+    if (!re.test(value)) {
+      throw new LiveStreakConfigError({
+        message: `Steward Solana config requires a valid ${kind} ${String(key)}`,
+        metadata: { details: value }
+      });
+    }
+    return value;
+  };
+  return {
+    programId: require("programId", SOLANA_ADDRESS_RE, "base58"),
+    usdcMint: require("usdcMint", SOLANA_ADDRESS_RE, "base58"),
+    marketId: require("marketId", HEX32_RE, "bytes32")
   };
 };
