@@ -310,7 +310,7 @@ const coerceConfigurePayload = (
       typeof record.chain === "string" &&
       typeof record.capture === "string" &&
       typeof record.publish === "string" &&
-      record.process === null
+      (record.process === null || record.process === undefined)
     ) {
       return {
         chain: record.chain,

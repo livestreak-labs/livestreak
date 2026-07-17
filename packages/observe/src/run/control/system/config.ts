@@ -293,8 +293,8 @@ export const systemConfigCatalogFunctions = (): Readonly<
         },
         {
           name: "process",
-          value: { type: "unknown", description: "Process stage (null in v0).", required: true },
-          help: "Must be null."
+          value: { type: "unknown", description: "Process stage (null in v0).", default: null },
+          help: "v0 has no process stage — leave blank."
         },
         {
           name: "publish",

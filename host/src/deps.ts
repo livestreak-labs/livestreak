@@ -111,7 +111,13 @@ export const bootstrapHostRouteDeps = async (
   const resolved = options.walrusResolved ?? config.resolvedWalrus;
   const walrus = buildWalrusDeps(config, resolved);
   const discoveryStore = createDiscoveryStore();
-  const catalogStack = buildCatalogStack(config, discoveryStore, options);
+  // Signaling-plane stores exist before the catalog so isLive can reflect a stream serving
+  // bytes right now (host ring ingest or a direct-lane announce), not only on-chain goLive.
+  const live = createLiveRingStore();
+  const direct = createDirectAnnounceStore();
+  const isStreamLive = (marketId: string): boolean =>
+    live.isLive(marketId) || direct.lookup(marketId) !== undefined;
+  const catalogStack = buildCatalogStack(config, discoveryStore, options, isStreamLive);
   // Boot path: also run the formal migrator (records the migration as applied on top of the
   // idempotent sync DDL) so the bookkeeping table reflects reality.
   await migrateToLatest(catalogStack.db.db);
@@ -140,8 +146,8 @@ export const bootstrapHostRouteDeps = async (
     aa,
     remote: buildRemoteService(config),
     ...stackToDeps(catalogStack),
-    live: createLiveRingStore(),
-    direct: createDirectAnnounceStore()
+    live,
+    direct
   };
 };
 
@@ -222,7 +228,8 @@ export interface CreateHostRouteDepsOptions extends CreateAaRouteDepsOptions {
 const buildCatalogStack = (
   config: HostServerConfig,
   store: ReturnType<typeof createDiscoveryStore>,
-  options: CreateHostRouteDepsOptions
+  options: CreateHostRouteDepsOptions,
+  isStreamLive?: (marketId: string) => boolean
 ): CatalogStack => {
   const readers = options.catalogReaders ?? createEnvReaderProvider();
   const service = createCatalogService({
@@ -231,7 +238,8 @@ const buildCatalogStack = (
     defaultChain:
       (process.env.LIVESTREAK_CATALOG_DEFAULT_CHAIN as "evm" | "sui" | undefined) ?? "evm",
     listDiscoveryMarketIds: () => store.listMarketIds(),
-    seedMarkets: parseSeedMarkets(process.env.LIVESTREAK_CATALOG_MARKETS)
+    seedMarkets: parseSeedMarkets(process.env.LIVESTREAK_CATALOG_MARKETS),
+    ...(isStreamLive === undefined ? {} : { isStreamLive })
   });
 
   // Under vitest/CI default to an isolated in-memory db (no file artifacts, no cross-test
@@ -246,7 +254,8 @@ const buildCatalogStack = (
     repo,
     readers,
     baseUrl: config.baseUrl,
-    knownMarkets: () => service.knownMarkets()
+    knownMarkets: () => service.knownMarkets(),
+    ...(isStreamLive === undefined ? {} : { isStreamLive })
   });
   const readModel = createCatalogReadModel({
     repo,
