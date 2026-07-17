@@ -11,11 +11,15 @@
 //! [u8;32] id encoding; the engine does not care what the 32 bytes mean.
 
 pub mod drips;
+pub mod drivers;
 pub mod vault;
 pub mod state;
+pub mod treasury;
 pub mod streams;
 
 pub use drips::*;
+pub use drivers::*;
 pub use vault::*;
 pub use state::*;
+pub use treasury::*;
 pub use streams::*;
