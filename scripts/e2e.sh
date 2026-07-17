@@ -19,7 +19,10 @@ DRIVE_LOG="/tmp/livestreak-e2e-drive.log"
 KEEP_UP="${KEEP_UP:-0}"
 WITH_SUI="${WITH_SUI:-0}"
 WITH_DIRECT="${WITH_DIRECT:-1}"
-BOOT_TIMEOUT="${BOOT_TIMEOUT:-240}"
+# The window spans dev.sh's ENTIRE boot (clean rebuild + chains + host + consoles) — a loaded
+# machine pushed a healthy boot past 240s (observed 2026-07-17: console URL landed seconds after
+# the old window expired and teardown fired on a stack that was about to be green).
+BOOT_TIMEOUT="${BOOT_TIMEOUT:-480}"
 E2E_VIDEO="${E2E_VIDEO:-/tmp/livestreak-e2e-clip.mp4}"
 DIRECT_PORT="${DIRECT_PORT:-48711}"
 
