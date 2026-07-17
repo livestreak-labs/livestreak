@@ -1,6 +1,10 @@
 [workspace]
-members = ["crates/livestreak-math"]
+members = ["programs/*", "crates/*"]
 resolver = "2"
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.89.0"
 
 [profile.release]
 overflow-checks = true

@@ -3,7 +3,7 @@
 //! the Move u256 source by construction. u128 appears only at the storage boundary.
 
 use crate::ln::ln_e9;
-use crate::wide::{narrow, w, U256};
+use crate::wide::{narrow, w};
 
 pub const BASE_PRICE: u128 = 100_000;
 pub const CURVE_K: u128 = 10_000_000_000;
