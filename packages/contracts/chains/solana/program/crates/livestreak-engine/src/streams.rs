@@ -269,3 +269,341 @@ pub fn verify_streams_history(
     }
     Ok(history_hashes)
 }
+
+// ── Delta accounting (Move add_delta / add_delta_range) ─────────────────────────
+//
+// Signed-256 site: transliterated via ethnum I256 (division truncates toward zero,
+// matching the Move i256 emulation and Solidity int256). The i128 storage cast is
+// the same bit-truncation as Move i128::from_bits(i256::as_i128(..)).
+
+use ethnum::I256;
+
+fn cycle_of_secs(ts: u64, cycle_secs: u64) -> u64 {
+    ts / cycle_secs + 1
+}
+
+pub fn add_delta(
+    amt_deltas: &mut alloc::collections::BTreeMap<(AccountId, u64), AmtDelta>,
+    account_id: AccountId,
+    timestamp: u64,
+    amt_per_sec: I256,
+    cycle_secs: u64,
+) {
+    let multiplier = I256::from(AMT_PER_SEC_MULTIPLIER);
+    let full_cycle = I256::from(cycle_secs) * amt_per_sec / multiplier;
+    let remainder = timestamp % cycle_secs;
+    let next_cycle = I256::from(remainder) * amt_per_sec / multiplier;
+    let cycle = cycle_of_secs(timestamp, cycle_secs);
+
+    let delta = amt_deltas.entry((account_id, cycle)).or_default();
+    delta.this_cycle += (full_cycle - next_cycle).as_i128();
+    delta.next_cycle += next_cycle.as_i128();
+}
+
+/// Apply a rate over [start, end): +delta at start, -delta at end.
+pub fn add_delta_range(
+    amt_deltas: &mut alloc::collections::BTreeMap<(AccountId, u64), AmtDelta>,
+    account_id: AccountId,
+    start: u64,
+    end: u64,
+    amt_per_sec: I256,
+    cycle_secs: u64,
+) {
+    if start == end {
+        return;
+    }
+    add_delta(amt_deltas, account_id, start, amt_per_sec, cycle_secs);
+    add_delta(amt_deltas, account_id, end, -amt_per_sec, cycle_secs);
+}
+
+// ── Receiver-state diffing (Move update_receiver_states) ────────────────────────
+
+/// Move casts rate u256 -> u128 with an aborting `as` cast before signing; narrow()
+/// is the same abort, then the value signs into I256 losslessly.
+fn rate_i256(amt_per_sec: U256) -> I256 {
+    I256::from(livestreak_math::wide::narrow(amt_per_sec, "amt_per_sec"))
+}
+
+impl StreamsRegistry {
+    fn ensure_state_exists(&mut self, account_id: AccountId) {
+        self.states.entry(account_id).or_default();
+    }
+
+    /// Two-pointer merge diffing old vs new receiver lists; adjusts deltas and
+    /// next_receivable_cycle per account. 1:1 with the Move control flow.
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_receiver_states(
+        &mut self,
+        curr_receivers: &[StreamReceiver],
+        last_update: u64,
+        curr_max_end: u64,
+        new_receivers: &[StreamReceiver],
+        new_max_end: u64,
+        now: u64,
+    ) {
+        let cycle_secs = self.cycle_secs;
+        let mut curr_idx = 0usize;
+        let mut new_idx = 0usize;
+
+        loop {
+            let mut pick_curr = curr_idx < curr_receivers.len();
+            let mut pick_new = new_idx < new_receivers.len();
+            if !pick_curr && !pick_new {
+                break;
+            }
+
+            let default_recv = StreamReceiver {
+                account_id: U256::ZERO,
+                config: StreamConfig {
+                    stream_id: 0,
+                    amt_per_sec: U256::ZERO,
+                    start: 0,
+                    duration: 0,
+                },
+            };
+            let curr_recv = if pick_curr { curr_receivers[curr_idx] } else { default_recv };
+            let new_recv = if pick_new { new_receivers[new_idx] } else { default_recv };
+
+            // Pick both only when they differ solely by time window.
+            if pick_curr && pick_new {
+                if curr_recv.account_id != new_recv.account_id
+                    || curr_recv.config.amt_per_sec != new_recv.config.amt_per_sec
+                {
+                    pick_curr = is_ordered(&curr_recv, &new_recv);
+                    pick_new = !pick_curr;
+                }
+            }
+
+            if pick_curr && pick_new {
+                // Shift the existing stream: adjust only the start and end deltas.
+                self.ensure_state_exists(curr_recv.account_id);
+                let (curr_start, curr_end) =
+                    stream_range(&curr_recv.config, last_update, curr_max_end, now, MAX_U64);
+                let (new_start, new_end) =
+                    stream_range(&new_recv.config, now, new_max_end, now, MAX_U64);
+                let amt = rate_i256(curr_recv.config.amt_per_sec);
+
+                add_delta_range(
+                    &mut self.amt_deltas, curr_recv.account_id,
+                    curr_start, new_start, -amt, cycle_secs,
+                );
+                add_delta_range(
+                    &mut self.amt_deltas, curr_recv.account_id,
+                    curr_end, new_end, amt, cycle_secs,
+                );
+
+                let curr_start_cycle = cycle_of_secs(curr_start, cycle_secs);
+                let new_start_cycle = cycle_of_secs(new_start, cycle_secs);
+                let state = self.states.get_mut(&curr_recv.account_id).unwrap();
+                if curr_start_cycle > new_start_cycle
+                    && state.next_receivable_cycle > new_start_cycle
+                {
+                    state.next_receivable_cycle = new_start_cycle;
+                }
+                curr_idx += 1;
+                new_idx += 1;
+            } else if pick_curr {
+                // Remove an existing stream.
+                self.ensure_state_exists(curr_recv.account_id);
+                let (start, end) =
+                    stream_range(&curr_recv.config, last_update, curr_max_end, now, MAX_U64);
+                let amt = rate_i256(curr_recv.config.amt_per_sec);
+                add_delta_range(
+                    &mut self.amt_deltas, curr_recv.account_id, start, end, -amt, cycle_secs,
+                );
+                curr_idx += 1;
+            } else {
+                // Create a new stream.
+                self.ensure_state_exists(new_recv.account_id);
+                let (start, end) =
+                    stream_range(&new_recv.config, now, new_max_end, now, MAX_U64);
+                let amt = rate_i256(new_recv.config.amt_per_sec);
+                add_delta_range(
+                    &mut self.amt_deltas, new_recv.account_id, start, end, amt, cycle_secs,
+                );
+                let start_cycle = cycle_of_secs(start, cycle_secs);
+                let state = self.states.get_mut(&new_recv.account_id).unwrap();
+                if state.next_receivable_cycle == 0 || state.next_receivable_cycle > start_cycle {
+                    state.next_receivable_cycle = start_cycle;
+                }
+                new_idx += 1;
+            }
+        }
+    }
+}
+
+// ── Balance & max-end (Move balance_at / calc_balance / calc_max_end) ──────────
+
+impl StreamsRegistry {
+    /// Account balance at `timestamp` (>= update_time), receivers must match hash.
+    pub fn balance_at(
+        &self,
+        account_id: AccountId,
+        curr_receivers: &[StreamReceiver],
+        timestamp: u64,
+    ) -> StreamsResult<u128> {
+        let Some(state) = self.states.get(&account_id) else {
+            return Ok(0);
+        };
+        if timestamp < state.update_time {
+            return Err(StreamsError::TimestampBeforeUpdate);
+        }
+        verify_streams_receivers(curr_receivers, state)?;
+        Ok(calc_balance(
+            state.balance,
+            state.update_time,
+            state.max_end,
+            curr_receivers,
+            timestamp,
+        ))
+    }
+
+    /// Binary-search the timestamp funds run out (with two search hints).
+    pub fn calc_max_end(
+        &self,
+        balance: u128,
+        receivers: &[StreamReceiver],
+        hint1: u64,
+        hint2: u64,
+        now: u64,
+    ) -> StreamsResult<u64> {
+        let configs = self.build_configs(receivers, now)?;
+        let min_guaranteed_end = now;
+        if configs.is_empty() || balance == 0 {
+            return Ok(min_guaranteed_end);
+        }
+        if is_balance_enough(balance, &configs, MAX_U64) {
+            return Ok(MAX_U64);
+        }
+
+        let mut enough_end = min_guaranteed_end;
+        let mut not_enough_end = MAX_U64;
+
+        for hint in [hint1, hint2] {
+            if hint > enough_end && hint < not_enough_end {
+                if is_balance_enough(balance, &configs, hint) {
+                    enough_end = hint;
+                } else {
+                    not_enough_end = hint;
+                }
+            }
+        }
+
+        loop {
+            // u64 midpoint without overflow (Move widens to u256 for this).
+            let mid = enough_end + (not_enough_end - enough_end) / 2;
+            if mid == enough_end {
+                return Ok(mid);
+            }
+            if is_balance_enough(balance, &configs, mid) {
+                enough_end = mid;
+            } else {
+                not_enough_end = mid;
+            }
+        }
+    }
+}
+
+/// last_balance minus everything streamed in [last_update, timestamp].
+fn calc_balance(
+    last_balance: u128,
+    last_update: u64,
+    max_end: u64,
+    receivers: &[StreamReceiver],
+    timestamp: u64,
+) -> u128 {
+    let mut balance = U256::from(last_balance);
+    for receiver in receivers {
+        let (start, end) =
+            stream_range(&receiver.config, last_update, max_end, last_update, timestamp);
+        balance -= streamed_amt(receiver.config.amt_per_sec, start, end);
+    }
+    livestreak_math::wide::narrow(balance, "balance")
+}
+
+fn is_balance_enough(balance: u128, configs: &[ProcessedConfig], max_end: u64) -> bool {
+    let mut spent = U256::ZERO;
+    let balance_wide = U256::from(balance);
+    for config in configs {
+        if max_end <= config.start {
+            continue;
+        }
+        let end = config.end.min(max_end);
+        spent += streamed_amt(config.amt_per_sec, config.start, end);
+        if spent > balance_wide {
+            return false;
+        }
+    }
+    true
+}
+
+// ── Receiving (Move receivable_streams_cycles / receive_streams) ────────────────
+
+impl StreamsRegistry {
+    fn receivable_streams_cycles_range(&self, account_id: AccountId, now: u64) -> (u64, u64) {
+        let Some(state) = self.states.get(&account_id) else {
+            return (0, 0);
+        };
+        let from_cycle = state.next_receivable_cycle;
+        let to_cycle = self.cycle_of(now);
+        if from_cycle == 0 || to_cycle < from_cycle {
+            (from_cycle, from_cycle)
+        } else {
+            (from_cycle, to_cycle)
+        }
+    }
+
+    pub fn receivable_streams_cycles(&self, account_id: AccountId, now: u64) -> u64 {
+        let (from_cycle, to_cycle) = self.receivable_streams_cycles_range(account_id, now);
+        to_cycle.saturating_sub(from_cycle)
+    }
+
+    /// (received_amt, receivable_cycles_left, from_cycle, to_cycle, amt_per_cycle).
+    pub fn receive_streams_result(
+        &self,
+        account_id: AccountId,
+        max_cycles: u64,
+        now: u64,
+    ) -> (u128, u64, u64, u64, i128) {
+        let (from_cycle, to_cycle_raw) = self.receivable_streams_cycles_range(account_id, now);
+
+        let (receivable_cycles, to_cycle) = if to_cycle_raw - from_cycle > max_cycles {
+            let remaining = to_cycle_raw - from_cycle - max_cycles;
+            (remaining, to_cycle_raw - remaining)
+        } else {
+            (0, to_cycle_raw)
+        };
+
+        let (received_amt, amt_per_cycle) =
+            if self.states.contains_key(&account_id) && from_cycle < to_cycle {
+                process_cycles(&self.amt_deltas, account_id, from_cycle, to_cycle, 0, 0)
+            } else {
+                (0, 0)
+            };
+
+        (received_amt, receivable_cycles, from_cycle, to_cycle, amt_per_cycle)
+    }
+
+    /// Receive from finished cycles; deletes drained deltas (unbounded-growth guard)
+    /// and re-anchors the residual rate as an absolute delta on to_cycle.
+    pub fn receive_streams(&mut self, account_id: AccountId, max_cycles: u64, now: u64) -> u128 {
+        let (received_amt, _left, from_cycle, to_cycle, final_amt_per_cycle) =
+            self.receive_streams_result(account_id, max_cycles, now);
+
+        if from_cycle != to_cycle {
+            self.ensure_state_exists(account_id);
+            self.states.get_mut(&account_id).unwrap().next_receivable_cycle = to_cycle;
+
+            for cycle in from_cycle..to_cycle {
+                self.amt_deltas.remove(&(account_id, cycle));
+            }
+
+            if final_amt_per_cycle != 0 {
+                let delta = self.amt_deltas.entry((account_id, to_cycle)).or_default();
+                delta.this_cycle += final_amt_per_cycle;
+            }
+        }
+
+        received_amt
+    }
+}
