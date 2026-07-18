@@ -326,19 +326,24 @@ solana_leg_up() {
 
 # Wiring: hand the registry default steward to the steward ROLE + mint mock USDC to the role/UI
 # wallets — wire:solana signs with the deployer keypair (mint authority + initialize-time steward).
+# Roles are NATIVE self-pay on Solana (no paymaster in the dev loop), so each also needs SOL for
+# fees + rent (init_protocol allocates the ~9KB engine blob) — airdrop alongside the USDC mint.
 solana_wire() {
-  log "Wiring Solana: set default steward + mint mock USDC..."
+  log "Wiring Solana: set default steward + airdrop SOL + mint mock USDC..."
   local wire_args="" role addr pw ui_addr
+  sol_fund() { solana airdrop 10 "$1" --url "$SOLANA_RPC_LOCAL" >/dev/null 2>&1 || warn "SOL airdrop to $1 failed"; }
   [ -n "$STEWARD_ADDR" ] && wire_args="--steward $STEWARD_ADDR"
   for role in $ROLES; do
     addr="$(cat "$ROLES_DIR/$role/addr" 2>/dev/null || true)"
     [ -z "$addr" ] && continue
+    sol_fund "$addr"
     wire_args="$wire_args --mint $addr=$DEMO_USDC_MINT"
   done
   # Fund the UI demo wallet(s) too (see evm_wire for why). Default "1234".
   for pw in ${UI_DEMO_PASSWORDS:-1234}; do
     ui_addr="$(role_address "$pw")"
     [ -z "$ui_addr" ] && { warn "UI demo wallet '$pw' derive failed — not funded"; continue; }
+    sol_fund "$ui_addr"
     wire_args="$wire_args --mint $ui_addr=$DEMO_USDC_MINT"
   done
   ( cd "$ROOT/packages/contracts" \

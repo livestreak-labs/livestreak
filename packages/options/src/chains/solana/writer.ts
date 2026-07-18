@@ -8,6 +8,7 @@ import { LiveStreakConfigError, LiveStreakRuntimeError } from "@livestreak/core"
 import {
   address,
   buildAdvanceIx,
+  buildCollectIx,
   buildFundIx,
   buildLivestreakTransaction,
   buildMintPositionIx,
@@ -99,6 +100,24 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
     const readOnly = await account.toReadOnlyAccount();
     await pollUntilUserOperationIncluded(readOnly, result.hash);
     return result.hash;
+  };
+
+  // Settlement-granularity retry: the pot is board-truth at resolvedAt but the CASH arrives with
+  // the next completed drips cycle (cycle_secs=10; EVM parity — its AA latency hides the same
+  // window). A too-early withdraw fails VaultInsufficientUsdc on preflight; crossing one boundary
+  // makes it deliverable, so retry across ~one cycle before surfacing the failure.
+  const sendWithCycleRetry = async (build: () => Promise<Instruction[]>): Promise<string> => {
+    const CYCLE_MS = 11_000;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, CYCLE_MS));
+      try {
+        return await send(await build());
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
   };
 
   const requireMarketForVault = async (vaultId: string): Promise<Hex32> => {
@@ -205,6 +224,14 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
     withdraw: async (input: WithdrawInput): Promise<TxId> => {
       const marketId = await requireMarketForVault(input.vaultId);
       const { signer } = await getWriter();
+      // Engine withdraw pays 0 until the pot is finalized — collect first (permissionless,
+      // idempotent post-resolve). SEPARATE txs, not one: the SBF bump allocator never frees, so
+      // two engine ops in one tx double the heap and blow even the 256KB ceiling.
+      const collect = await buildCollectIx({
+        programId: ctx.programId,
+        marketId,
+        vaultId: vaultIdHex(input.vaultId)
+      });
       const ix = await buildWithdrawIx({
         programId: ctx.programId,
         marketId,
@@ -213,7 +240,14 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
         usdcMint: ctx.usdcMint,
         vaultId: vaultIdHex(input.vaultId)
       });
-      return asTxId(await send([ix]));
+      // Each attempt re-runs collect: the HARVEST lives in collect, so cash delivered by a new
+      // cycle boundary only becomes payable after another collect pass.
+      return asTxId(
+        await sendWithCycleRetry(async () => {
+          await send([collect]);
+          return [ix];
+        })
+      );
     },
 
     withdrawMany: async (input: WithdrawManyInput): Promise<TxId> => {
@@ -223,6 +257,12 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
       // A position is single-market, so all its vaults share one shard — resolve once from the first.
       const marketId = await requireMarketForVault(input.vaultIds[0]!);
       const { signer } = await getWriter();
+      const collects: Instruction[] = [];
+      for (const vaultId of input.vaultIds) {
+        collects.push(
+          await buildCollectIx({ programId: ctx.programId, marketId, vaultId: vaultIdHex(vaultId) })
+        );
+      }
       const ixs: Instruction[] = [];
       for (const vaultId of input.vaultIds) {
         ixs.push(
@@ -283,10 +323,17 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
         message: "Solana: approveNft not supported (PositionOwner PDA model, no approvals)"
       });
     },
-    setApprovalForAll: async (_input: SetApprovalForAllInput): Promise<never> => {
-      throw new LiveStreakConfigError({
-        message: "Solana: setApprovalForAll not supported (PositionOwner PDA model, no approvals)"
-      });
+    setApprovalForAll: async (input: SetApprovalForAllInput): Promise<TxId> => {
+      // Protocol-operator approval (operator omitted) is TRUE BY CONSTRUCTION on Solana: the
+      // program's authority over positions is PDA-structural, so the postcondition already holds
+      // and this is a correct no-op (zero-sig sentinel, observe alreadyRegistered parity).
+      // Arbitrary operators have no on-chain counterpart — honest throw.
+      if (input.operator !== undefined) {
+        throw new LiveStreakConfigError({
+          message: "Solana: setApprovalForAll for an arbitrary operator not supported (program authority is PDA-structural)"
+        });
+      }
+      return asTxId(`0x${"0".repeat(64)}`);
     }
   };
 };

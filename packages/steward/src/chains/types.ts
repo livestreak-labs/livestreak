@@ -30,12 +30,10 @@ export interface StewardSuiObjectIds {
 export interface StewardSolanaAddresses {
   readonly programId: string;
   readonly usdcMint: string;
-  // DIVERGENCE (Solana-only): the program partitions vaults by market — protocol_state and the
-  // per-market steward override are PDAs seeded by market_id — so `resolve` needs a marketId that
-  // the chain-agnostic StewardContractCall (`[vaultId, outcome]`) does not carry. EVM/Sui key a
-  // GLOBAL registry by vaultId and need none. It rides the config because a steward executor is
-  // single-market (mirrors the steward runtime's own market scoping).
-  readonly marketId: string;
+  // Solana-only: the program partitions vaults by market (protocol_state + steward-override PDAs
+  // seed by market_id) while StewardContractCall carries only [vaultId, outcome]. The executor
+  // resolves the vault's market AT CALL TIME by scanning the on-chain market ledger (options-leg
+  // parity), so no marketId rides the config and the executor stays market-agnostic like EVM/Sui.
 }
 
 export interface StewardChainConfig {
@@ -95,7 +93,6 @@ export const validateStewardSolanaAddresses = (input: unknown): StewardSolanaAdd
   };
   return {
     programId: require("programId", SOLANA_ADDRESS_RE, "base58"),
-    usdcMint: require("usdcMint", SOLANA_ADDRESS_RE, "base58"),
-    marketId: require("marketId", HEX32_RE, "bytes32")
+    usdcMint: require("usdcMint", SOLANA_ADDRESS_RE, "base58")
   };
 };

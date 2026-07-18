@@ -5,20 +5,19 @@ import { severityToContractValue } from "../src/chains/types.js";
 
 describe("steward chain config", () => {
   it("validates a solana steward config (program deployed — resolve is live)", () => {
-    const marketId = `0x${"11".repeat(32)}`;
+    // No marketId in the bag: the executor resolves the vault's market at call time
+    // from the on-chain ledger, so the config stays market-agnostic like EVM/Sui.
     const validated = validateStewardChainConfig({
       walletInit: { chain: "solana", seedSource: "raw", config: { rpcUrl: "http://x" } } as never,
       seed: "test-seed",
       addresses: {
         programId: "So11111111111111111111111111111111111111112",
-        usdcMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-        marketId
+        usdcMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
       }
     });
     expect(validated.addresses).toEqual({
       programId: "So11111111111111111111111111111111111111112",
-      usdcMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      marketId
+      usdcMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
     });
   });
 
@@ -27,7 +26,7 @@ describe("steward chain config", () => {
       validateStewardChainConfig({
         walletInit: { chain: "solana", seedSource: "raw", config: { rpcUrl: "http://x" } } as never,
         seed: "test-seed",
-        addresses: { programId: "0xnot-base58", usdcMint: "0xnope", marketId: "0xshort" }
+        addresses: { programId: "0xnot-base58", usdcMint: "0xnope" }
       })
     ).toThrow(/valid base58 programId/);
   });

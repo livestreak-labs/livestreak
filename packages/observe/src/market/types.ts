@@ -100,7 +100,8 @@ export interface SolanaMarketRegistryConfig {
 export interface ObserveRunMarketConfig {
   readonly walletInit: WalletInit;
   readonly seed: string | Uint8Array;
-  readonly marketRegistryAddress: EvmAddress;
+  /** Required for EVM/Sui runs (the registry contract/object); absent on Solana (PDA-derived). */
+  readonly marketRegistryAddress?: EvmAddress;
   readonly title: string;
   /** Required only for Sui runs; resolved from deployment, never a constant. */
   readonly suiRegistry?: SuiMarketRegistryConfig;

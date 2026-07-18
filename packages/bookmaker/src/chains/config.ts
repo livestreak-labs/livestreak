@@ -62,17 +62,28 @@ export const validateBookmakerChainConfig = (input: unknown): BookmakerChainConf
   };
 };
 
-export const hasBookmakerChainAddresses = (addresses: unknown): addresses is BookmakerContractAddresses =>
-  typeof addresses === "object" &&
-  addresses !== null &&
-  typeof (addresses as BookmakerContractAddresses).vaultDriver === "string" &&
-  (addresses as BookmakerContractAddresses).vaultDriver.length > 0 &&
-  typeof (addresses as BookmakerContractAddresses).marketRegistry === "string" &&
-  (addresses as BookmakerContractAddresses).marketRegistry.length > 0 &&
-  typeof (addresses as BookmakerContractAddresses).vault === "string" &&
-  (addresses as BookmakerContractAddresses).vault.length > 0 &&
-  typeof (addresses as BookmakerContractAddresses).usdc === "string" &&
-  (addresses as BookmakerContractAddresses).usdc.length > 0;
+const hasNonEmptyStrings = (value: unknown, keys: readonly string[]): boolean =>
+  typeof value === "object" &&
+  value !== null &&
+  keys.every((key) => {
+    const field = (value as Record<string, unknown>)[key];
+    return typeof field === "string" && field.length > 0;
+  });
+
+// One complete per-chain shape: EVM contract addresses, Sui object ids, or the Solana program bag.
+export const hasBookmakerChainAddresses = (
+  addresses: unknown
+): addresses is BookmakerChainConfig["addresses"] =>
+  hasNonEmptyStrings(addresses, ["vaultDriver", "marketRegistry", "vault", "usdc"]) ||
+  hasNonEmptyStrings(addresses, [
+    "packageId",
+    "vaultDriverRegistry",
+    "vaultRegistry",
+    "marketRegistry",
+    "dripsRegistry",
+    "streamsRegistry"
+  ]) ||
+  hasNonEmptyStrings(addresses, ["programId", "usdcMint"]);
 
 // --- helpers ---
 

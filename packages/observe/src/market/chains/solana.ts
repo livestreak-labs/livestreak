@@ -8,6 +8,7 @@ import {
   address,
   buildLivestreakTransaction,
   buildGoLiveIx,
+  buildInitProtocolIx,
   buildRegisterMarketIx,
   buildSetEndedIx,
   bytesFromHex32,
@@ -37,6 +38,12 @@ import { validateMarketRunId } from "#market/validate.js";
 
 const ZERO_SIG = `0x${"0".repeat(64)}`;
 const utf8 = (value: string): Uint8Array => new TextEncoder().encode(value);
+// Engine-blob capacity provisioned with the market (bytes of postcard payload). Registration
+// provisions the engine ATOMICALLY (same tx) so a market can never exist without its
+// protocol_state/escrow — design-out of the init ordering hazard. 10_000 is the practical
+// ceiling: CPI-created accounts cap at 10240 bytes; growing past this needs the Phase-4
+// realloc ladder + state compaction.
+const PROTOCOL_CAPACITY = 10_000;
 
 const toRuntimeError = (prefix: string, error: unknown): LiveStreakRuntimeError =>
   new LiveStreakRuntimeError({
@@ -145,11 +152,11 @@ export const createSolanaMarketRegistrar = (config: ObserveRunMarketConfig): Mar
       sendTransaction: (tx: SolanaTransaction) => Promise<{ hash: string }>;
       toReadOnlyAccount: () => Promise<unknown>;
     },
-    instruction: import("@livestreak/wallet").Instruction
+    instructions: import("@livestreak/wallet").Instruction | import("@livestreak/wallet").Instruction[]
   ): Effect.Effect<string, LiveStreakError> =>
     Effect.gen(function* () {
       // feePayer omitted: the account attaches its own (paymaster under gasless, creator direct).
-      const tx = buildLivestreakTransaction([instruction]);
+      const tx = buildLivestreakTransaction(Array.isArray(instructions) ? instructions : [instructions]);
       const result = yield* Effect.tryPromise({
         try: () => account.sendTransaction(tx),
         catch: (error) => toRuntimeError("Solana transaction failed", error)
@@ -237,20 +244,30 @@ export const createSolanaMarketRegistrar = (config: ObserveRunMarketConfig): Mar
         }
         const registry = decodeRegistryAccount(registryBytes);
 
-        const instruction = yield* Effect.tryPromise({
-          try: () =>
-            buildRegisterMarketIx({
+        const instructions = yield* Effect.tryPromise({
+          try: async () => {
+            if (config.solanaRegistry === undefined) throw new Error("solanaRegistry required");
+            const register = await buildRegisterMarketIx({
               programId,
               creator,
               title: utf8(input.title),
               streamId: bytesFromHex32(streamId),
               marketCount: registry.marketCount,
               marketId
-            }),
-          catch: (error) => toRuntimeError("Failed to build register_market instruction", error)
+            });
+            const initProtocol = await buildInitProtocolIx({
+              programId,
+              marketId,
+              payer: creator,
+              usdcMint: address(config.solanaRegistry.usdcMint),
+              capacity: PROTOCOL_CAPACITY
+            });
+            return [register, initProtocol];
+          },
+          catch: (error) => toRuntimeError("Failed to build register_market instructions", error)
         });
 
-        const hash = yield* send(account, instruction);
+        const hash = yield* send(account, instructions);
         return { userOpHash: hash, marketId, streamId, title: input.title } satisfies MarketRegisterResult;
       }),
     goLive: (input) => sendLifecycle("go_live", input),

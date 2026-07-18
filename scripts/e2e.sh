@@ -47,6 +47,16 @@ teardown() {
     for _ in $(seq 1 20); do kill -0 "$DEV_PID" 2>/dev/null || break; sleep 1; done
     kill -0 "$DEV_PID" 2>/dev/null && kill -TERM "$DEV_PID" 2>/dev/null || true
   fi
+  # dev.sh's signal path does not reliably reap its children when signaled non-interactively
+  # (observed: dev.sh dead, whole stack alive → the next boot races a ghost stack). Sweep the
+  # stack's own patterns + ports directly — the same list dev.sh's clean_slate owns.
+  for pat in "remote open" "tsx src/main.ts" "vite dev --port 3000" "alto --entrypoints" "anvil" \
+             "solana-test-validator" "sui start" "sui-faucet"; do
+    pkill -9 -f "$pat" 2>/dev/null || true
+  done
+  for p in 8545 8787 3000 4337 9000 9123 9124 8899 8900; do
+    lsof -ti:$p 2>/dev/null | xargs kill -9 2>/dev/null || true
+  done
 }
 trap teardown EXIT
 

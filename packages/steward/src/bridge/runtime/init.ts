@@ -131,9 +131,7 @@ export const stewardChainConfigFromPackageInit = (init: PackageRuntimeInit): Ste
       : init.wallet.walletInit.chain === "solana"
         ? {
             programId: init.contracts.programId ?? "",
-            usdcMint: init.contracts.usdcMint ?? "",
-            // Solana resolve is market-partitioned; the executor is single-market (see StewardSolanaAddresses).
-            marketId: init.contracts.marketId ?? ""
+            usdcMint: init.contracts.usdcMint ?? ""
           }
         : { stewardRegistry: init.contracts.stewardRegistry ?? "" }
 });
