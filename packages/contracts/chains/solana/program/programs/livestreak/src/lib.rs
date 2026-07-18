@@ -156,4 +156,8 @@ pub mod livestreak {
     pub fn resolve(ctx: Context<Resolve>, vault_id: [u8; 32], winning_side: u8) -> Result<()> {
         instructions::protocol::handle_resolve(ctx, vault_id, winning_side)
     }
+
+    pub fn claim_loss_lvst(ctx: Context<ClaimLossLvst>, vault_id: [u8; 32], side: u8) -> Result<()> {
+        instructions::protocol::handle_claim_loss_lvst(ctx, vault_id, side)
+    }
 }

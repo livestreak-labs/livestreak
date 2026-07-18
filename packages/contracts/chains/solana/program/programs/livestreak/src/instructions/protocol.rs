@@ -7,7 +7,7 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 use ruint::aliases::U256;
 use livestreak_engine::{Protocol, STATUS_RESOLVED, SIDE_NO, SIDE_YES};
 
-use crate::constants::{MARKET_SEED, MARKET_STEWARD_SEED, REGISTRY_SEED};
+use crate::constants::{LVST_AUTHORITY_SEED, MARKET_SEED, MARKET_STEWARD_SEED, REGISTRY_SEED};
 use crate::error::LivestreakError;
 use crate::state::{Market, MarketSteward, PositionOwner, ProtocolState, Registry};
 
@@ -404,6 +404,79 @@ pub fn handle_withdraw(ctx: Context<PositionEngineOp>, vault_id: [u8; 32]) -> Re
     let len = ctx.accounts.protocol_state.to_account_info().data_len();
     store(&mut ctx.accounts.protocol_state, &p, len)?;
     assert_conserved(&mut ctx.accounts.escrow, &p)?;
+    Ok(())
+}
+
+// ── claim_loss_lvst ─────────────────────────────────────────────────────────────
+
+/// A losing position mints LVST against its loss basis. The basis is READ FROM THE
+/// VAULT by the engine (trust boundary, EVM/Move parity) — never caller-supplied — and
+/// the double-claim guard lives in the treasury ledger (`loss_claimed`). This touches
+/// the LVST mint only; the USDC escrow ledgers are untouched, so — like `resolve` — it
+/// carries no escrow account and no conservation assert.
+#[derive(Accounts)]
+pub struct ClaimLossLvst<'info> {
+    pub claimer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [PROTOCOL_SEED, &protocol_state.market_id],
+        bump = protocol_state.bump
+    )]
+    pub protocol_state: Account<'info, ProtocolState>,
+    /// Ownership gate: the claimer must own the position whose token_id fixes the loss.
+    #[account(
+        seeds = [POSITION_SEED, &position.token_id],
+        bump = position.bump,
+        constraint = position.owner == claimer.key() @ LivestreakError::NotCreator
+    )]
+    pub position: Account<'info, PositionOwner>,
+    /// CHECK: protocol-wide LVST mint authority PDA — seeds prove it; signs the mint_to CPI.
+    #[account(seeds = [LVST_AUTHORITY_SEED], bump)]
+    pub lvst_authority: UncheckedAccount<'info>,
+    /// The canonical LVST mint (its authority must be the lvst_authority PDA).
+    #[account(mut, mint::authority = lvst_authority)]
+    pub lvst_mint: Account<'info, Mint>,
+    /// The claimer's LVST token account. Require-exists (mirrors how the program treats
+    /// user USDC ATAs): the client prepends a createAtaIdempotent for the LVST mint.
+    #[account(mut, token::mint = lvst_mint, token::authority = claimer)]
+    pub claimer_lvst: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
+
+pub fn handle_claim_loss_lvst(
+    ctx: Context<ClaimLossLvst>,
+    vault_id: [u8; 32],
+    side: u8,
+) -> Result<()> {
+    valid_side(side)?;
+    let mut p = load(&ctx.accounts.protocol_state)?;
+    let token_id = token_id_from(&ctx.accounts.position.token_id);
+    // Call the treasury directly (not the driver wrapper, which flattens NothingLost /
+    // AlreadyClaimed to NoLane) so each failure decodes to its own typed error. A loser
+    // with any non-zero basis always yields amount > 0 (mint_rate >= MINT_FLOOR).
+    let minted = p
+        .treasury
+        .mint_loss_lvst(&p.vault, token_id, &vault_id, side)
+        .map_err(engine_err)?;
+    let amount = u64_amount(livestreak_math::wide::narrow(minted, "lvst_mint"))?;
+
+    let bump = ctx.bumps.lvst_authority;
+    let seeds: &[&[u8]] = &[LVST_AUTHORITY_SEED, &[bump]];
+    token::mint_to(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.key(),
+            token::MintTo {
+                mint: ctx.accounts.lvst_mint.to_account_info(),
+                to: ctx.accounts.claimer_lvst.to_account_info(),
+                authority: ctx.accounts.lvst_authority.to_account_info(),
+            },
+            &[seeds],
+        ),
+        amount,
+    )?;
+
+    let len = ctx.accounts.protocol_state.to_account_info().data_len();
+    store(&mut ctx.accounts.protocol_state, &p, len)?;
     Ok(())
 }
 
