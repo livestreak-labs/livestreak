@@ -3,6 +3,9 @@ pub const REGISTRY_SEED: &[u8] = b"registry";
 pub const MARKET_SEED: &[u8] = b"market";
 pub const MARKET_INDEX_SEED: &[u8] = b"market_idx";
 pub const MARKET_STEWARD_SEED: &[u8] = b"steward";
+// Protocol-wide LVST reward-token mint authority — one PDA across all markets
+// (LVST is a single token; loss-mint + staking dividends land in later chunks).
+pub const LVST_AUTHORITY_SEED: &[u8] = b"lvst_authority";
 
 // Stream status (mirrors market_registry.move).
 pub const STREAM_STATUS_NONE: u8 = 0;

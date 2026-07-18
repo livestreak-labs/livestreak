@@ -4,6 +4,7 @@ export const REGISTRY_SEED = "registry";
 export const MARKET_SEED = "market";
 export const MARKET_INDEX_SEED = "market_idx";
 export const MARKET_STEWARD_SEED = "steward";
+export const LVST_AUTHORITY_SEED = "lvst_authority";
 export const PROTOCOL_SEED = "protocol";
 export const ESCROW_SEED = "escrow";
 export const POSITION_SEED = "position";

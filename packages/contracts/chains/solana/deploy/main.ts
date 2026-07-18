@@ -20,7 +20,7 @@ import {
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import { createMint } from "@solana/spl-token";
-import { REGISTRY_SEED } from "../seeds.js";
+import { LVST_AUTHORITY_SEED, REGISTRY_SEED } from "../seeds.js";
 import type { SolanaDeployment, SolanaDeploymentName } from "../types.js";
 import { DEPLOYMENTS_DIR, PROGRAM_DIR, writeDeployment } from "./utils.js";
 
@@ -146,6 +146,17 @@ async function main(): Promise<void> {
   const usdcMint = await createMint(connection, deployer, deployer.publicKey, null, 6);
   console.log(`mock USDC mint ${usdcMint.toBase58()}`);
 
+  // LVST reward token — protocol-wide (one mint across all markets), so the mint authority
+  // is the program's lvst_authority PDA, letting later instructions mint (loss-mint /
+  // staking dividends). SPL caps at 9 decimals; 9 matches the Sui coin (EVM uses 18 there).
+  // No freeze authority.
+  const [lvstAuthority] = PublicKey.findProgramAddressSync(
+    [Buffer.from(LVST_AUTHORITY_SEED)],
+    programId,
+  );
+  const lvstMint = await createMint(connection, deployer, lvstAuthority, null, 9);
+  console.log(`LVST mint ${lvstMint.toBase58()} (authority ${lvstAuthority.toBase58()})`);
+
   const snapshot: SolanaDeployment = {
     chain: args.name,
     rpc,
@@ -154,6 +165,7 @@ async function main(): Promise<void> {
     programId: programId.toBase58(),
     accounts: {
       usdcMint: usdcMint.toBase58(),
+      lvstMint: lvstMint.toBase58(),
       registry: registry.toBase58(),
       defaultSteward: defaultSteward.toBase58(),
     },
