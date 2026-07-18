@@ -93,8 +93,13 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
     try {
       result = await account.sendTransaction(tx);
     } catch (error) {
+      // Preflight logs live on the kit error's context, not its message — surface the program's
+      // settlement line so the ready_at-aware retry can wait precisely instead of falling back.
+      const logs = (error as { context?: { logs?: readonly string[] } }).context?.logs;
+      const settlement = logs?.find((line) => line.includes("settlement pending"));
+      const detail = error instanceof Error ? error.message : String(error);
       throw new LiveStreakRuntimeError({
-        message: `Solana transaction failed: ${error instanceof Error ? error.message : String(error)}`
+        message: `Solana transaction failed: ${detail}${settlement === undefined ? "" : ` (${settlement})`}`
       });
     }
     const readOnly = await account.toReadOnlyAccount();
@@ -104,13 +109,17 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
 
   // Settlement-granularity retry: the pot is board-truth at resolvedAt but the CASH arrives with
   // the next completed drips cycle (cycle_secs=10; EVM parity — its AA latency hides the same
-  // window). A too-early withdraw fails VaultInsufficientUsdc on preflight; crossing one boundary
-  // makes it deliverable, so retry across ~one cycle before surfacing the failure.
+  // window). A too-early withdraw fails the program's `SettlementPending` gate on preflight;
+  // crossing `ready_at` makes it deliverable, so retry across ~one cycle before surfacing the
+  // failure. When the program surfaced a precise `ready_at` in the error, wait exactly until then
+  // (see settlementRetryWaitMs); otherwise fall back to the fixed one-cycle sleep.
   const sendWithCycleRetry = async (build: () => Promise<Instruction[]>): Promise<string> => {
     const CYCLE_MS = 11_000;
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      if (attempt > 0) await new Promise((r) => setTimeout(r, CYCLE_MS));
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, settlementRetryWaitMs(lastError, Date.now(), CYCLE_MS)));
+      }
       try {
         return await send(await build());
       } catch (error) {
@@ -339,6 +348,47 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
 };
 
 // --- helpers ---
+
+// The program logs `settlement pending: ready_at=<unix seconds>` when a withdraw races ahead of the
+// settlement boundary (protocol.rs `require_settled`). Pull that unix-seconds value out of an error
+// text so the retry can wait exactly until the vault is deliverable. Pure + exported for unit tests.
+export const parseSettlementReadyAt = (message: string): number | undefined => {
+  const match = /ready_at=(\d+)/.exec(message);
+  if (match === null) return undefined;
+  const seconds = Number(match[1]);
+  return Number.isSafeInteger(seconds) && seconds > 0 ? seconds : undefined;
+};
+
+// Flatten an error's message plus its `cause` chain into one searchable string: the Solana send
+// error is wrapped by a LiveStreakRuntimeError, so a `ready_at` (if it ever reaches a message in the
+// chain) can sit below the top-level message. Bounded depth guards against a cyclic cause.
+const errorMessageChain = (error: unknown): string => {
+  const parts: string[] = [];
+  let cur: unknown = error;
+  for (let depth = 0; cur !== undefined && cur !== null && depth < 8; depth += 1) {
+    if (typeof cur === "string") {
+      parts.push(cur);
+      break;
+    }
+    if (cur instanceof Error) {
+      parts.push(cur.message);
+      cur = (cur as { cause?: unknown }).cause;
+      continue;
+    }
+    parts.push(String(cur));
+    break;
+  }
+  return parts.join(" ");
+};
+
+// Wait before the next settlement retry: precise when the program surfaced a `ready_at` (sleep until
+// ready_at + 500ms, clamped to [0, 15s]), else the fixed one-cycle fallback. Pure + exported so the
+// branch is unit-testable without a live send.
+export const settlementRetryWaitMs = (error: unknown, nowMs: number, fallbackMs: number): number => {
+  const readyAt = parseSettlementReadyAt(errorMessageChain(error));
+  if (readyAt === undefined) return fallbackMs;
+  return Math.min(15_000, Math.max(0, readyAt * 1000 - nowMs + 500));
+};
 
 const requirePositiveBigInt = (value: bigint, field: string): bigint => {
   if (typeof value !== "bigint" || value <= 0n) {
