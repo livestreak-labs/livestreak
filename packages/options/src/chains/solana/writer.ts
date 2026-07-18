@@ -23,6 +23,7 @@ import {
   buildWithdrawIx,
   computePositionTokenId,
   createWalletManager,
+  isSponsoredSolanaConfig,
   pollUntilUserOperationIncluded,
   type Address,
   type Hex32,
@@ -227,9 +228,16 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
         message: "Solana: mint recipient must be the wallet signer (no mint-to-third-party instruction)"
       });
     }
+    // The PositionOwner rent payer must equal the tx fee payer: sponsored → the paymaster (Kora
+    // co-signs as fee payer, so a zero-SOL user pays nothing), self-pay → the signer. minter stays
+    // the owner/identity either way.
+    const rentPayer = isSponsoredSolanaConfig(solanaConfig)
+      ? address(solanaConfig.paymasterAddress)
+      : signer;
     const ix = await buildMintPositionIx({
       programId: ctx.programId,
       marketId: marketId as unknown as Hex32,
+      payer: rentPayer,
       minter: signer,
       salt
     });

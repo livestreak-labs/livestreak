@@ -518,8 +518,12 @@ export const livestreakIdl = {
       ],
       "accounts": [
         {
-          "name": "minter",
+          "name": "payer",
           "writable": true,
+          "signer": true
+        },
+        {
+          "name": "minter",
           "signer": true
         },
         {

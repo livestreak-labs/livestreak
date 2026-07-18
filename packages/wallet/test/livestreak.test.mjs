@@ -98,7 +98,7 @@ const built = {
       rate: 5_000_000n,
       deposit: 500_000_000n,
     }),
-  mint_position: () => buildMintPositionIx({ programId: PROGRAM_ID, marketId: ID_A, minter: USER, salt: 42n }),
+  mint_position: () => buildMintPositionIx({ programId: PROGRAM_ID, marketId: ID_A, payer: USER, minter: USER, salt: 42n }),
   fund: () =>
     buildFundIx({
       programId: PROGRAM_ID,
