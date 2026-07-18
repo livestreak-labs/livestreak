@@ -628,6 +628,56 @@ impl VaultRegistry {
     pub fn join_usdc(&mut self, amount: u128) {
         self.usdc_held += amount;
     }
+
+    /// Settled-state compaction: delete storage that can PROVABLY never be read
+    /// again. Idempotent and view-preserving — every surviving read (engine + wasm
+    /// views) returns byte-identical results. Only the two classes below are dead;
+    /// positions/boards/boundary-suffix stay (they still back loss-mint, winnings,
+    /// overage, and the get_boundaries live-pool view).
+    pub fn compact(&mut self) {
+        // (1) Boundary-queue prefix [0, head). Once advance_internal moves a board's
+        //     boundary head past an entry it is unreachable: advance_internal iterates
+        //     from `head` (advance loop + more_due check), get_boundaries does
+        //     `skip(head)`, pending_boundaries is `len - head`, and schedule_boundary
+        //     only bubble-sorts new entries within [head, len). Dropping the prefix and
+        //     resetting head to 0 leaves the live suffix — and every view over it —
+        //     unchanged. This is the boundary analog of receive_streams' amt_deltas
+        //     delete; the schedule grows monotonically as funders deplete / refresh
+        //     max_ends, so the dead prefix is the dominant lingering crumb.
+        let heads: Vec<((VaultId, u8), u64)> = self
+            .boundary_heads
+            .iter()
+            .filter(|(_, &h)| h > 0)
+            .map(|(k, &h)| (*k, h))
+            .collect();
+        for (key, head) in heads {
+            if let Some(list) = self.boundaries.get_mut(&key) {
+                let head = (head as usize).min(list.len());
+                list.drain(0..head);
+            }
+            self.boundary_heads.insert(key, 0);
+        }
+
+        // (2) Fully-settled overage crumbs. A ZERO overage_owed marks a rate==0
+        //     position whose post-resolution overage was paid in full: on_stop only
+        //     ever inserts a POSITIVE owed, and pay_overage zeroes it after paying the
+        //     whole entitlement. pay_overage's rate==0 branch reads overage_owed and
+        //     overage_paid via unwrap_or(ZERO), and a resolved vault can never re-fund
+        //     (on_fund requires STATUS_OPEN), so both maps read identically whether the
+        //     entry is ZERO or absent — the pair is dead. rate>0 positions keep
+        //     overage_paid: their entitlement still grows with time.
+        let dead: Vec<(VaultId, u8, AccountId)> = self
+            .overage_owed
+            .iter()
+            .filter(|(_, v)| **v == U256::ZERO)
+            .map(|(k, _)| *k)
+            .filter(|k| self.positions.get(k).map(|p| p.rate == U256::ZERO).unwrap_or(true))
+            .collect();
+        for key in dead {
+            self.overage_owed.remove(&key);
+            self.overage_paid.remove(&key);
+        }
+    }
 }
 
 // ── Internal helpers (Move segment/settle/boundary/advance/pot machinery) ───────
