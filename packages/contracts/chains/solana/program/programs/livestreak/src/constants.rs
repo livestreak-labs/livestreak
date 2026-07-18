@@ -6,6 +6,10 @@ pub const MARKET_STEWARD_SEED: &[u8] = b"steward";
 // Protocol-wide LVST reward-token mint authority — one PDA across all markets
 // (LVST is a single token; loss-mint + staking dividends land in later chunks).
 pub const LVST_AUTHORITY_SEED: &[u8] = b"lvst_authority";
+// Per-market LVST staking escrow token account. The staking ledger (TreasuryRegistry)
+// lives inside each market's Protocol blob, so staked-LVST custody is per-market too:
+// one escrow at ["lvst_escrow", market_id], authority = that market's protocol_state.
+pub const LVST_ESCROW_SEED: &[u8] = b"lvst_escrow";
 
 // Stream status (mirrors market_registry.move).
 pub const STREAM_STATUS_NONE: u8 = 0;

@@ -160,4 +160,12 @@ pub mod livestreak {
     pub fn claim_loss_lvst(ctx: Context<ClaimLossLvst>, vault_id: [u8; 32], side: u8) -> Result<()> {
         instructions::protocol::handle_claim_loss_lvst(ctx, vault_id, side)
     }
+
+    pub fn stake_lvst(ctx: Context<StakeLvst>, amount: u64) -> Result<()> {
+        instructions::protocol::handle_stake_lvst(ctx, amount)
+    }
+
+    pub fn unstake_lvst(ctx: Context<UnstakeLvst>, amount: u64) -> Result<()> {
+        instructions::protocol::handle_unstake_lvst(ctx, amount)
+    }
 }

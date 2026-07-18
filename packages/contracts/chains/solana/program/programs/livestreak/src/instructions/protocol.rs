@@ -7,7 +7,9 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 use ruint::aliases::U256;
 use livestreak_engine::{Protocol, STATUS_RESOLVED, SIDE_NO, SIDE_YES};
 
-use crate::constants::{LVST_AUTHORITY_SEED, MARKET_SEED, MARKET_STEWARD_SEED, REGISTRY_SEED};
+use crate::constants::{
+    LVST_AUTHORITY_SEED, LVST_ESCROW_SEED, MARKET_SEED, MARKET_STEWARD_SEED, REGISTRY_SEED,
+};
 use crate::error::LivestreakError;
 use crate::state::{Market, MarketSteward, PositionOwner, ProtocolState, Registry};
 
@@ -477,6 +479,144 @@ pub fn handle_claim_loss_lvst(
 
     let len = ctx.accounts.protocol_state.to_account_info().data_len();
     store(&mut ctx.accounts.protocol_state, &p, len)?;
+    Ok(())
+}
+
+// ── stake_lvst / unstake_lvst ───────────────────────────────────────────────────
+
+/// LVST holders stake into a market's treasury to earn (later-chunk) USDC dividends.
+/// This chunk is custody + ledger only: the staked LVST lives in a PHYSICAL per-market
+/// escrow (["lvst_escrow", market_id], authority = protocol_state) and the amount is
+/// tracked by the engine's TreasuryRegistry — the single source of truth for every
+/// staked balance, mirroring how the USDC ops let the engine own the numbers.
+///
+/// Mint-identity is deliberately NOT constrained to the canonical LVST mint: the escrow
+/// is a per-market PDA and the engine ledger is denominated in whatever token it holds,
+/// so custody + ledger are self-consistent on their own. The FIRST staker's `lvst_mint`
+/// binds the escrow (`token::mint = lvst_mint` on the init_if_needed account); every
+/// later stake/unstake with a different mint fails that same constraint on the now-
+/// existing escrow, so the market's staking denomination is fixed without the program
+/// having to know the canonical mint. (Later dividend chunks that touch the LVST mint
+/// authority can add the canonical-mint constraint where it actually matters.)
+#[derive(Accounts)]
+pub struct StakeLvst<'info> {
+    #[account(mut)]
+    pub staker: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [PROTOCOL_SEED, &protocol_state.market_id],
+        bump = protocol_state.bump
+    )]
+    pub protocol_state: Account<'info, ProtocolState>,
+    pub lvst_mint: Account<'info, Mint>,
+    /// Per-market LVST staking escrow, created lazily on the first stake (payer = staker).
+    /// init_if_needed is already an enabled anchor feature; a lazy init keeps this to the
+    /// scoped two instructions (no separate init op / extra client round-trip) and cannot
+    /// be griefed into a bad state — the seeds are fixed and the mint/authority constraints
+    /// are re-checked on every call, so there is no trusted data to corrupt.
+    #[account(
+        init_if_needed,
+        payer = staker,
+        seeds = [LVST_ESCROW_SEED, &protocol_state.market_id],
+        bump,
+        token::mint = lvst_mint,
+        token::authority = protocol_state
+    )]
+    pub lvst_escrow: Account<'info, TokenAccount>,
+    #[account(mut, token::mint = lvst_mint, token::authority = staker)]
+    pub staker_lvst: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+pub fn handle_stake_lvst(ctx: Context<StakeLvst>, amount: u64) -> Result<()> {
+    let mut p = load(&ctx.accounts.protocol_state)?;
+    // Physical custody first: staker -> escrow (the staker signs the pull).
+    token::transfer(
+        CpiContext::new(
+            ctx.accounts.token_program.key(),
+            Transfer {
+                from: ctx.accounts.staker_lvst.to_account_info(),
+                to: ctx.accounts.lvst_escrow.to_account_info(),
+                authority: ctx.accounts.staker.to_account_info(),
+            },
+        ),
+        amount,
+    )?;
+    // Ledger update: the treasury owns the zero-amount guard (typed TreasuryZeroStake).
+    p.treasury
+        .stake_lvst(ctx.accounts.staker.key().to_bytes(), amount as u128)
+        .map_err(engine_err)?;
+    let len = ctx.accounts.protocol_state.to_account_info().data_len();
+    store(&mut ctx.accounts.protocol_state, &p, len)?;
+    assert_lvst_conserved(&mut ctx.accounts.lvst_escrow, &p)?;
+    Ok(())
+}
+
+#[derive(Accounts)]
+pub struct UnstakeLvst<'info> {
+    pub staker: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [PROTOCOL_SEED, &protocol_state.market_id],
+        bump = protocol_state.bump
+    )]
+    pub protocol_state: Account<'info, ProtocolState>,
+    pub lvst_mint: Account<'info, Mint>,
+    /// Require-exists: you cannot unstake without a prior stake, which created this escrow.
+    #[account(
+        mut,
+        seeds = [LVST_ESCROW_SEED, &protocol_state.market_id],
+        bump,
+        token::mint = lvst_mint,
+        token::authority = protocol_state
+    )]
+    pub lvst_escrow: Account<'info, TokenAccount>,
+    #[account(mut, token::mint = lvst_mint, token::authority = staker)]
+    pub staker_lvst: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
+
+pub fn handle_unstake_lvst(ctx: Context<UnstakeLvst>, amount: u64) -> Result<()> {
+    let mut p = load(&ctx.accounts.protocol_state)?;
+    // Ledger first: the treasury enforces (typed TreasuryInvalidUnstake) that you cannot
+    // unstake more than staked — it never saturates — and returns the exact payout amount.
+    let payout = p
+        .treasury
+        .unstake_lvst(ctx.accounts.staker.key().to_bytes(), amount as u128)
+        .map_err(engine_err)?;
+    // Pay the LVST back out of the escrow, signed by the protocol_state PDA.
+    let market_id = ctx.accounts.protocol_state.market_id;
+    let bump = ctx.accounts.protocol_state.bump;
+    let seeds: &[&[u8]] = &[PROTOCOL_SEED, &market_id, &[bump]];
+    token::transfer(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.key(),
+            Transfer {
+                from: ctx.accounts.lvst_escrow.to_account_info(),
+                to: ctx.accounts.staker_lvst.to_account_info(),
+                authority: ctx.accounts.protocol_state.to_account_info(),
+            },
+            &[seeds],
+        ),
+        u64_amount(payout)?,
+    )?;
+    let len = ctx.accounts.protocol_state.to_account_info().data_len();
+    store(&mut ctx.accounts.protocol_state, &p, len)?;
+    assert_lvst_conserved(&mut ctx.accounts.lvst_escrow, &p)?;
+    Ok(())
+}
+
+/// LVST-side twin of `assert_conserved`: the staking escrow's balance must exactly equal
+/// the treasury's staked-LVST ledger after every stake/unstake. Follows the same exact-
+/// equality invariant the USDC token-moving ops use (a direct token donation to the
+/// escrow would break it, identically to the USDC escrow — accepted design parity).
+fn assert_lvst_conserved(escrow: &mut Account<TokenAccount>, p: &Protocol) -> Result<()> {
+    escrow.reload()?;
+    require!(
+        escrow.amount as u128 == p.treasury.staked_lvst_held,
+        LivestreakError::ConservationViolated
+    );
     Ok(())
 }
 
