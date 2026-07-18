@@ -13,6 +13,7 @@ import {
   buildCollectIx,
   buildCreateAtaIdempotentIx,
   buildFundIx,
+  buildGrowProtocolIx,
   buildLivestreakTransaction,
   buildMintPositionIx,
   buildSetLanesIx,
@@ -31,7 +32,7 @@ import {
 } from "@livestreak/wallet";
 
 import { validateOptionsVaultSide } from "../../model/vault.js";
-import { asTokenId, type TokenId } from "../../model/ids.js";
+import { asTokenId, type TokenId, type VaultId } from "../../model/ids.js";
 import {
   asTxId,
   type AdvanceInput,
@@ -104,9 +105,13 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
       // settlement line so the ready_at-aware retry can wait precisely instead of falling back.
       const logs = (error as { context?: { logs?: readonly string[] } }).context?.logs;
       const settlement = logs?.find((line) => line.includes("settlement pending"));
+      // The two typed capacity faults (StateFull / VaultBoardBehind) name themselves only in those
+      // preflight logs, which the wrap below drops. Fold the detected name into the thrown message
+      // so the capacity-recovery wrapper can read it back off the (message-chain) LiveStreakRuntimeError.
+      const capacity = detectSolanaCapacityError(error);
       const detail = error instanceof Error ? error.message : String(error);
       throw new LiveStreakRuntimeError({
-        message: `Solana transaction failed: ${detail}${settlement === undefined ? "" : ` (${settlement})`}`
+        message: `Solana transaction failed: ${detail}${settlement === undefined ? "" : ` (${settlement})`}${capacity === undefined ? "" : ` (${capacity})`}`
       });
     }
     const readOnly = await account.toReadOnlyAccount();
@@ -134,6 +139,49 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
       }
     }
     throw lastError;
+  };
+
+  // One-shot capacity recovery. The engine emits two typed, permissionlessly-recoverable capacity
+  // faults while a money-moving op loads+stores the engine-state blob:
+  //   • StateFull        → the protocol blob is out of room; the fix is the permissionless
+  //                        grow_protocol ix (payer = signer), which reallocs it one +10_240-byte rung.
+  //   • VaultBoardBehind → the vault's board has more elapsed funder boundaries than the implicit
+  //                        catch-up allows; the fix is to DRAIN it with the bounded advance ix.
+  // Bounded: exactly one recovery + one retry. If the retry still fails we surface its (still-typed)
+  // error. `vaultId` is undefined for token-scoped ops (stopAll / setLanes) that span many vaults —
+  // there is no single board to advance, so VaultBoardBehind is NOT recoverable there and re-throws.
+  const ADVANCE_RECOVERY_MAX_STEPS = 64n;
+  const withCapacityRecovery = async (
+    marketId: Hex32,
+    vaultId: VaultId | undefined,
+    attempt: () => Promise<string>
+  ): Promise<string> => {
+    try {
+      return await attempt();
+    } catch (error) {
+      const capacity = detectSolanaCapacityError(error);
+      if (capacity === "StateFull") {
+        const { signer } = await getWriter();
+        await send([await buildGrowProtocolIx({ programId: ctx.programId, marketId, payer: signer })]);
+        return await attempt();
+      }
+      if (capacity === "VaultBoardBehind" && vaultId !== undefined) {
+        // The fault names the vault but not which side is behind — drain BOTH (SIDE_YES=0, SIDE_NO=1).
+        for (const side of [0, 1]) {
+          await send([
+            await buildAdvanceIx({
+              programId: ctx.programId,
+              marketId,
+              vaultId: vaultIdHex(vaultId),
+              side,
+              maxSteps: ADVANCE_RECOVERY_MAX_STEPS
+            })
+          ]);
+        }
+        return await attempt();
+      }
+      throw error;
+    }
   };
 
   const requireMarketForVault = async (vaultId: string): Promise<Hex32> => {
@@ -219,7 +267,8 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
         rate,
         deposit
       });
-      return asTxId(await send([ix]));
+      // Vault-scoped funding: recover both StateFull (grow) and VaultBoardBehind (advance this vault).
+      return asTxId(await withCapacityRecovery(marketId, input.vaultId, () => send([ix])));
     },
 
     advance: async (input: AdvanceInput): Promise<TxId> => {
@@ -245,7 +294,9 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
         tokenId: tokenIdToHex32(input.tokenId),
         usdcMint: ctx.usdcMint
       });
-      return asTxId(await send([ix]));
+      // Token-scoped: stopAll stops EVERY lane across many vaults, so there is no single board to
+      // advance — VaultBoardBehind is skipped (re-thrown); only StateFull (grow) is recoverable here.
+      return asTxId(await withCapacityRecovery(marketId, undefined, () => send([ix])));
     },
 
     withdraw: async (input: WithdrawInput): Promise<TxId> => {
@@ -268,12 +319,15 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
         vaultId: vaultIdHex(input.vaultId)
       });
       // Each attempt re-runs collect: the HARVEST lives in collect, so cash delivered by a new
-      // cycle boundary only becomes payable after another collect pass.
+      // cycle boundary only becomes payable after another collect pass. Vault-scoped, so wrap the
+      // whole settlement-retry cycle in capacity recovery (both StateFull and VaultBoardBehind).
       return asTxId(
-        await sendWithCycleRetry(async () => {
-          await send([collect]);
-          return [ix];
-        })
+        await withCapacityRecovery(marketId, input.vaultId, () =>
+          sendWithCycleRetry(async () => {
+            await send([collect]);
+            return [ix];
+          })
+        )
       );
     },
 
@@ -303,7 +357,9 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
           })
         );
       }
-      return asTxId(await send(ixs));
+      // Multi-vault withdraw path: one shared market shard, but the tx spans several boards — no
+      // single vault to advance, so VaultBoardBehind re-throws; StateFull (grow) stays recoverable.
+      return asTxId(await withCapacityRecovery(marketId, undefined, () => send(ixs)));
     },
 
     // set_lanes: declarative full-set reshape of a position's lanes with an optional top-up. The
@@ -333,7 +389,9 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
         lanes,
         addDeposit
       });
-      return asTxId(await send([ix]));
+      // A lane-set reshape touches every lane's vault board in the market — no single vault to
+      // advance, so VaultBoardBehind re-throws; only StateFull (grow, from the addDeposit store) recovers.
+      return asTxId(await withCapacityRecovery(marketId, undefined, () => send([ix])));
     },
     // stop_funding: stop a SINGLE lane (one vault, one side) of a position; no cash moves. Market
     // resolves from the lane's vault exactly like advance/withdraw.
@@ -349,7 +407,8 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
         vaultId: vaultIdHex(input.vaultId),
         side
       });
-      return asTxId(await send([ix]));
+      // Vault-scoped single-lane stop: recover both StateFull (grow) and VaultBoardBehind (this vault).
+      return asTxId(await withCapacityRecovery(marketId, input.vaultId, () => send([ix])));
     },
     // A losing position mints LVST against its vault-read loss basis. Market-scoped on Solana
     // (protocol_state per market), so resolve the shard from the vault exactly like withdraw.
@@ -481,6 +540,23 @@ export const settlementRetryWaitMs = (error: unknown, nowMs: number, fallbackMs:
   const readyAt = parseSettlementReadyAt(errorMessageChain(error));
   if (readyAt === undefined) return fallbackMs;
   return Math.min(15_000, Math.max(0, readyAt * 1000 - nowMs + 500));
+};
+
+// The two typed, recoverable capacity faults the engine can raise on preflight. Anchor formats them
+// as `Program log: AnchorError ... Error Code: <Name> ...` and the kit hangs those preflight lines on
+// the error's `context.logs`; once send() wraps the error the name survives only in the message chain.
+export type SolanaCapacityError = "StateFull" | "VaultBoardBehind";
+
+// Detect a capacity fault from a caught send error by flattening BOTH the message/cause chain and any
+// `context.logs` into one haystack and matching the anchor error NAME. Works on the raw kit error
+// (name in logs) and on the wrapped LiveStreakRuntimeError (name folded into the message by send()).
+// Pure + exported for unit tests.
+export const detectSolanaCapacityError = (error: unknown): SolanaCapacityError | undefined => {
+  const logs = (error as { context?: { logs?: readonly string[] } } | null)?.context?.logs ?? [];
+  const haystack = [errorMessageChain(error), ...logs].join(" ");
+  if (haystack.includes("StateFull")) return "StateFull";
+  if (haystack.includes("VaultBoardBehind")) return "VaultBoardBehind";
+  return undefined;
 };
 
 const requirePositiveBigInt = (value: bigint, field: string): bigint => {
