@@ -2,8 +2,10 @@ import { describe, expect, it, beforeEach } from 'vitest'
 import {
   SESSION_CHAIN_KEY,
   SUPPORTED_CHAINS,
+  firstOtherChainWithVaults,
   isValidRecipientAddress,
   readStoredChain,
+  recipientPlaceholder,
 } from '../src/utils/chain'
 
 // readStoredChain guards on `typeof window` and reads sessionStorage; the default vitest env is
@@ -47,6 +49,35 @@ describe('SUPPORTED_CHAINS', () => {
     expect(solana).toBeDefined()
     expect(solana?.deployed).toBe(true)
     expect(solana?.network).toBe('localnet · 8899')
+  })
+})
+
+describe('recipientPlaceholder', () => {
+  it('never prompts a solana user for a 0x address', () => {
+    expect(recipientPlaceholder('solana')).toBe('Transfer to Solana address…')
+    expect(recipientPlaceholder('solana')).not.toContain('0x')
+  })
+
+  it('keeps the sui + evm placeholders chain-accurate', () => {
+    expect(recipientPlaceholder('sui')).toBe('Transfer to Sui address…')
+    expect(recipientPlaceholder('evm')).toBe('Transfer to 0x…')
+  })
+})
+
+describe('firstOtherChainWithVaults', () => {
+  it('skips the active chain and returns the first OTHER chain that has vaults', () => {
+    // Active solana, vaults only on sui -> point at sui (not evm, the old binary "other").
+    expect(firstOtherChainWithVaults('solana', c => c === 'sui')).toBe('sui')
+  })
+
+  it('never points at an equally-empty chain (returns null when no other chain has vaults)', () => {
+    expect(firstOtherChainWithVaults('evm', c => c === 'evm')).toBe(null)
+    expect(firstOtherChainWithVaults('solana', () => false)).toBe(null)
+  })
+
+  it('honours SUPPORTED_CHAINS ordering when multiple others qualify', () => {
+    // sui precedes evm in SUPPORTED_CHAINS; active solana with both funded -> sui wins.
+    expect(firstOtherChainWithVaults('solana', c => c === 'sui' || c === 'evm')).toBe('sui')
   })
 })
 

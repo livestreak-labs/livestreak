@@ -22,6 +22,17 @@ export const SUPPORTED_CHAINS: readonly ChainOption[] = [
   { id: 'solana', label: 'Solana', network: 'localnet · 8899', deployed: true },
 ]
 
+// Empty-state helper: given the active chain, return the FIRST other supported chain that has open
+// vaults (per the `hasVaults` probe), or null if none do. Replaces a binary `evm ? sui : evm` toggle
+// that silently mispointed once Solana became a third chain — the "switch chain" hint must never send
+// a user to an equally-empty chain.
+export function firstOtherChainWithVaults(
+  active: OptionsChainKind,
+  hasVaults: (chain: OptionsChainKind) => boolean,
+): OptionsChainKind | null {
+  return SUPPORTED_CHAINS.map((c) => c.id).find((id) => id !== active && hasVaults(id)) ?? null
+}
+
 export const chainLabel = (id: OptionsChainKind): string =>
   SUPPORTED_CHAINS.find((c) => c.id === id)?.label ?? id
 
@@ -35,6 +46,14 @@ export function readStoredChain(): OptionsChainKind {
   if (stored === 'sui') return 'sui'
   if (stored === 'solana') return 'solana'
   return 'evm'
+}
+
+// Placeholder for a transfer-recipient input, matched to each chain's address shape (EVM/Sui are
+// 0x-hex, Solana is base58) so we never prompt a Solana user for a "0x…" address.
+export function recipientPlaceholder(chain: OptionsChainKind): string {
+  if (chain === 'sui') return 'Transfer to Sui address…'
+  if (chain === 'solana') return 'Transfer to Solana address…'
+  return 'Transfer to 0x…'
 }
 
 export function isValidRecipientAddress(chain: OptionsChainKind, value: string): boolean {

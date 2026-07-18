@@ -3,7 +3,7 @@ import { isAddress } from 'viem'
 import type { OptionsFunctionView, OptionsNftPanel } from '@livestreak/options'
 
 import { isOptionsModeEnabled } from '#/utils/env'
-import { isValidRecipientAddress, type OptionsChainKind } from '#/utils/chain'
+import { isValidRecipientAddress, recipientPlaceholder, type OptionsChainKind } from '#/utils/chain'
 import { useOptionsContext } from '#/providers/options-provider'
 import { OptionsActionButton } from '#/components/atoms/options-action-button'
 import { formatUSDC, formatRunway } from '#/utils/format'
@@ -19,7 +19,9 @@ export function NftPanel() {
 
   if (!optionsEnabled || !options.isConnected || !options.board) return null
 
-  const isSui = options.chain === 'sui'
+  // setApprovalForAll / approve are ERC-721 (EVM) concepts — Sui AND Solana have no operator-approval
+  // model, so gate the whole approval apparatus on EVM (mirrors the per-NFT `showApprove` below).
+  const isEvm = options.chain === 'evm'
   const nfts = options.board.panel.nfts
   const approveAllFn = options.findFunction('setApprovalForAll', fn => fn.target?.kind === 'global')
 
@@ -29,7 +31,7 @@ export function NftPanel() {
         POSITION NFTS
       </div>
 
-      {!isSui && <ApproveAllRow fn={approveAllFn} onApproveAll={options.setApprovalForAll} />}
+      {isEvm && <ApproveAllRow fn={approveAllFn} onApproveAll={options.setApprovalForAll} />}
 
       {nfts.length === 0 ? (
         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', padding: '0 4px 14px', margin: 0 }}>
@@ -49,7 +51,7 @@ export function NftPanel() {
               fn.target?.kind === 'nft' && fn.target.tokenId === nft.tokenId)}
             transferFn={options.findFunction('transferNft', fn =>
               fn.target?.kind === 'nft' && fn.target.tokenId === nft.tokenId)}
-            approveFn={!isSui
+            approveFn={isEvm
               ? options.findFunction('approveNft', fn =>
                 fn.target?.kind === 'nft' && fn.target.tokenId === nft.tokenId)
               : undefined}
@@ -213,7 +215,7 @@ function NftRow({
           <input
             value={transferTo}
             onChange={e => setTransferTo(e.target.value.trim())}
-            placeholder={chain === 'sui' ? 'Transfer to Sui address…' : 'Transfer to 0x…'}
+            placeholder={recipientPlaceholder(chain)}
             style={addressInputStyle}
           />
           <OptionsActionButton
