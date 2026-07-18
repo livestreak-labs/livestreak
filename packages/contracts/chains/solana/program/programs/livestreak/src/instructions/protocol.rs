@@ -435,6 +435,54 @@ pub fn handle_withdraw(ctx: Context<PositionEngineOp>, vault_id: [u8; 32]) -> Re
     Ok(())
 }
 
+// ── set_lanes (declarative full-set reconfiguration) ─────────────────────────────
+
+/// One desired lane in a `set_lanes` full-set declaration. Rates are the human u64 the
+/// client speaks (mirroring `fund`); the handler widens each to the engine's U256 before
+/// the driver call. Anchor-(de)serializable so it rides in the `Vec<LaneArg>` arg.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct LaneArg {
+    pub vault_id: [u8; 32],
+    pub side: u8,
+    pub rate: u64,
+}
+
+/// Declarative FULL-SET lane reconfiguration for one position (Move `set_lanes` parity):
+/// `lanes` is the COMPLETE desired lane set — the engine diffs it against the current lanes,
+/// runs `on_stop` for the removed and `on_fund` for the added. That added-lane on_fund is the
+/// cross-chain STRAND FIX: a top-up that re-adds a run-dry / stopped lane re-funds it, closing
+/// the idle-chain TOCTOU that stranded pot delivery. Because a reshape can carry a top-up,
+/// this reuses the money-moving `PositionEngineOp` shell: `add_deposit` is pulled user->escrow
+/// BEFORE the engine call (mirroring `fund`), and the conservation assert closes the op. The
+/// engine re-guards every desired lane (TooManyLanes / ZeroRate / WrongMarket / DuplicateVault /
+/// UnknownMarket via engine_err); `valid_side` here is only a cheap up-front scheme check.
+pub fn handle_set_lanes(
+    ctx: Context<PositionEngineOp>,
+    lanes: Vec<LaneArg>,
+    add_deposit: u64,
+) -> Result<()> {
+    for lane in &lanes {
+        valid_side(lane.side)?;
+    }
+    let mut p = load(&ctx.accounts.protocol_state)?;
+    ctx.accounts.as_user_op().pull(add_deposit as u128)?;
+    let desired: Vec<([u8; 32], u8, U256)> = lanes
+        .iter()
+        .map(|l| (l.vault_id, l.side, U256::from(l.rate)))
+        .collect();
+    p.set_lanes(
+        token_id_from(&ctx.accounts.position.token_id),
+        &desired,
+        add_deposit as u128,
+        now_secs()?,
+    )
+    .map_err(engine_err)?;
+    let len = ctx.accounts.protocol_state.to_account_info().data_len();
+    store(&mut ctx.accounts.protocol_state, &p, len)?;
+    assert_conserved(&mut ctx.accounts.escrow, &p)?;
+    Ok(())
+}
+
 // ── stop_funding (stop ONE lane) ─────────────────────────────────────────────────
 
 /// Stop a SINGLE funding lane of a position (one vault, one side). Unlike `stop_all`,

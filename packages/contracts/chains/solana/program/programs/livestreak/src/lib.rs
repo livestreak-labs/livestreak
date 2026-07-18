@@ -145,6 +145,14 @@ pub mod livestreak {
         instructions::protocol::handle_stop_funding(ctx, vault_id, side)
     }
 
+    pub fn set_lanes(
+        ctx: Context<PositionEngineOp>,
+        lanes: Vec<LaneArg>,
+        add_deposit: u64,
+    ) -> Result<()> {
+        instructions::protocol::handle_set_lanes(ctx, lanes, add_deposit)
+    }
+
     pub fn withdraw(ctx: Context<PositionEngineOp>, vault_id: [u8; 32]) -> Result<()> {
         instructions::protocol::handle_withdraw(ctx, vault_id)
     }
