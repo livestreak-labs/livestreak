@@ -123,6 +123,10 @@ pub mod livestreak {
         instructions::protocol::handle_mint_position(ctx, salt)
     }
 
+    pub fn transfer_position(ctx: Context<TransferPosition>, new_owner: Pubkey) -> Result<()> {
+        instructions::protocol::handle_transfer_position(ctx, new_owner)
+    }
+
     pub fn fund(
         ctx: Context<PositionEngineOp>,
         vault_id: [u8; 32],

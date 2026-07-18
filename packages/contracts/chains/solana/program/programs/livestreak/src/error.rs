@@ -41,6 +41,8 @@ pub enum LivestreakError {
     WrongLvstMint,
     #[msg("no dividends accrued to claim")]
     NoDividends,
+    #[msg("new position owner must be non-zero")]
+    ZeroNewOwner,
 
     // ── streams ──
     #[msg("too many stream receivers")]

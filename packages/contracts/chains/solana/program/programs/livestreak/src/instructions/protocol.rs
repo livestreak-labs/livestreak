@@ -271,6 +271,32 @@ pub fn handle_mint_position(ctx: Context<MintPosition>, salt: u64) -> Result<()>
     Ok(())
 }
 
+// ── transfer_position ───────────────────────────────────────────────────────────
+
+/// ERC-721-parity ownership transfer of a position NFT. The engine ledger keys every
+/// position by its opaque token_id and never records the owner — ownership lives solely
+/// in this PositionOwner PDA and is enforced by the `position.owner == signer` gate on the
+/// money ops. So a transfer is a pure account-level owner reassignment: no engine load, no
+/// state blob, no token movement. After it the new owner (and only the new owner) can drive
+/// fund/stop_all/withdraw/claim_loss for this position.
+#[derive(Accounts)]
+pub struct TransferPosition<'info> {
+    pub owner: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [POSITION_SEED, &position.token_id],
+        bump = position.bump,
+        constraint = position.owner == owner.key() @ LivestreakError::NotCreator
+    )]
+    pub position: Account<'info, PositionOwner>,
+}
+
+pub fn handle_transfer_position(ctx: Context<TransferPosition>, new_owner: Pubkey) -> Result<()> {
+    require!(new_owner != Pubkey::default(), LivestreakError::ZeroNewOwner);
+    ctx.accounts.position.owner = new_owner;
+    Ok(())
+}
+
 // ── position-gated ops (fund/stop_all/withdraw) ─────────────────────────────────
 
 #[derive(Accounts)]
