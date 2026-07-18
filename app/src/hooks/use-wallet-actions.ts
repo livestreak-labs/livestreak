@@ -11,6 +11,7 @@ import {
 import { privateKeyToAccount } from 'viem/accounts'
 
 import { useOptionsContext } from '#/providers/options-provider'
+import type { OptionsChainKind } from '#/utils/chain'
 import { LOCAL_CHAIN_ID } from '#/utils/env'
 import { LOCALHOST_MOCK_USDC, LOCALHOST_RPC_URL } from '#/utils/deployments'
 
@@ -51,7 +52,7 @@ const localChain = defineChain({
 export interface WalletActions {
   /** The connected Safe (smart-account) address that holds USDC + position NFTs. */
   readonly address: Address | null
-  readonly chain: 'evm' | 'sui'
+  readonly chain: OptionsChainKind
   readonly usdcBalance: number
   readonly isConnected: boolean
   /**
