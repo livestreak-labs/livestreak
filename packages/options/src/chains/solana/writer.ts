@@ -15,7 +15,10 @@ import {
   buildFundIx,
   buildLivestreakTransaction,
   buildMintPositionIx,
+  buildSetLanesIx,
   buildStopAllIx,
+  buildStopFundingIx,
+  buildTransferPositionIx,
   buildWithdrawIx,
   computePositionTokenId,
   createWalletManager,
@@ -23,6 +26,7 @@ import {
   type Address,
   type Hex32,
   type Instruction,
+  type LaneArgInput,
   type LiveStreakSolanaWalletConfig
 } from "@livestreak/wallet";
 
@@ -302,19 +306,50 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
       return asTxId(await send(ixs));
     },
 
-    // ── not available this phase ──────────────────────────────────────────────────────
-    // setLanes: no atomic multi-lane set instruction (only per-vault `fund` + position-wide
-    // `stop_all`). Rebuilding "set" semantics from those would risk mis-stopping lanes — surface it.
-    setLanes: async (_input: SetLanesInput): Promise<never> => {
-      throw new LiveStreakConfigError({
-        message: "Solana: setLanes not supported (no atomic set_lanes instruction; use fund/stopAllFunding)"
+    // set_lanes: declarative full-set reshape of a position's lanes with an optional top-up. The
+    // canonical lanes map 1:1 onto the on-chain LaneArg (vault id, side, positive rate). addDeposit
+    // may be ZERO — a pure reshape moves no cash — so only NEGATIVE/invalid is rejected. Every lane
+    // must live in ONE market (the program aborts WrongMarket on a mismatch); resolve the shard from
+    // the first lane's vault rather than pre-scanning them all. An empty set (clear all lanes) has no
+    // lane to resolve from, so fall back to the token's own market footprint.
+    setLanes: async (input: SetLanesInput): Promise<TxId> => {
+      const addDeposit = requireNonNegativeBigInt(input.addDeposit, "addDeposit");
+      const lanes: LaneArgInput[] = input.lanes.map((lane) => ({
+        vaultId: vaultIdHex(lane.vaultId),
+        side: sideToSolana(validateOptionsVaultSide(lane.side)),
+        rate: requirePositiveBigInt(lane.rate, "rate")
+      }));
+      const marketId =
+        input.lanes.length > 0
+          ? await requireMarketForVault(input.lanes[0]!.vaultId)
+          : await requireMarketForToken(input.tokenId);
+      const { signer } = await getWriter();
+      const ix = await buildSetLanesIx({
+        programId: ctx.programId,
+        marketId,
+        user: signer,
+        tokenId: tokenIdToHex32(input.tokenId),
+        usdcMint: ctx.usdcMint,
+        lanes,
+        addDeposit
       });
+      return asTxId(await send([ix]));
     },
-    // stopFunding: no per-lane bettor stop instruction (only position-wide stop_all).
-    stopFunding: async (_input: StopFundingInput): Promise<never> => {
-      throw new LiveStreakConfigError({
-        message: "Solana: stopFunding not supported (no per-lane stop instruction; use stopAllFunding)"
+    // stop_funding: stop a SINGLE lane (one vault, one side) of a position; no cash moves. Market
+    // resolves from the lane's vault exactly like advance/withdraw.
+    stopFunding: async (input: StopFundingInput): Promise<TxId> => {
+      const side = sideToSolana(validateOptionsVaultSide(input.side));
+      const marketId = await requireMarketForVault(input.vaultId);
+      const { signer } = await getWriter();
+      const ix = await buildStopFundingIx({
+        programId: ctx.programId,
+        marketId,
+        user: signer,
+        tokenId: tokenIdToHex32(input.tokenId),
+        vaultId: vaultIdHex(input.vaultId),
+        side
       });
+      return asTxId(await send([ix]));
     },
     // A losing position mints LVST against its vault-read loss basis. Market-scoped on Solana
     // (protocol_state per market), so resolve the shard from the vault exactly like withdraw.
@@ -364,10 +399,26 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
         message: "Solana: claimDividends not supported (per-market dividend escrow, but the canonical call carries no market to scope it to)"
       });
     },
-    transferNft: async (_input: TransferNftInput): Promise<never> => {
-      throw new LiveStreakConfigError({
-        message: "Solana: transferNft not supported (no NFT-transfer instruction; PositionOwner PDA is bound to its minter)"
+    // transfer_position reassigns the PositionOwner PDA — the CURRENT owner signs, no SPL token moves.
+    // The position PDA is derived from tokenId alone (findPositionPda), so no market resolution is
+    // needed. Solana has no transfer-on-behalf path, so the sender (input.from) must be the wallet
+    // signer — mirror the doMint recipient guard; the new owner is input.to (validated base58 pubkey).
+    transferNft: async (input: TransferNftInput): Promise<TxId> => {
+      const { signer } = await getWriter();
+      const from = validateSolanaUserAddress(input.from, "from");
+      if (String(from) !== String(signer)) {
+        throw new LiveStreakConfigError({
+          message: "Solana: transferNft sender must be the wallet signer (transfer_position is signed by the current owner)"
+        });
+      }
+      const newOwner = validateSolanaUserAddress(input.to, "to");
+      const ix = await buildTransferPositionIx({
+        programId: ctx.programId,
+        owner: signer,
+        tokenId: tokenIdToHex32(input.tokenId),
+        newOwner: address(String(newOwner))
       });
+      return asTxId(await send([ix]));
     },
     approveNft: async (_input: ApproveNftInput): Promise<never> => {
       throw new LiveStreakConfigError({
@@ -436,6 +487,17 @@ const requirePositiveBigInt = (value: bigint, field: string): bigint => {
   if (typeof value !== "bigint" || value <= 0n) {
     throw new LiveStreakConfigError({
       message: `Solana write requires ${field} to be a bigint > 0`,
+      metadata: { details: String(value) }
+    });
+  }
+  return value;
+};
+
+// Zero is legal (a pure lane reshape moves no cash); only reject negatives / non-bigints.
+const requireNonNegativeBigInt = (value: bigint, field: string): bigint => {
+  if (typeof value !== "bigint" || value < 0n) {
+    throw new LiveStreakConfigError({
+      message: `Solana write requires ${field} to be a bigint >= 0`,
       metadata: { details: String(value) }
     });
   }
