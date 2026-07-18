@@ -247,14 +247,27 @@ SOLANA_LOG="/tmp/livestreak-solana.log"
 SOLANA_LEDGER="/tmp/livestreak-solana-ledger"
 ANZA_BIN="$HOME/.local/share/solana/install/active_release/bin"
 
-# The brew solana lacks parts of the toolchain; prefer the official Anza release when present.
+# Pick the NEWEST agave install (brew vs Anza) and pin its bin dir first on PATH — profile-level
+# PATH order is unreliable (a stale Anza 4.1.1 shadowing brew 4.1.2 rejected the sbpf-v3 artifact
+# with "sbpf_version ... not enabled"; v3 deploys need >= 4.1.2). The same dir then serves the
+# solana/solana-keygen CLIs the deploy tooling shells out to, so validator and CLI always match.
 # Fail BEFORE touching chain state if the validator or the built program is missing.
 solana_ensure_toolchain() {
-  [ -d "$ANZA_BIN" ] && export PATH="$ANZA_BIN:$PATH"
-  if ! command -v solana-test-validator >/dev/null 2>&1; then
-    err "solana-test-validator not found (install the Anza toolchain). Aborting Solana leg."
+  local dir v best_dir="" best_ver="0"
+  for dir in /opt/homebrew/bin "$ANZA_BIN" "$(dirname "$(command -v solana-test-validator 2>/dev/null)" 2>/dev/null)"; do
+    [ -n "$dir" ] && [ -x "$dir/solana-test-validator" ] || continue
+    v="$("$dir/solana-test-validator" --version 2>/dev/null | awk '{print $2}')"
+    [ -n "$v" ] || continue
+    if [ "$(printf '%s\n%s\n' "$best_ver" "$v" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)" = "$v" ]; then
+      best_ver="$v"; best_dir="$dir"
+    fi
+  done
+  if [ -z "$best_dir" ]; then
+    err "solana-test-validator not found (install agave via brew or the Anza release). Aborting Solana leg."
     return 1
   fi
+  export PATH="$best_dir:$PATH"
+  log "Solana toolchain: $best_dir (agave $best_ver)"
   if [ ! -f "$ROOT/packages/contracts/chains/solana/program/target/deploy/livestreak.so" ]; then
     err "livestreak.so not built — run 'cargo-build-sbf --arch v3' in .../solana/program/programs/livestreak (see program README: v3 is mandatory)."
     return 1

@@ -29,7 +29,11 @@ Three sharp edges, all deliberate:
    only accepts v3), while litesvm executes v3 fine since 0.14 (hence that pin; 0.10
    choked on v3 with `InvalidAccountData` at `add_program`). One artifact serves both.
    The workspace root can't be the cwd: `cargo-build-sbf` would try to build the wasm
-   crate for SBF and fail on wasm-bindgen.
+   crate for SBF and fail on wasm-bindgen. CACHE TRAP: `--arch` alone does NOT
+   invalidate cargo's cache — switching arch silently reuses the previous artifact
+   (a "v3 rebuild" once shipped v2 bytes in 0.39s). `touch src/lib.rs` first when
+   changing arch, and verify with the ELF e_flags (v3 ⇒ 3):
+   `python3 -c "import struct;print(struct.unpack('<I',open('target/deploy/livestreak.so','rb').read(64)[48:52])[0])"`
 
 3. **ruint is pinned to 1.17 and `Cargo.lock` is committed.** The SBF toolchain
    currently ships rustc 1.89; newer ruint releases require a newer compiler. A plain
