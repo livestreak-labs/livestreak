@@ -9,6 +9,7 @@ import {
   solanaAddress
 } from "@livestreak/wallet";
 import { readOptionalEnv } from "../../config/env.js";
+import { readSolanaDeployment } from "../../config/solana-deployment.js";
 import type { HostServerConfig } from "../../config/host.js";
 import {
   resolveSolanaPayerSeed,
@@ -51,6 +52,10 @@ export interface SolanaPaymasterService {
   readonly advertise: boolean;
   readonly payerAddress: string | null;
   readonly paymasterPath: typeof SOLANA_PAYMASTER_PATH;
+  /** SPL fee-token mints the paymaster leg accepts, advertised in the AA descriptor. */
+  readonly feeTokens: readonly string[];
+  /** The paymaster leg's configured RPC, advertised so the wallet reuses the same endpoint. */
+  readonly rpcUrl: string | null;
   bootstrap(): Promise<void>;
   handleRpc(body: unknown): Promise<{ readonly status: number; readonly body: unknown }>;
 }
@@ -76,13 +81,25 @@ export const readSolanaPaymasterRuntimeConfig = async (
 
   const payer = await resolveSolanaPayerWallet(config);
   const feeTokensRaw = readOptionalEnv("LIVESTREAK_SOLANA_FEE_TOKENS");
-  const feeTokens =
+  const envFeeTokens =
     feeTokensRaw === null
       ? []
       : feeTokensRaw
           .split(",")
           .map((token) => token.trim())
           .filter((token) => token.length > 0);
+
+  // The app only builds a sponsored Solana config when feeTokens[0] is present. With the free-price
+  // in-process signer the honest fee token is the deployment's mock USDC mint, so default to it when
+  // no explicit LIVESTREAK_SOLANA_FEE_TOKENS override is set — otherwise sponsorship is silently
+  // unsatisfiable and every write self-pays.
+  const feeTokens =
+    envFeeTokens.length > 0
+      ? envFeeTokens
+      : (() => {
+          const mint = readSolanaDeployment()?.usdcMint;
+          return mint === undefined ? [] : [mint];
+        })();
 
   return {
     rpcUrl,
@@ -100,6 +117,8 @@ const createDisabledSolanaPaymaster = (): SolanaPaymasterService => ({
   advertise: false,
   payerAddress: null,
   paymasterPath: SOLANA_PAYMASTER_PATH,
+  feeTokens: [],
+  rpcUrl: null,
   async bootstrap() {
     return;
   },
@@ -207,6 +226,8 @@ const createEnabledSolanaPaymaster = (
     },
     payerAddress: config.payerAddress,
     paymasterPath: SOLANA_PAYMASTER_PATH,
+    feeTokens: [...config.feeTokens],
+    rpcUrl: config.rpcUrl,
 
     async bootstrap() {
       const balance = await rpc.getBalance(solanaAddress(config.payerAddress)).send();

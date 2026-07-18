@@ -177,6 +177,14 @@ export const createAaController = (deps: AaRouteDeps) => ({
 
     const result = await deps.solanaPaymaster.handleRpc(req.body);
     res.status(result.status).json(result.body);
+  },
+
+  solanaFaucet: async (
+    req: { body: unknown },
+    res: { status: (code: number) => { json: (body: unknown) => void } }
+  ): Promise<void> => {
+    const result = await deps.solanaFaucet.faucet(req.body);
+    res.status(result.status).json(result.body);
   }
 });
 
@@ -242,7 +250,14 @@ const buildSolanaSponsorshipDescriptor = (
     paymasterPath: deps.solanaPaymaster.paymasterPath,
     ...(deps.solanaPaymaster.payerAddress === null
       ? {}
-      : { payerAddress: deps.solanaPaymaster.payerAddress })
+      : { payerAddress: deps.solanaPaymaster.payerAddress }),
+    // feeTokens + rpcUrl complete the sponsorship triple the app needs to construct the Kora-sponsored
+    // wallet config (options-provider buildSolanaWalletInit). Omit each when empty/unset so the field
+    // is absent rather than a poison empty value.
+    ...(deps.solanaPaymaster.feeTokens.length === 0
+      ? {}
+      : { feeTokens: [...deps.solanaPaymaster.feeTokens] }),
+    ...(deps.solanaPaymaster.rpcUrl === null ? {} : { rpcUrl: deps.solanaPaymaster.rpcUrl })
   };
 };
 
