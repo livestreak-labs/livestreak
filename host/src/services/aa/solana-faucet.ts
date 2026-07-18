@@ -4,7 +4,6 @@ import { join } from "node:path";
 import {
   Connection,
   Keypair,
-  LAMPORTS_PER_SOL,
   PublicKey
 } from "@solana/web3.js";
 import { getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
@@ -18,17 +17,17 @@ import { resolveSolanaRpcUrl } from "../../infrastructure/wallet/solana.js";
 
 // --- exports ---
 
-// Dev top-up UX for the app's Solana arm: a fresh bettor's derived address holds zero USDC and zero
-// SOL, so it cannot bet (or even self-pay to create its own token account). This route mints mock
-// USDC (mint authority = the localnet deployer keypair) and airdrops a little SOL. It is HARD-gated
-// on the solana leg being localnet — the mock mint and free airdrop only exist there — so it can
-// never mint on devnet/mainnet. This mirrors the EVM app's anvil-key top-up, which has no Solana
-// equivalent today.
+// Dev top-up UX for the app's Solana arm: a fresh bettor's derived address holds zero mock USDC, so
+// it has nothing to stake. This route mints mock USDC ONLY (mint authority = the localnet deployer
+// keypair; the recipient's ATA rent is paid by that authority, so the bettor needs no SOL of its own).
+// It deliberately does NOT airdrop SOL: a SOL airdrop is a loopback/devnet-only mechanism that never
+// works on mainnet, so relying on it would bake a broken assumption into the product. End users need
+// zero SOL — transaction fees are covered by the host's Solana paymaster (sponsorship). HARD-gated on
+// the solana leg being localnet, so it can never mint on devnet/mainnet.
 export const SOLANA_FAUCET_PATH = "/aa/solana/faucet";
 
 // 1,000,000 mock USDC (6 decimals). Generous for a dev bettor; overridable per request.
 const DEFAULT_USDC_AMOUNT = 1_000_000_000_000n;
-const DEFAULT_SOL_LAMPORTS = 2 * LAMPORTS_PER_SOL;
 
 export interface SolanaFaucetService {
   /** True only when the solana leg is localnet AND a deploy snapshot is readable. */
@@ -105,17 +104,8 @@ export const createSolanaFaucet = (
         const recipient = parsed.address;
         const usdcMint = new PublicKey(deployment.usdcMint);
 
-        // Belt-and-suspenders: airdrop SOL FIRST (free on localnet) so the recipient can hold its own
-        // ATA rent and self-pay if sponsorship is ever off — the getOrCreateAssociatedTokenAccount
-        // below is funded by the authority regardless, but a bettor with zero SOL cannot otherwise act.
-        let solSignature: string | null = null;
-        if (parsed.sol) {
-          const sig = await connection.requestAirdrop(recipient, DEFAULT_SOL_LAMPORTS);
-          const latest = await connection.getLatestBlockhash();
-          await connection.confirmTransaction({ signature: sig, ...latest }, "confirmed");
-          solSignature = sig;
-        }
-
+        // Mint mock USDC only — no SOL. The recipient's ATA rent below is paid by the authority, so a
+        // zero-SOL bettor still receives USDC; its transaction fees are covered by the paymaster.
         const ata = await getOrCreateAssociatedTokenAccount(
           connection,
           authority,
@@ -137,9 +127,7 @@ export const createSolanaFaucet = (
             address: recipient.toBase58(),
             usdcMint: deployment.usdcMint,
             usdcAmount: parsed.usdcAmount.toString(),
-            usdcSignature,
-            solLamports: parsed.sol ? DEFAULT_SOL_LAMPORTS : 0,
-            solSignature
+            usdcSignature
           }
         };
       } catch (error) {
@@ -155,14 +143,13 @@ export const createSolanaFaucet = (
 interface ParsedFaucetRequest {
   readonly address: PublicKey;
   readonly usdcAmount: bigint;
-  readonly sol: boolean;
 }
 
 const parseFaucetRequest = (body: unknown): ParsedFaucetRequest | null => {
   if (body === null || typeof body !== "object") {
     return null;
   }
-  const request = body as { address?: unknown; usdcAmount?: unknown; sol?: unknown };
+  const request = body as { address?: unknown; usdcAmount?: unknown };
   if (typeof request.address !== "string" || request.address.length === 0) {
     return null;
   }
@@ -179,11 +166,7 @@ const parseFaucetRequest = (body: unknown): ParsedFaucetRequest | null => {
     return null;
   }
 
-  return {
-    address,
-    usdcAmount,
-    sol: request.sol === undefined ? true : request.sol === true
-  };
+  return { address, usdcAmount };
 };
 
 const readAmount = (value: unknown): bigint | null => {

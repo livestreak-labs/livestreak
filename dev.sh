@@ -346,6 +346,13 @@ solana_wire() {
     sol_fund "$ui_addr"
     wire_args="$wire_args --mint $ui_addr=$DEMO_USDC_MINT"
   done
+  # Fund the OPERATOR paymaster/sponsor from the deployer's EXISTING SOL (a transfer, NOT an airdrop),
+  # so the host's Solana paymaster passes its funded check and advertises sponsorship. This is the
+  # Solana mirror of sui_fund_sponsor — operator funds its own fee-payer; end users are sponsored.
+  local sponsor_addr
+  sponsor_addr="$( cd "$ROOT" && node -e "import('@livestreak/wallet').then(async(w)=>{const m=w.createWalletManager('solana',process.env.LIVESTREAK_SOLANA_SPONSOR_SEED,{provider:'$SOLANA_RPC_LOCAL'});console.log(await (await m.getAccount(0)).getAddress())}).catch(()=>{})" 2>/dev/null )"
+  [ -n "$sponsor_addr" ] && wire_args="$wire_args --fund-sol $sponsor_addr=2000000000" \
+    || warn "Solana sponsor address derive failed — sponsorship may not advertise"
   ( cd "$ROOT/packages/contracts" \
       && LIVESTREAK_SOLANA_RPC_URL="$SOLANA_RPC_LOCAL" npm run wire:solana -- $wire_args ) 2>&1 | sed 's/^/  /' \
     || warn "Solana wiring failed (see output above)"
