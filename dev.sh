@@ -322,6 +322,20 @@ solana_leg_up() {
   solana_start || return 1
   solana_deploy || return 1
   export LIVESTREAK_SOLANA_RPC_URL="$SOLANA_RPC_LOCAL"
+  solana_fund_sponsor
+}
+
+# Fund the OPERATOR paymaster/sponsor from the deployer's EXISTING SOL (a transfer, NOT an airdrop),
+# mirror of sui_fund_sponsor. MUST run before host_up: the host paymaster checks the sponsor balance
+# once at bootstrap and sets advertise=false if it is unfunded, so funding it later (in solana_wire,
+# after host_up) leaves sponsorship un-advertised for the whole session. Idempotent (tops up to target).
+solana_fund_sponsor() {
+  local sponsor_addr
+  sponsor_addr="$( cd "$ROOT" && node -e "import('@livestreak/wallet').then(async(w)=>{const m=w.createWalletManager('solana',process.env.LIVESTREAK_SOLANA_SPONSOR_SEED,{provider:'$SOLANA_RPC_LOCAL'});console.log(await (await m.getAccount(0)).getAddress())}).catch(()=>{})" 2>/dev/null )"
+  [ -z "$sponsor_addr" ] && { warn "Solana sponsor address derive failed — sponsorship may not advertise"; return 0; }
+  ( cd "$ROOT/packages/contracts" \
+      && LIVESTREAK_SOLANA_RPC_URL="$SOLANA_RPC_LOCAL" npm run wire:solana -- --fund-sol "$sponsor_addr=2000000000" ) 2>&1 | sed 's/^/  /' \
+    || warn "Solana sponsor funding failed — sponsorship may not advertise"
 }
 
 # Wiring: hand the registry default steward to the steward ROLE + mint mock USDC to the role/UI
@@ -346,13 +360,8 @@ solana_wire() {
     sol_fund "$ui_addr"
     wire_args="$wire_args --mint $ui_addr=$DEMO_USDC_MINT"
   done
-  # Fund the OPERATOR paymaster/sponsor from the deployer's EXISTING SOL (a transfer, NOT an airdrop),
-  # so the host's Solana paymaster passes its funded check and advertises sponsorship. This is the
-  # Solana mirror of sui_fund_sponsor — operator funds its own fee-payer; end users are sponsored.
-  local sponsor_addr
-  sponsor_addr="$( cd "$ROOT" && node -e "import('@livestreak/wallet').then(async(w)=>{const m=w.createWalletManager('solana',process.env.LIVESTREAK_SOLANA_SPONSOR_SEED,{provider:'$SOLANA_RPC_LOCAL'});console.log(await (await m.getAccount(0)).getAddress())}).catch(()=>{})" 2>/dev/null )"
-  [ -n "$sponsor_addr" ] && wire_args="$wire_args --fund-sol $sponsor_addr=2000000000" \
-    || warn "Solana sponsor address derive failed — sponsorship may not advertise"
+  # (The operator sponsor is funded earlier, in solana_leg_up/solana_fund_sponsor, so it is ready
+  # before host_up reads its balance.)
   ( cd "$ROOT/packages/contracts" \
       && LIVESTREAK_SOLANA_RPC_URL="$SOLANA_RPC_LOCAL" npm run wire:solana -- $wire_args ) 2>&1 | sed 's/^/  /' \
     || warn "Solana wiring failed (see output above)"
