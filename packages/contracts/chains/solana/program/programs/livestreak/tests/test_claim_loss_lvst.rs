@@ -48,7 +48,11 @@ fn loser_mints_lvst_and_guards_hold() {
     let registry = h.pda(&[b"registry"]);
     let ix = Instruction::new_with_bytes(
         h.program_id,
-        &livestreak::instruction::Initialize { default_steward: creator.pubkey() }.data(),
+        &livestreak::instruction::Initialize {
+            default_steward: creator.pubkey(),
+            lvst_mint,
+        }
+        .data(),
         livestreak::accounts::Initialize {
             payer: creator.pubkey(),
             registry,

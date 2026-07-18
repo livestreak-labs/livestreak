@@ -490,14 +490,13 @@ pub fn handle_claim_loss_lvst(
 /// tracked by the engine's TreasuryRegistry — the single source of truth for every
 /// staked balance, mirroring how the USDC ops let the engine own the numbers.
 ///
-/// Mint-identity is deliberately NOT constrained to the canonical LVST mint: the escrow
-/// is a per-market PDA and the engine ledger is denominated in whatever token it holds,
-/// so custody + ledger are self-consistent on their own. The FIRST staker's `lvst_mint`
-/// binds the escrow (`token::mint = lvst_mint` on the init_if_needed account); every
-/// later stake/unstake with a different mint fails that same constraint on the now-
-/// existing escrow, so the market's staking denomination is fixed without the program
-/// having to know the canonical mint. (Later dividend chunks that touch the LVST mint
-/// authority can add the canonical-mint constraint where it actually matters.)
+/// Mint-identity IS constrained to the canonical LVST mint recorded in the registry at
+/// `initialize`. Custody + the per-market escrow binding alone are self-consistent, but
+/// once `claim_dividends` pays real USDC pro-rata to the stake ledger a fake-mint stake
+/// becomes value extraction — and `mint::authority = lvst_authority` is not sufficient (an
+/// attacker can pre-mint supply then transfer the mint authority to our PDA). So the true
+/// canonical mint is pinned in program state at the deployer-trusted moment and checked by
+/// KEY equality here. Unstake needs no such check (its escrow is already bound by mint).
 #[derive(Accounts)]
 pub struct StakeLvst<'info> {
     #[account(mut)]
@@ -508,6 +507,10 @@ pub struct StakeLvst<'info> {
         bump = protocol_state.bump
     )]
     pub protocol_state: Account<'info, ProtocolState>,
+    /// Read-only registry: the canonical LVST mint lives here (recorded at initialize).
+    #[account(seeds = [REGISTRY_SEED], bump = registry.bump)]
+    pub registry: Account<'info, Registry>,
+    #[account(constraint = lvst_mint.key() == registry.lvst_mint @ LivestreakError::WrongLvstMint)]
     pub lvst_mint: Account<'info, Mint>,
     /// Per-market LVST staking escrow, created lazily on the first stake (payer = staker).
     /// init_if_needed is already an enabled anchor feature; a lazy init keeps this to the
@@ -617,6 +620,56 @@ fn assert_lvst_conserved(escrow: &mut Account<TokenAccount>, p: &Protocol) -> Re
         escrow.amount as u128 == p.treasury.staked_lvst_held,
         LivestreakError::ConservationViolated
     );
+    Ok(())
+}
+
+// ── claim_dividends ─────────────────────────────────────────────────────────────
+
+/// A staker claims their accrued USDC dividends (the staking share of collected skim).
+/// Money-out mirror of `withdraw`: the engine treasury owns the amount — it settles the
+/// MasterChef accrual, zeroes the accrued ledger, and decrements `treasury.usdc_held` —
+/// and the program pays exactly that out of the SHARED USDC escrow (skim never left it;
+/// the treasury ledger just partitioned it). No mint check: no LVST is minted or moved.
+/// This MOVES USDC, so the conservation assert is mandatory.
+#[derive(Accounts)]
+pub struct ClaimDividends<'info> {
+    pub staker: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [PROTOCOL_SEED, &protocol_state.market_id],
+        bump = protocol_state.bump
+    )]
+    pub protocol_state: Account<'info, ProtocolState>,
+    #[account(mut, seeds = [ESCROW_SEED, &protocol_state.market_id], bump)]
+    pub escrow: Account<'info, TokenAccount>,
+    /// The staker's USDC token account. Require-exists (mirrors the other user_usdc ATAs).
+    #[account(mut, constraint = staker_usdc.owner == staker.key() @ LivestreakError::NotCreator)]
+    pub staker_usdc: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
+
+impl<'info> ClaimDividends<'info> {
+    fn as_user_op(&self) -> UserOpRefs<'_, 'info> {
+        UserOpRefs {
+            protocol_state: &self.protocol_state,
+            escrow: &self.escrow,
+            user_usdc: &self.staker_usdc,
+            user: &self.staker,
+            token_program: &self.token_program,
+        }
+    }
+}
+
+pub fn handle_claim_dividends(ctx: Context<ClaimDividends>) -> Result<()> {
+    let mut p = load(&ctx.accounts.protocol_state)?;
+    // The treasury settles + zeroes the accrued ledger and decrements usdc_held itself,
+    // returning the exact USDC amount to pay. Zero accrued => nothing to claim (typed).
+    let amount = p.treasury.claim_dividends(ctx.accounts.staker.key().to_bytes());
+    require!(amount > 0, LivestreakError::NoDividends);
+    ctx.accounts.as_user_op().pay(amount)?;
+    let len = ctx.accounts.protocol_state.to_account_info().data_len();
+    store(&mut ctx.accounts.protocol_state, &p, len)?;
+    assert_conserved(&mut ctx.accounts.escrow, &p)?;
     Ok(())
 }
 

@@ -73,8 +73,12 @@ declare_id!("CZnAfgbnbVtuXDRQynwL9XMHqeQ7wngbodRihGLbErK8");
 pub mod livestreak {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, default_steward: Pubkey) -> Result<()> {
-        instructions::initialize::handle_initialize(ctx, default_steward)
+    pub fn initialize(
+        ctx: Context<Initialize>,
+        default_steward: Pubkey,
+        lvst_mint: Pubkey,
+    ) -> Result<()> {
+        instructions::initialize::handle_initialize(ctx, default_steward, lvst_mint)
     }
 
     pub fn register_market(
@@ -167,5 +171,9 @@ pub mod livestreak {
 
     pub fn unstake_lvst(ctx: Context<UnstakeLvst>, amount: u64) -> Result<()> {
         instructions::protocol::handle_unstake_lvst(ctx, amount)
+    }
+
+    pub fn claim_dividends(ctx: Context<ClaimDividends>) -> Result<()> {
+        instructions::protocol::handle_claim_dividends(ctx)
     }
 }

@@ -27,7 +27,11 @@ fn instant_same_side_resolve_pays_out() {
     let registry = h.pda(&[b"registry"]);
     let ix = Instruction::new_with_bytes(
         h.program_id,
-        &livestreak::instruction::Initialize { default_steward: creator.pubkey() }.data(),
+        &livestreak::instruction::Initialize {
+            default_steward: creator.pubkey(),
+            lvst_mint: Pubkey::default(),
+        }
+        .data(),
         livestreak::accounts::Initialize {
             payer: creator.pubkey(),
             registry,

@@ -110,6 +110,19 @@ async function main(): Promise<void> {
     await new Promise((r) => setTimeout(r, 1000));
   }
 
+  // LVST reward token — protocol-wide (one mint across all markets), so the mint authority
+  // is the program's lvst_authority PDA, letting later instructions mint (loss-mint /
+  // staking dividends). SPL caps at 9 decimals; 9 matches the Sui coin (EVM uses 18 there).
+  // No freeze authority. Created BEFORE initialize so its pubkey can be recorded as the
+  // registry's canonical LVST mint (staking constrains against it — a fake-mint stake would
+  // otherwise extract real USDC dividends once claim_dividends pays pro-rata).
+  const [lvstAuthority] = PublicKey.findProgramAddressSync(
+    [Buffer.from(LVST_AUTHORITY_SEED)],
+    programId,
+  );
+  const lvstMint = await createMint(connection, deployer, lvstAuthority, null, 9);
+  console.log(`LVST mint ${lvstMint.toBase58()} (authority ${lvstAuthority.toBase58()})`);
+
   const [registry] = PublicKey.findProgramAddressSync([Buffer.from(REGISTRY_SEED)], programId);
   const defaultSteward = args.defaultSteward
     ? new PublicKey(args.defaultSteward)
@@ -117,7 +130,7 @@ async function main(): Promise<void> {
 
   const registryInfo = await connection.getAccountInfo(registry);
   if (registryInfo === null) {
-    const data = Buffer.concat([INITIALIZE_DISC, defaultSteward.toBytes()]);
+    const data = Buffer.concat([INITIALIZE_DISC, defaultSteward.toBytes(), lvstMint.toBytes()]);
     const ix = new TransactionInstruction({
       programId,
       keys: [
@@ -145,17 +158,6 @@ async function main(): Promise<void> {
   // Mock USDC (6 decimals), mint authority = deployer — dev.sh mints to roles from it.
   const usdcMint = await createMint(connection, deployer, deployer.publicKey, null, 6);
   console.log(`mock USDC mint ${usdcMint.toBase58()}`);
-
-  // LVST reward token — protocol-wide (one mint across all markets), so the mint authority
-  // is the program's lvst_authority PDA, letting later instructions mint (loss-mint /
-  // staking dividends). SPL caps at 9 decimals; 9 matches the Sui coin (EVM uses 18 there).
-  // No freeze authority.
-  const [lvstAuthority] = PublicKey.findProgramAddressSync(
-    [Buffer.from(LVST_AUTHORITY_SEED)],
-    programId,
-  );
-  const lvstMint = await createMint(connection, deployer, lvstAuthority, null, 9);
-  console.log(`LVST mint ${lvstMint.toBase58()} (authority ${lvstAuthority.toBase58()})`);
 
   const snapshot: SolanaDeployment = {
     chain: args.name,

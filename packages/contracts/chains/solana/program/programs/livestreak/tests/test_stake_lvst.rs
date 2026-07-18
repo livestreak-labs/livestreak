@@ -6,9 +6,9 @@
 //!
 //! The LVST mint here is created with a HARNESS-controlled authority so the test can
 //! MintTo the staker directly: stake/unstake only MOVE existing tokens, they never mint,
-//! so the canonical lvst_authority PDA is irrelevant to this path. The program also does
-//! not constrain the mint identity — the per-market escrow's `token::mint` binds it on
-//! first stake — so any consistent mint works (documented in the instruction).
+//! so the canonical lvst_authority PDA is irrelevant to this path. `initialize` records
+//! THIS mint as the registry's canonical LVST mint, so the stake constraint (which checks
+//! KEY equality against the registry, not the mint authority) is satisfied.
 
 mod common;
 
@@ -49,7 +49,10 @@ fn stake_unstake_custody_and_typed_guards() {
     let registry = h.pda(&[b"registry"]);
     let ix = Instruction::new_with_bytes(
         h.program_id,
-        &livestreak::instruction::Initialize { default_steward: creator.pubkey() }.data(),
+        // Record the harness LVST mint as canonical so the stake constraint passes (the
+        // constraint checks KEY equality, not the mint authority — see the test doc header).
+        &livestreak::instruction::Initialize { default_steward: creator.pubkey(), lvst_mint }
+            .data(),
         livestreak::accounts::Initialize {
             payer: creator.pubkey(),
             registry,
@@ -113,6 +116,7 @@ fn stake_unstake_custody_and_typed_guards() {
             livestreak::accounts::StakeLvst {
                 staker: staker.pubkey(),
                 protocol_state,
+                registry,
                 lvst_mint,
                 lvst_escrow,
                 staker_lvst,

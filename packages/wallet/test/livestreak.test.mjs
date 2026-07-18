@@ -37,6 +37,7 @@ const PROGRAM_ID = address('CZnAfgbnbVtuXDRQynwL9XMHqeQ7wngbodRihGLbErK8')
 const STEWARD = address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
 const USER = address('So11111111111111111111111111111111111111112')
 const USDC = address('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')
+const LVST_MINT = address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL')
 const ID_A = '0x' + '11'.repeat(32)
 const ID_B = '0x' + '22'.repeat(32)
 
@@ -56,7 +57,8 @@ const idlByName = Object.fromEntries(livestreakIdl.instructions.map((ix) => [ix.
 
 // One representative invocation per IDL instruction name.
 const built = {
-  initialize: () => buildInitializeIx({ programId: PROGRAM_ID, payer: USER, defaultSteward: STEWARD }),
+  initialize: () =>
+    buildInitializeIx({ programId: PROGRAM_ID, payer: USER, defaultSteward: STEWARD, lvstMint: LVST_MINT }),
   init_protocol: () =>
     buildInitProtocolIx({ programId: PROGRAM_ID, marketId: ID_A, payer: USER, usdcMint: USDC, capacity: 9000 }),
   register_market: () =>
@@ -116,12 +118,12 @@ const built = {
 }
 
 describe('livestreak instruction builders', () => {
-  it('initialize data == deploy encoding (disc + steward pubkey)', async () => {
+  it('initialize data == deploy encoding (disc + steward pubkey + lvst mint pubkey)', async () => {
     const ix = await built.initialize()
     const disc = Uint8Array.from([175, 175, 109, 31, 13, 152, 155, 237])
-    const expected = new Uint8Array([...disc, ...bytesOf(STEWARD)])
+    const expected = new Uint8Array([...disc, ...bytesOf(STEWARD), ...bytesOf(LVST_MINT)])
     assert.deepEqual(ix.data, expected)
-    assert.equal(ix.data.length, 40)
+    assert.equal(ix.data.length, 72)
   })
 
   it('every instruction matches its IDL discriminator + account count/order', async () => {
@@ -199,11 +201,13 @@ describe('livestreak account decoders', () => {
       ...u64le.encode(7n),
       ...bytesOf(STEWARD),
       9,
+      ...bytesOf(LVST_MINT), // lvst_mint appended last
     ])
     const acc = decodeRegistryAccount(bytes)
     assert.equal(acc.marketCount, 7n)
     assert.equal(acc.defaultSteward, STEWARD)
     assert.equal(acc.bump, 9)
+    assert.equal(acc.lvstMint, LVST_MINT)
   })
 
   it('round-trips a MarketIndex account', () => {

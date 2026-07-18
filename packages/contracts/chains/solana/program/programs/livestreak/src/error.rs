@@ -37,6 +37,10 @@ pub enum LivestreakError {
     ConservationViolated,
     #[msg("settlement pending: winnings payable after the cycle boundary at ready_at")]
     SettlementPending,
+    #[msg("staked mint is not the canonical LVST mint recorded in the registry")]
+    WrongLvstMint,
+    #[msg("no dividends accrued to claim")]
+    NoDividends,
 
     // ── streams ──
     #[msg("too many stream receivers")]

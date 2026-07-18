@@ -87,15 +87,17 @@ interface MarketScoped extends Base {
 export interface InitializeInput extends Base {
   payer: Address
   defaultSteward: Address
+  /** The canonical LVST reward-token mint, recorded in the registry for the staking guard. */
+  lvstMint: Address
 }
 
-/** initialize: create the singleton registry with a default steward. */
+/** initialize: create the singleton registry with a default steward + canonical LVST mint. */
 export async function buildInitializeIx(input: InitializeInput): Promise<Instruction> {
   const registry = first(await findRegistryPda(input.programId))
   return {
     programAddress: input.programId,
     accounts: [writableSigner(input.payer), writable(registry), readonly(SYSTEM_PROGRAM_ADDRESS)],
-    data: encodeData('initialize', enc(pubkey, input.defaultSteward)),
+    data: encodeData('initialize', enc(pubkey, input.defaultSteward), enc(pubkey, input.lvstMint)),
   }
 }
 
