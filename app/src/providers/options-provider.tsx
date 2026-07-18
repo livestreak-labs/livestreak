@@ -10,7 +10,7 @@ import {
 } from 'react'
 import { sha256, toBytes, hexToBytes, bytesToHex, parseUnits, isAddress, type Address } from 'viem'
 import { Schema } from 'effect'
-import { EvmWalletInitConfig, SolanaWalletInitConfig, type WalletInit } from '@livestreak/schema'
+import { EvmWalletInitConfig, solanaWalletInitFromDescriptor, type WalletInit } from '@livestreak/schema'
 import { localnetDeployment } from '@livestreak/contracts/sui'
 import { localnetDeployment as solanaLocalnetDeployment } from '@livestreak/contracts/solana/deployments/localnet'
 import {
@@ -249,29 +249,14 @@ function buildWalletInit(descriptor: AaCapabilityDescriptor): WalletInit {
 const SOLANA_RPC_URL = solanaLocalnetDeployment.rpc
 
 // Build the solana WalletInit from the host descriptor. When the descriptor advertises a
-// solanaSponsorship module (Kora leg up), carry the paymaster triple so writes are fee-payer
-// co-signed; otherwise a self-pay config (provider only) so the read-only board still loads.
+// Delegates to the shared schema helper so the app and the CLI gateway map the host's advertised
+// Solana sponsorship the same way (Kora paymaster triple → fee-payer co-signed writes; else self-pay).
 function buildSolanaWalletInit(descriptor: AaCapabilityDescriptor): WalletInit {
-  const sponsorship = descriptor.solanaSponsorship
-  const canSponsor =
-    sponsorship !== undefined &&
-    sponsorship.payerAddress !== undefined &&
-    (sponsorship.feeTokens?.[0] ?? undefined) !== undefined
-
-  const config = Schema.decodeUnknownSync(SolanaWalletInitConfig)(
-    canSponsor
-      ? {
-          provider: sponsorship.rpcUrl ?? SOLANA_RPC_URL,
-          isSponsored: true,
-          paymasterUrl: `${HOST_BASE_URL}${sponsorship.paymasterPath}`,
-          paymasterAddress: sponsorship.payerAddress,
-          paymasterToken: { address: sponsorship.feeTokens![0] },
-          network: 'localnet',
-        }
-      : { provider: SOLANA_RPC_URL, network: 'localnet' },
-  )
-
-  return { chain: 'solana', seedSource: 'raw', config }
+  return solanaWalletInitFromDescriptor(descriptor.solanaSponsorship, {
+    hostBaseUrl: HOST_BASE_URL,
+    fallbackRpc: SOLANA_RPC_URL,
+    network: 'localnet',
+  })
 }
 
 // Read-only viewer used to populate the board for a disconnected visitor — a dummy address that owns

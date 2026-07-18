@@ -124,3 +124,45 @@ export const WalletInit = Schema.Union(
   })
 );
 export type WalletInit = Schema.Schema.Type<typeof WalletInit>;
+
+// --- descriptor → wallet-init (shared edge composition) ---
+
+// The minimal Solana sponsorship shape a host AA descriptor advertises — just the fields the
+// wallet-init mapping reads. Kept structural (NOT an import of @livestreak/host's descriptor) so this
+// foundation stays dependency-free; each edge passes its `descriptor.solanaSponsorship` straight in.
+export interface SolanaSponsorshipInput {
+  readonly paymasterPath: string;
+  readonly payerAddress?: string;
+  readonly feeTokens?: readonly string[];
+  readonly rpcUrl?: string;
+}
+
+// Map a host's advertised Solana sponsorship into a WalletInit — the ONE place both edges (the app
+// provider and the CLI gateway) shape this config, instead of each hand-rolling the same field copy.
+// Sponsors only when the full paymaster triple is advertised (payerAddress + a fee token); otherwise a
+// self-pay config so the read-only board still loads and writes fund their own fee. `hostBaseUrl`
+// prefixes the relative paymasterPath; `fallbackRpc` is used when the descriptor carries no rpcUrl.
+export function solanaWalletInitFromDescriptor(
+  sponsorship: SolanaSponsorshipInput | undefined,
+  opts: {
+    readonly hostBaseUrl: string;
+    readonly fallbackRpc: string;
+    readonly network?: "mainnet-beta" | "devnet" | "testnet" | "localnet";
+  }
+): WalletInit {
+  const network = opts.network ?? "localnet";
+  const feeToken = sponsorship?.feeTokens?.[0];
+  const raw =
+    sponsorship !== undefined && sponsorship.payerAddress !== undefined && feeToken !== undefined
+      ? {
+          provider: sponsorship.rpcUrl ?? opts.fallbackRpc,
+          isSponsored: true,
+          paymasterUrl: `${opts.hostBaseUrl}${sponsorship.paymasterPath}`,
+          paymasterAddress: sponsorship.payerAddress,
+          paymasterToken: { address: feeToken },
+          network
+        }
+      : { provider: opts.fallbackRpc, network };
+  const config = Schema.decodeUnknownSync(SolanaWalletInitConfig)(raw);
+  return { chain: "solana", seedSource: "raw", config };
+}
