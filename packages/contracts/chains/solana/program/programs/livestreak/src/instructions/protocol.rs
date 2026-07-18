@@ -5,7 +5,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 use ruint::aliases::U256;
-use livestreak_engine::{Protocol, SIDE_NO, SIDE_YES};
+use livestreak_engine::{Protocol, STATUS_RESOLVED, SIDE_NO, SIDE_YES};
 
 use crate::constants::{MARKET_SEED, MARKET_STEWARD_SEED, REGISTRY_SEED};
 use crate::error::LivestreakError;
@@ -32,6 +32,31 @@ fn now_secs() -> Result<u64> {
 
 fn valid_side(side: u8) -> Result<()> {
     require!(side == SIDE_YES || side == SIDE_NO, LivestreakError::BadScheme);
+    Ok(())
+}
+
+/// Winnings freeze from board truth at `resolved_at`, but the CASH only lands in the
+/// vault ledger when the next drips cycle boundary completes. A withdraw before that
+/// boundary would otherwise fail deep in the pay path with the confusing
+/// VaultInsufficientUsdc — gate it up front with a legible error and log the concrete
+/// `ready_at` so clients can wait for it. Unresolved vaults are untouched (the engine
+/// keeps its NotResolved / zero-payout behavior).
+fn require_settled(p: &Protocol, vault_id: &[u8; 32], now: u64) -> Result<()> {
+    if let Ok(v) = p.vault.get_vault(vault_id) {
+        if v.status == STATUS_RESOLVED {
+            let cycle = p.streams.cycle_secs;
+            // ceil(resolved_at / cycle) * cycle — on-boundary resolves pay immediately.
+            let ready_at = if cycle == 0 {
+                v.resolved_at
+            } else {
+                v.resolved_at.div_ceil(cycle).saturating_mul(cycle)
+            };
+            if now < ready_at {
+                msg!("settlement pending: ready_at={}", ready_at);
+                return Err(error!(LivestreakError::SettlementPending));
+            }
+        }
+    }
     Ok(())
 }
 
@@ -370,8 +395,10 @@ pub fn handle_stop_all(ctx: Context<PositionEngineOp>) -> Result<()> {
 
 pub fn handle_withdraw(ctx: Context<PositionEngineOp>, vault_id: [u8; 32]) -> Result<()> {
     let mut p = load(&ctx.accounts.protocol_state)?;
+    let now = now_secs()?;
+    require_settled(&p, &vault_id, now)?;
     let paid = p
-        .withdraw(token_id_from(&ctx.accounts.position.token_id), &vault_id, now_secs()?)
+        .withdraw(token_id_from(&ctx.accounts.position.token_id), &vault_id, now)
         .map_err(engine_err)?;
     ctx.accounts.as_user_op().pay(paid)?;
     let len = ctx.accounts.protocol_state.to_account_info().data_len();
@@ -396,8 +423,10 @@ pub fn handle_stop_seed(ctx: Context<UserEngineOp>, vault_id: [u8; 32]) -> Resul
 
 pub fn handle_withdraw_seed(ctx: Context<UserEngineOp>, vault_id: [u8; 32]) -> Result<()> {
     let mut p = load(&ctx.accounts.protocol_state)?;
+    let now = now_secs()?;
+    require_settled(&p, &vault_id, now)?;
     let paid = p
-        .withdraw_seed(&vault_id, ctx.accounts.user.key().to_bytes(), now_secs()?)
+        .withdraw_seed(&vault_id, ctx.accounts.user.key().to_bytes(), now)
         .map_err(engine_err)?;
     ctx.accounts.pay(paid)?;
     let len = ctx.accounts.protocol_state.to_account_info().data_len();

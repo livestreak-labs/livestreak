@@ -35,6 +35,8 @@ pub enum LivestreakError {
     NotSteward,
     #[msg("escrow balance diverged from engine ledgers")]
     ConservationViolated,
+    #[msg("settlement pending: winnings payable after the cycle boundary at ready_at")]
+    SettlementPending,
 
     // ── streams ──
     #[msg("too many stream receivers")]

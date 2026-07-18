@@ -155,6 +155,24 @@ fn instant_same_side_resolve_pays_out() {
     );
     h.send(ix, &[&creator]).unwrap();
 
+    // Resolved at t (mid-cycle), but the winnings cash only lands in the vault ledger when the
+    // next drips cycle boundary (cycle_secs=10) completes. A withdraw before ready_at must fail
+    // with the legible SettlementPending gate — not the confusing VaultInsufficientUsdc from
+    // deep in the pay path.
+    let early = h.send(
+        Instruction::new_with_bytes(
+            h.program_id,
+            &livestreak::instruction::Withdraw { vault_id }.data(),
+            position_op(bettor.pubkey(), bettor_ata).to_account_metas(None),
+        ),
+        &[&h.payer.insecure_clone(), &bettor],
+    );
+    let err = early.expect_err("withdraw before the cycle boundary must be gated");
+    assert!(
+        err.contains("settlement pending"),
+        "expected SettlementPending gate before the boundary, got: {err}"
+    );
+
     // Stop both legs, then cross a drips cycle boundary (cycle_secs=10) so the streamed cash
     // is DELIVERED before payout — the engine's documented settlement granularity: the pot is
     // board-truth at resolvedAt; the cash arrives with the next completed cycle.
