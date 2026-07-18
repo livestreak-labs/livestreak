@@ -141,6 +141,10 @@ pub mod livestreak {
         instructions::protocol::handle_stop_all(ctx)
     }
 
+    pub fn stop_funding(ctx: Context<PositionStateOp>, vault_id: [u8; 32], side: u8) -> Result<()> {
+        instructions::protocol::handle_stop_funding(ctx, vault_id, side)
+    }
+
     pub fn withdraw(ctx: Context<PositionEngineOp>, vault_id: [u8; 32]) -> Result<()> {
         instructions::protocol::handle_withdraw(ctx, vault_id)
     }

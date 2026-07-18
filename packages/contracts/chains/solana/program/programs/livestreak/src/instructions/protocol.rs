@@ -435,6 +435,53 @@ pub fn handle_withdraw(ctx: Context<PositionEngineOp>, vault_id: [u8; 32]) -> Re
     Ok(())
 }
 
+// ── stop_funding (stop ONE lane) ─────────────────────────────────────────────────
+
+/// Stop a SINGLE funding lane of a position (one vault, one side). Unlike `stop_all`,
+/// this moves NO cash: the engine `stop` reshuffles the position's one shared stream
+/// budget across its remaining lanes (set_streams_and_transfer with deposit=0 and
+/// balance_delta=0 → real_balance_delta = 0 → nothing is withdrawn from the drips
+/// escrow), and `vault.on_stop` only adjusts the board's `side_rate` and the loss/overage
+/// ledgers. The engine's `()` return confirms there is nothing to pay out. So — like
+/// `resolve` / `claim_loss_lvst` — this carries no escrow account, no token program, and
+/// no conservation assert; it is a pure protocol-state mutation behind the owner gate.
+#[derive(Accounts)]
+pub struct PositionStateOp<'info> {
+    pub user: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [PROTOCOL_SEED, &protocol_state.market_id],
+        bump = protocol_state.bump
+    )]
+    pub protocol_state: Account<'info, ProtocolState>,
+    #[account(
+        seeds = [POSITION_SEED, &position.token_id],
+        bump = position.bump,
+        constraint = position.owner == user.key() @ LivestreakError::NotCreator
+    )]
+    pub position: Account<'info, PositionOwner>,
+}
+
+pub fn handle_stop_funding(
+    ctx: Context<PositionStateOp>,
+    vault_id: [u8; 32],
+    side: u8,
+) -> Result<()> {
+    valid_side(side)?;
+    let mut p = load(&ctx.accounts.protocol_state)?;
+    // Typed NoLane (missing lane / wrong side) decodes via engine_err -> DriverNoLane.
+    p.stop(
+        token_id_from(&ctx.accounts.position.token_id),
+        &vault_id,
+        side,
+        now_secs()?,
+    )
+    .map_err(engine_err)?;
+    let len = ctx.accounts.protocol_state.to_account_info().data_len();
+    store(&mut ctx.accounts.protocol_state, &p, len)?;
+    Ok(())
+}
+
 // ── claim_loss_lvst ─────────────────────────────────────────────────────────────
 
 /// A losing position mints LVST against its loss basis. The basis is READ FROM THE
