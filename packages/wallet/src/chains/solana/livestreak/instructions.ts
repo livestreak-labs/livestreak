@@ -1,4 +1,4 @@
-// Typed instruction builders for all 24 livestreak instructions. Discriminators are read
+// Typed instruction builders for all 25 livestreak instructions. Discriminators are read
 // from the imported IDL const (never hand-typed); args are borsh-encoded per the IDL
 // layouts; accounts are resolved from the PDA helpers so callers pass only free variables.
 // Every builder returns a @solana/kit Instruction that plugs into buildLivestreakTransaction.
@@ -130,6 +130,25 @@ export async function buildInitProtocolIx(input: InitProtocolInput): Promise<Ins
       readonly(SYSTEM_PROGRAM_ADDRESS),
     ],
     data: encodeData('init_protocol', enc(u16, input.capacity)),
+  }
+}
+
+export interface GrowProtocolInput extends MarketScoped {
+  /** Rent-top-up payer (mut signer); the delta for the larger size moves payer -> protocol_state. */
+  payer: Address
+}
+
+/** grow_protocol: realloc a market's engine-state blob up one +10_240-byte rung (permissionless). */
+export async function buildGrowProtocolIx(input: GrowProtocolInput): Promise<Instruction> {
+  const protocolState = first(await findProtocolStatePda(input.programId, input.marketId))
+  return {
+    programAddress: input.programId,
+    accounts: [
+      writableSigner(input.payer),
+      writable(protocolState),
+      readonly(SYSTEM_PROGRAM_ADDRESS),
+    ],
+    data: encodeData('grow_protocol'),
   }
 }
 

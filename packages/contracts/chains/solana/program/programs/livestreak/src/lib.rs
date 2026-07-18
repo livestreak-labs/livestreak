@@ -109,6 +109,10 @@ pub mod livestreak {
         instructions::protocol::handle_init_protocol(ctx, capacity)
     }
 
+    pub fn grow_protocol(ctx: Context<GrowProtocol>) -> Result<()> {
+        instructions::protocol::handle_grow_protocol(ctx)
+    }
+
     pub fn create_vault_seeded(
         ctx: Context<UserEngineOp>,
         question: Vec<u8>,

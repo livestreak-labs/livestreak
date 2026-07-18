@@ -29,6 +29,8 @@ pub enum LivestreakError {
     EngineState,
     #[msg("protocol state account is full")]
     StateFull,
+    #[msg("protocol state is at its maximum size; cannot grow further")]
+    StateAtCapacity,
     #[msg("engine operation failed (see logs)")]
     EngineOp,
     #[msg("caller is not the effective steward")]

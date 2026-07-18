@@ -28,3 +28,10 @@ pub const STREAM_LOCK_GRACE: i64 = 86_400;
 pub const MAX_TITLE_LEN: usize = 200;
 pub const MAX_STREAM_ID_LEN: usize = 64;
 pub const MAX_POINTER_LEN: usize = 64;
+
+// Hard ceiling on a market's ProtocolState blob payload (excludes PROTOCOL_HEADER).
+// InitProtocol caps the initial account at ~10_240 bytes (a CPI-created account cannot
+// exceed MAX_PERMITTED_DATA_INCREASE); grow_protocol then reallocs one 10_240-byte rung
+// at a time up to PROTOCOL_HEADER + this cap. Bounded so a runaway market cannot rent-drain
+// the payer topping up each grow. 10 rungs (~102_400 bytes) before Phase-4 sharding supersedes.
+pub const MAX_PROTOCOL_BYTES: usize = 10 * 10_240;

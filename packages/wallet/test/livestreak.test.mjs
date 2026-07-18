@@ -13,6 +13,7 @@ import {
   buildCreateVaultSeededIx,
   buildFundIx,
   buildGoLiveIx,
+  buildGrowProtocolIx,
   buildInitProtocolIx,
   buildInitializeIx,
   buildMintPositionIx,
@@ -68,6 +69,7 @@ const built = {
     buildInitializeIx({ programId: PROGRAM_ID, payer: USER, defaultSteward: STEWARD, lvstMint: LVST_MINT }),
   init_protocol: () =>
     buildInitProtocolIx({ programId: PROGRAM_ID, marketId: ID_A, payer: USER, usdcMint: USDC, capacity: 9000 }),
+  grow_protocol: () => buildGrowProtocolIx({ programId: PROGRAM_ID, marketId: ID_A, payer: USER }),
   register_market: () =>
     buildRegisterMarketIx({
       programId: PROGRAM_ID,

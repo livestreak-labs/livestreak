@@ -8,7 +8,8 @@ use ruint::aliases::U256;
 use livestreak_engine::{Protocol, STATUS_RESOLVED, SIDE_NO, SIDE_YES};
 
 use crate::constants::{
-    LVST_AUTHORITY_SEED, LVST_ESCROW_SEED, MARKET_SEED, MARKET_STEWARD_SEED, REGISTRY_SEED,
+    LVST_AUTHORITY_SEED, LVST_ESCROW_SEED, MARKET_SEED, MARKET_STEWARD_SEED, MAX_PROTOCOL_BYTES,
+    REGISTRY_SEED,
 };
 use crate::error::LivestreakError;
 use crate::state::{Market, MarketSteward, PositionOwner, ProtocolState, Registry};
@@ -125,6 +126,69 @@ pub fn handle_init_protocol(ctx: Context<InitProtocol>, _capacity: u16) -> Resul
     state.market_id = ctx.accounts.market.market_id;
     state.bump = ctx.bumps.protocol_state;
     state.data = Protocol::default().to_bytes();
+    Ok(())
+}
+
+// ── grow_protocol (realloc ladder) ───────────────────────────────────────────────
+
+/// Permissionless realloc ladder for a market's ProtocolState blob. InitProtocol caps the
+/// initial account at PROTOCOL_HEADER + capacity because a CPI-created account can be at most
+/// MAX_PERMITTED_DATA_INCREASE (10_240) bytes; a busy market outgrows that around ~3 vaults and
+/// `store()` then fails typed StateFull. Solana lets an EXISTING account grow by up to 10_240
+/// bytes per instruction via AccountInfo::realloc, with the payer topping up rent-exemption for
+/// the larger size. We grow one rung at a time up to a hard PROTOCOL_HEADER + MAX_PROTOCOL_BYTES
+/// ceiling so a runaway market cannot rent-drain payers (Phase-4 sharding supersedes this).
+///
+/// Anchor-exit soundness (the hard part): `protocol_state` is a plain `Account<ProtocolState>`.
+/// Anchor deserializes it on entry and RE-serializes it on exit — but that exit only WRITES the
+/// struct (discriminator + market_id + bump + the len-prefixed `data` Vec) into the FRONT of the
+/// account's data region; Anchor's `Account<T>::exit` never truncates or reallocs the account
+/// DOWN. This handler does not touch the `data` field, so exit re-writes the identical head bytes
+/// and leaves the freshly-grown (zero-initialized) tail intact. The realloc therefore persists,
+/// and the NEXT `store()` reads the grown `data_len()` and can write a larger blob into it. (If
+/// Anchor truncated on exit we would have had to drop to AccountInfo-level handling; it does not,
+/// so `Account<ProtocolState>` is the correct and simplest shape here.)
+#[derive(Accounts)]
+pub struct GrowProtocol<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [PROTOCOL_SEED, &protocol_state.market_id],
+        bump = protocol_state.bump
+    )]
+    pub protocol_state: Account<'info, ProtocolState>,
+    pub system_program: Program<'info, System>,
+}
+
+pub fn handle_grow_protocol(ctx: Context<GrowProtocol>) -> Result<()> {
+    use anchor_lang::solana_program::account_info::MAX_PERMITTED_DATA_INCREASE;
+    let info = ctx.accounts.protocol_state.to_account_info();
+    let current_len = info.data_len();
+    let cap_len = PROTOCOL_HEADER + MAX_PROTOCOL_BYTES;
+    let new_len = core::cmp::min(current_len + MAX_PERMITTED_DATA_INCREASE, cap_len);
+    // Already at the ceiling — refuse with a typed error rather than silently no-op.
+    require!(new_len > current_len, LivestreakError::StateAtCapacity);
+
+    // Top up rent-exemption for the larger size: payer -> protocol_state via the system program.
+    let needed = Rent::get()?.minimum_balance(new_len);
+    let current_lamports = info.lamports();
+    if needed > current_lamports {
+        anchor_lang::system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.key(),
+                anchor_lang::system_program::Transfer {
+                    from: ctx.accounts.payer.to_account_info(),
+                    to: info.clone(),
+                },
+            ),
+            needed - current_lamports,
+        )?;
+    }
+    // Grow in place. `resize` is bounded to +MAX_PERMITTED_DATA_INCREASE from the ORIGINAL
+    // (per-instruction) length — which resets each transaction, so one rung per tx is valid —
+    // and it zero-extends the newly mapped tail. Anchor's exit then re-writes only the head.
+    info.resize(new_len)?;
     Ok(())
 }
 
