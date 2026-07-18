@@ -1,14 +1,17 @@
 // --- exports ---
 
-// The Solana options writer. Maps the canonical writer surface onto the 16 deployed livestreak
-// instructions (money-complete LVST/treasury + NFT-transfer ops land a later phase). Multichain-
+// The Solana options writer. Maps the canonical writer surface onto the 24 deployed livestreak
+// instructions. Staking/dividends stay typed-unsupported pending the global-treasury shard
+// (the canonical API is protocol-global; the per-market treasury is a porting artifact). Multichain-
 // hygiene: @livestreak/wallet is the single @solana/* owner — instruction builders, PDA derivation,
 // the tx composer, the shared inclusion poller and kit primitives all come from its re-exports.
 import { LiveStreakConfigError, LiveStreakRuntimeError } from "@livestreak/core";
 import {
   address,
   buildAdvanceIx,
+  buildClaimLossLvstIx,
   buildCollectIx,
+  buildCreateAtaIdempotentIx,
   buildFundIx,
   buildLivestreakTransaction,
   buildMintPositionIx,
@@ -138,6 +141,17 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
       });
     }
     return marketId;
+  };
+
+  // The LVST mint is optional in the Solana addresses config (older bags omit it). The loss-mint
+  // path is the only writer op that needs it, so it fails typed HERE rather than at construction.
+  const requireLvstMint = (): Address => {
+    if (ctx.lvstMint === undefined) {
+      throw new LiveStreakConfigError({
+        message: "Solana: claimLossLvst requires lvstMint in the options Solana addresses config"
+      });
+    }
+    return ctx.lvstMint;
   };
 
   const requireMarketForToken = async (tokenId: TokenId): Promise<Hex32> => {
@@ -302,24 +316,52 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
         message: "Solana: stopFunding not supported (no per-lane stop instruction; use stopAllFunding)"
       });
     },
-    claimLossLvst: async (_input: ClaimLossLvstInput): Promise<never> => {
-      throw new LiveStreakConfigError({
-        message: "Solana: claimLossLvst not supported yet (LVST/treasury instructions land a later phase)"
+    // A losing position mints LVST against its vault-read loss basis. Market-scoped on Solana
+    // (protocol_state per market), so resolve the shard from the vault exactly like withdraw.
+    // The program mints to the CLAIMER's own LVST ATA (no mint-to-third-party account), so the
+    // recipient must be the wallet signer — mirror the mint guard. Prepend idempotent ATA creation
+    // so the claimer's LVST ATA existing is never a launch-order precondition (claim CREDITS it).
+    claimLossLvst: async (input: ClaimLossLvstInput): Promise<TxId> => {
+      const side = sideToSolana(validateOptionsVaultSide(input.side));
+      const recipient = validateSolanaUserAddress(input.to, "to");
+      const lvstMint = requireLvstMint();
+      const { signer } = await getWriter();
+      if (String(recipient) !== String(signer)) {
+        throw new LiveStreakConfigError({
+          message: "Solana: claimLossLvst recipient must be the wallet signer (LVST is minted to the claimer's own ATA)"
+        });
+      }
+      const marketId = await requireMarketForVault(input.vaultId);
+      const ensureAta = await buildCreateAtaIdempotentIx({ payer: signer, owner: signer, mint: lvstMint });
+      const ix = await buildClaimLossLvstIx({
+        programId: ctx.programId,
+        marketId,
+        claimer: signer,
+        tokenId: tokenIdToHex32(input.tokenId),
+        lvstMint,
+        vaultId: vaultIdHex(input.vaultId),
+        side
       });
+      return asTxId(await send([ensureAta, ix]));
     },
+    // ── seam mismatch: LVST staking is protocol-GLOBAL on EVM (a single Treasury; the canonical
+    // input carries only { amount }/no-input) but PER-MARKET on Solana (stake_lvst/unstake_lvst/
+    // claim_dividends bind a specific protocol_state + lvst_escrow). There is no market context in
+    // the canonical input to name a Solana market, and inventing one would silently stake into an
+    // arbitrary shard — so these stay a typed failure until the canonical types gain a market seam.
     stakeLvst: async (_input: StakeLvstInput): Promise<never> => {
       throw new LiveStreakConfigError({
-        message: "Solana: stakeLvst not supported yet (LVST/treasury instructions land a later phase)"
+        message: "Solana: stakeLvst not supported (per-market staking escrow, but the canonical input carries no market to scope it to)"
       });
     },
     unstakeLvst: async (_input: UnstakeLvstInput): Promise<never> => {
       throw new LiveStreakConfigError({
-        message: "Solana: unstakeLvst not supported yet (LVST/treasury instructions land a later phase)"
+        message: "Solana: unstakeLvst not supported (per-market staking escrow, but the canonical input carries no market to scope it to)"
       });
     },
     claimDividends: async (): Promise<never> => {
       throw new LiveStreakConfigError({
-        message: "Solana: claimDividends not supported yet (LVST/treasury instructions land a later phase)"
+        message: "Solana: claimDividends not supported (per-market dividend escrow, but the canonical call carries no market to scope it to)"
       });
     },
     transferNft: async (_input: TransferNftInput): Promise<never> => {
