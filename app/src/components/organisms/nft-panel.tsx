@@ -7,6 +7,7 @@ import { isValidRecipientAddress, recipientPlaceholder, type OptionsChainKind } 
 import { useOptionsContext } from '#/providers/options-provider'
 import { OptionsActionButton } from '#/components/atoms/options-action-button'
 import { formatUSDC, formatRunway } from '#/utils/format'
+import { hasBalanceReadout } from '#/utils/options'
 
 // UI-only input gating (amount/address format); protocol gating comes from the real SDK descriptors.
 function invalidFn(reason: string): OptionsFunctionView {
@@ -177,8 +178,9 @@ function NftRow({
         owner {nft.owner}
       </div>
 
-      {/* Shared Drips balance (live-ticking) + runway + realized winnings (EVM only; balance absent on Sui). */}
-      {chain === 'evm' && nft.account.balanceUSDC !== undefined && (
+      {/* Shared Drips balance (live-ticking) + runway + realized winnings. DATA-gated, not chain-gated:
+          renders on any chain whose reader supplies `balanceUSDC` (EVM today; Sui/Solana omit it). */}
+      {hasBalanceReadout(nft.account) && (
         <RunwayReadout account={nft.account} pnl={nft.pnl} />
       )}
 

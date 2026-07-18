@@ -1,6 +1,7 @@
 import type {
   OptionsFunctionView,
   OptionsMarketPanel,
+  OptionsNftPanel,
   OptionsPanel,
   OptionsVault,
   OptionsVaultPanel,
@@ -194,6 +195,15 @@ export function findOptionsFunction(
   match?: (fn: OptionsFunctionView) => boolean,
 ): OptionsFunctionView | undefined {
   return functions.find(fn => fn.name === name && (match ? match(fn) : true))
+}
+
+// The balance/runway readout is DATA-driven, not chain-gated: any chain whose reader populates the
+// account balance emits `balanceUSDC` (EVM today; Sui and Solana omit it — Sui has no shared-Drips
+// account, Solana's reader returns a zeroed placeholder and never sets the model balance). Gating on
+// the field's presence lights the readout up automatically whenever a chain starts supplying it, and
+// keeps the app a thin consumer that never fakes a number.
+export function hasBalanceReadout(account: OptionsNftPanel['account']): boolean {
+  return account.balanceUSDC !== undefined
 }
 
 export function findFundFunction(
