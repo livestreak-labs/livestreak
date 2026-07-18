@@ -126,4 +126,7 @@ fn zero_sol_bettor_mints_when_sponsor_pays_rent() {
     // Ownership is the bettor's: PositionOwner.owner (offset 8 disc + 32 token_id = 40) == bettor.
     let data = h.svm.get_account(&position).expect("position account must exist").data;
     assert_eq!(&data[40..72], &bettor.pubkey().to_bytes(), "position owner must be the bettor");
+    // The position records its market (offset 40 owner + 32 = 72): a laneless mint is still
+    // attributable to its market, which is what enables first-bet controls in the UI.
+    assert_eq!(&data[72..104], &market_id, "position must record the market it was minted for");
 }

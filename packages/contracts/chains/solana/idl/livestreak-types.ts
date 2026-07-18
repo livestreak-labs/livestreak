@@ -1810,6 +1810,22 @@ export type Livestreak = {
             "type": "pubkey"
           },
           {
+            "name": "marketId",
+            "docs": [
+              "The market this position was minted for. The per-token market accessor EVM",
+              "(MarketDriver.marketIdOf) and Sui (the NFT's market_id field) already expose —",
+              "lets a reader attribute a still-laneless position to its market instead of",
+              "falling back to the zero id. Placed AFTER `owner` so owner keeps offset 40 and",
+              "listOwnerTokens' memcmp filter is unchanged; market_id decodes at offset 72."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
             "name": "bump",
             "type": "u8"
           }

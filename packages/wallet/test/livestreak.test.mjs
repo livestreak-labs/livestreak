@@ -244,11 +244,13 @@ describe('livestreak account decoders', () => {
       ...accountDiscriminator('PositionOwner'),
       ...Array(32).fill(0x22), // token_id = 0x22..22 == ID_B
       ...bytesOf(USER),
+      ...Array(32).fill(0x11), // market_id = 0x11..11 == ID_A (after owner, keeps owner at offset 40)
       bump,
     ])
     const acc = decodePositionOwnerAccount(bytes)
     assert.equal(acc.tokenId, tokenId)
     assert.equal(acc.owner, USER)
+    assert.equal(acc.marketId, ID_A)
     assert.equal(acc.bump, bump)
   })
 

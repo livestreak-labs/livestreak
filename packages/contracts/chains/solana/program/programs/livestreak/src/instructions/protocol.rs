@@ -337,6 +337,7 @@ pub fn handle_mint_position(ctx: Context<MintPosition>, salt: u64) -> Result<()>
     let position = &mut ctx.accounts.position;
     position.token_id = token_id_bytes(token_id);
     position.owner = ctx.accounts.minter.key();
+    position.market_id = ctx.accounts.protocol_state.market_id;
     position.bump = ctx.bumps.position;
     Ok(())
 }
