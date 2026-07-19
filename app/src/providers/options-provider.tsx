@@ -40,12 +40,14 @@ import {
 import { HOST_BASE_URL, LOCAL_CHAIN_ID, isOptionsModeEnabled, testOptionsSeed } from '#/utils/env'
 import {
   buildOptionsContractAddresses,
+  initialChain,
+  isChainDeployed,
   LOCALHOST_AA_CONTRACTS,
   LOCALHOST_RPC_URL,
 } from '#/utils/deployments'
 import {
+  chainLabel,
   isValidRecipientAddress,
-  readStoredChain,
   SESSION_CHAIN_KEY,
   type OptionsChainKind,
 } from '#/utils/chain'
@@ -310,10 +312,10 @@ function buildChainConfig(
 
 export function OptionsProvider({ children }: { children: ReactNode }) {
   const enabled = isOptionsModeEnabled()
-  const [chain, setChainState] = useState<OptionsChainKind>(() =>
-    enabled ? readStoredChain() : 'evm',
-  )
-  const [ready, setReady] = useState(!enabled || readStoredChain() === 'sui')
+  // Start on the last valid pick, else the smart default (the running chain / first deployed) — never a
+  // hard-coded evm that a Solana-only run can't boot. `initialChain` is deployment-aware.
+  const [chain, setChainState] = useState<OptionsChainKind>(() => initialChain(enabled))
+  const [ready, setReady] = useState(() => !enabled || initialChain(enabled) === 'sui')
   const [isConnected, setIsConnected] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [derivationStep, setDerivationStep] = useState<string | null>(null)
@@ -373,6 +375,11 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     teardownRuntime()
 
     const selectedChain = chainRef.current
+    // Never boot a chain this build has no valid deployment for — fail with a clear message instead of the
+    // cryptic "Invalid contract address" throw that used to wedge the whole board.
+    if (!isChainDeployed(selectedChain)) {
+      throw new Error(`${chainLabel(selectedChain)} isn't deployed in this environment — pick a deployed chain.`)
+    }
     const chainConfig = buildChainConfig(selectedChain, secret, walletInitRef.current)
     const marketId = activeMarketIdRef.current
 
@@ -414,6 +421,7 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
   // secret; the writer is never invoked while disconnected) so the active market's vaults render.
   const bootAnonymous = useCallback(async () => {
     if (!activeMarketIdRef.current) return
+    if (!isChainDeployed(chainRef.current)) return // read-only board: silently skip an undeployed chain
     if (chainRef.current !== 'sui' && !walletInitRef.current) return
     try {
       await bootRuntime(new Uint8Array(32), ANON_VIEWER[chainRef.current] as UserAddress)
@@ -470,8 +478,12 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return
 
+    // Atomic binding: drop the previous chain's walletInit IMMEDIATELY on any switch, before the async
+    // re-fetch. The boot guards key on `!walletInitRef.current`, so this blocks the board from ever booting
+    // with a stale config that doesn't match the selected chain (the picker↔board race).
+    walletInitRef.current = null
+
     if (chain === 'sui') {
-      walletInitRef.current = null
       setReady(true)
       return
     }
