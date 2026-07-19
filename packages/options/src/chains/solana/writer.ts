@@ -96,6 +96,12 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
     return ctxPromise;
   };
 
+  // Account rent (PositionOwner PDA, a fresh LVST ATA) must be paid by a signer holding SOL. In
+  // sponsored (token-free) mode the user has zero SOL, so the paymaster — which co-signs as fee
+  // payer — pays the rent too; self-pay falls back to the signer. Owner/identity stays the signer.
+  const rentPayerFor = (signer: Address): Address =>
+    isSponsoredSolanaConfig(solanaConfig) ? address(solanaConfig.paymasterAddress) : signer;
+
   // Compose instructions into one tx, send, and confirm inclusion via the shared poller (Solana
   // getSignatureStatuses is mapped onto the receipt contract by the wallet account).
   const send = async (instructions: Instruction[]): Promise<string> => {
@@ -244,12 +250,9 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
         message: "Solana: mint recipient must be the wallet signer (no mint-to-third-party instruction)"
       });
     }
-    // The PositionOwner rent payer must equal the tx fee payer: sponsored → the paymaster (Kora
-    // co-signs as fee payer, so a zero-SOL user pays nothing), self-pay → the signer. minter stays
-    // the owner/identity either way.
-    const rentPayer = isSponsoredSolanaConfig(solanaConfig)
-      ? address(solanaConfig.paymasterAddress)
-      : signer;
+    // The PositionOwner rent payer must equal the tx fee payer (sponsored → paymaster, self-pay →
+    // signer); minter stays the owner/identity either way.
+    const rentPayer = rentPayerFor(signer);
     const ix = await buildMintPositionIx({
       programId: ctx.programId,
       marketId: marketId as unknown as Hex32,
@@ -473,7 +476,13 @@ export const createSolanaOptionsWriter = (config: OptionsChainConfig): OptionsWr
         });
       }
       const marketId = await requireMarketForVault(input.vaultId);
-      const ensureAta = await buildCreateAtaIdempotentIx({ payer: signer, owner: signer, mint: lvstMint });
+      // The claimer's LVST ATA is created here (first LVST touch) — its rent follows the same
+      // sponsored-payer rule as mint, so a zero-SOL user's claim doesn't fail funding the ATA.
+      const ensureAta = await buildCreateAtaIdempotentIx({
+        payer: rentPayerFor(signer),
+        owner: signer,
+        mint: lvstMint
+      });
       const ix = await buildClaimLossLvstIx({
         programId: ctx.programId,
         marketId,
