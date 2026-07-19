@@ -322,7 +322,7 @@ function ResolvedVaultCard({ group, index = 0 }: { group: VaultGroup; index?: nu
                   <OptionsActionButton label="Withdraw" fn={withdrawFn} onAction={() => options.claimWin(p.vaultId)} variant="green" compact />
                 )}
                 {useOptions && !p.won && (
-                  <OptionsActionButton label="Claim LVST" fn={claimLossFn} onAction={() => options.claimLoss(p.vaultId, p.side)} variant="red" compact />
+                  <OptionsActionButton label="Claim &amp; Exit" fn={claimLossFn} onAction={() => options.claimLossAndExit(p.vaultId, p.side)} variant="red" compact />
                 )}
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: 10 }}>

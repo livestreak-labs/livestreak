@@ -168,7 +168,10 @@ export const createSolanaOptionsReader = (
       ),
     readLossClaimable: (tokenId, vaultId, side) =>
       withVaultView(vaultId, (view, target) =>
-        view.lossClaimable(tokenIdToHex32(tokenId), target, sideToSolana(side))
+        lossBasisToLvst(
+          view.lossClaimable(tokenIdToHex32(tokenId), target, sideToSolana(side)),
+          BigInt(view.mintRate())
+        )
       ),
     readPot: (vaultId) => withVaultView(vaultId, (view, target) => view.pot(target)),
     readCollected: (vaultId) => withVaultView(vaultId, (view, target) => view.collected(target)),
@@ -184,11 +187,15 @@ export const createSolanaOptionsReader = (
 
     listOwnerTokens: (owner) => listOwnerTokens(ctx, owner),
 
-    readLvstAccount: async (user) =>
-      // LVST staking/dividends have no on-chain instruction set this phase (money-complete engine ops
-      // land later), and LVST balance is a not-yet-deployed SPL mint — return a zeroed account so the
-      // board stays functional. Divergence from EVM/Sui (which read real balances). See report.
-      mapSolanaLvstAccount(validateSolanaUserAddress(user, "user"), 0n, 0n, 0n) as LvstAccount,
+    readLvstAccount: async (user) => {
+      // LVST is a DEPLOYED SPL mint now — read the user's real LVST ATA balance (loss-mint credits it).
+      // Staking/dividends have no on-chain READ wired this phase (per-market treasury; unblocks with the
+      // global-treasury shard), so those stay 0. The projection scales `balance` by the chain's LVST
+      // decimals (9 on Solana).
+      const validated = validateSolanaUserAddress(user, "user");
+      const balance = await readLvstBalance(ctx, validated);
+      return mapSolanaLvstAccount(validated, balance, 0n, 0n) as LvstAccount;
+    },
 
     readUsdcAddress: async () => ctx.usdcMint as unknown as `0x${string}`,
     readUsdcBalance: (owner) => readUsdcBalance(ctx, owner),
@@ -317,6 +324,7 @@ const readNft = async (
   const nft = await withTokenView(tokenId, (view, tokenHex, marketId) => {
     const laneCount = view.laneCount(tokenHex);
     const balance = view.nftBalance(tokenHex);
+    const mintRate = BigInt(view.mintRate()); // protocol-wide; loss-basis → LVST for the whole NFT
     const lanes: OptionsLane[] = [];
     for (const vId of view.accountVaultIds(tokenHex)) {
       const vault = view.vault(vId);
@@ -332,7 +340,7 @@ const readNft = async (
         const pos = view.position(vId, sideNum, tokenHex);
         if (pos.rate === 0n && pos.sharesAccrued === 0n && pos.gPaid === 0n) continue;
         const claimable = view.claimable(tokenHex, vId, sideNum);
-        const lossClaimable = view.lossClaimable(tokenHex, vId, sideNum);
+        const lossClaimable = lossBasisToLvst(view.lossClaimable(tokenHex, vId, sideNum), mintRate);
         lanes.push(
           mapSolanaLane(
             tokenId,
@@ -413,6 +421,23 @@ const readUsdcBalance = async (ctx: SolanaOptionsContext, owner: UserAddress): P
   const bytes = await fetchAccountBytes(ctx.rpc, ata);
   if (bytes === undefined || bytes.length < 72) return 0n;
   // SPL token account: mint(32) owner(32) amount:u64-LE @64.
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return dv.getBigUint64(64, true);
+};
+
+// The engine's lossClaimable returns the USDC loss BASIS; the on-chain claim mints LVST as
+// basis × mintRate / USDC_ONE (treasury.rs mint_loss_lvst). Convert here so the panel's
+// lossClaimableLVST (which the projection scales by the chain's LVST decimals) previews what the
+// claim actually mints, not the raw basis. (EVM/Sui readers return the basis too and want the same.)
+const USDC_ONE_UNITS = 1_000_000n;
+const lossBasisToLvst = (basisUsdc: bigint, mintRate: bigint): bigint => (basisUsdc * mintRate) / USDC_ONE_UNITS;
+
+// Same SPL token-account read as USDC, against the LVST mint's ATA (loss-mint / future staking credit it).
+const readLvstBalance = async (ctx: SolanaOptionsContext, owner: UserAddress): Promise<bigint> => {
+  if (ctx.lvstMint === undefined) return 0n;
+  const [ata] = await findUsdcAta(address(String(owner)), ctx.lvstMint);
+  const bytes = await fetchAccountBytes(ctx.rpc, ata);
+  if (bytes === undefined || bytes.length < 72) return 0n;
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   return dv.getBigUint64(64, true);
 };

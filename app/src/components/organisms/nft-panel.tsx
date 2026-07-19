@@ -205,13 +205,13 @@ function NftRow({
           />
         </div>
 
-        {/* Get money out: sweep the remaining balance back to the wallet / collect all winnings. EVM only. */}
-        {chain === 'evm' && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <OptionsActionButton label="Sweep to wallet" fn={sweepFn} onAction={onSweep} variant="ghost" compact />
-            <OptionsActionButton label="Withdraw all" fn={withdrawAllFn} onAction={onWithdrawAll} variant="green" compact />
-          </div>
-        )}
+        {/* Get money out: sweep the remaining balance back to the wallet / collect all winnings.
+            Chain-agnostic — stopAllFunding + withdrawMany project on evm/sui/solana, and each button
+            self-disables (via its fn) when there's nothing to sweep or no winnings to claim. */}
+        <div style={{ display: 'flex', gap: 6 }}>
+          <OptionsActionButton label="Sweep to wallet" fn={sweepFn} onAction={onSweep} variant="ghost" compact />
+          <OptionsActionButton label="Withdraw all" fn={withdrawAllFn} onAction={onWithdrawAll} variant="green" compact />
+        </div>
 
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <input

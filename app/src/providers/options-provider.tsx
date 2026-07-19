@@ -160,6 +160,7 @@ interface OptionsContextValue {
   hasNftForVault: (vaultId: string) => boolean
   mint: (marketId: string) => Promise<TxId>
   claimLoss: (vaultId: string, side: 'yes' | 'no') => Promise<TxId>
+  claimLossAndExit: (vaultId: string, side: 'yes' | 'no') => Promise<TxId>
   stake: (amountLvst: number) => Promise<TxId>
   unstake: (amountLvst: number) => Promise<TxId>
   claimDividends: () => Promise<TxId>
@@ -769,6 +770,19 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     })
   }, [callBridgeAction, requireUser, resolveTokenId])
 
+  // Claim & exit a LOSING position in one gesture: mint the LVST consolation, THEN stop every stream
+  // and claw back the remaining shared balance to the wallet. Claim first — it's the once-only value
+  // (loss basis is fixed at resolution) and now reliable; if the sweep leg fails the claim still
+  // landed and the standalone "Sweep to wallet" button recovers the funds. Chain-agnostic: both
+  // claimLossLvst and stopAllFunding exist on evm/sui/solana. stopAllFunding is position-wide (halts
+  // every lane + returns the whole Drips balance), which is the correct semantic for "exit this bet".
+  const claimLossAndExit = useCallback(async (vaultId: string, side: 'yes' | 'no'): Promise<TxId> => {
+    const user = requireUser()
+    const tokenId = asTokenId(resolveTokenId(vaultId))
+    await callBridgeAction('claimLossLvst', { tokenId, vaultId: asVaultId(vaultId), side, to: user })
+    return callBridgeAction('stopAllFunding', { tokenId })
+  }, [callBridgeAction, requireUser, resolveTokenId])
+
   const stake = useCallback(async (amountLvst: number): Promise<TxId> => {
     return callBridgeAction('stakeLvst', {
       amount: parseUnits(String(amountLvst), 18),
@@ -848,6 +862,7 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     hasNftForVault,
     mint,
     claimLoss,
+    claimLossAndExit,
     stake,
     unstake,
     claimDividends,
@@ -858,7 +873,7 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     enabled, ready, chain, setChain, isConnected, isLoading, derivationStep, claiming, error, address, usdcBalance, board, controls,
     connect, disconnect, afterWrite, setActiveMarketId, findFunction, findFundFunctionForVault,
     findStopFundingFunctionForVault, streamLane, pauseLane, resumeLane,
-    addFundsNft, sweepNft, withdrawAllNft, previewAccrual, claimWin, hasNftForVault, mint, claimLoss,
+    addFundsNft, sweepNft, withdrawAllNft, previewAccrual, claimWin, hasNftForVault, mint, claimLoss, claimLossAndExit,
     stake, unstake, claimDividends, transferNft, approveNft, setApprovalForAll,
   ])
 
