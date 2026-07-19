@@ -109,17 +109,6 @@ interface AaCapabilityDescriptor {
   solanaSponsorship?: SolanaSponsorshipDescriptor
 }
 
-/** One leg of a per-vault cash-out, streamed to the UI so the button can show live progress. Each engine
- *  op is its own sponsored tx (Solana can't batch them), so a hedged resolved vault settles in up to four
- *  legs. `amount` is the KNOWN earned/owed figure (LVST for 'loss', USDC for 'win'/'overstream'), reported
- *  as the leg's tx confirms; 'freeze' just stops the still-running stream and carries no amount. */
-export type SettleStepKind = 'freeze' | 'loss' | 'win' | 'overstream'
-export interface SettleStep {
-  kind: SettleStepKind
-  status: 'pending' | 'active' | 'done'
-  amount?: number
-}
-
 interface OptionsContextValue {
   enabled: boolean
   ready: boolean
@@ -173,9 +162,8 @@ interface OptionsContextValue {
   hasNftForVault: (vaultId: string) => boolean
   mint: (marketId: string) => Promise<TxId>
   claimLoss: (vaultId: string, side: 'yes' | 'no') => Promise<TxId>
-  /** Cash out ONE resolved vault, running each settlement leg in order (freeze → mint loss LVST → withdraw
-   *  winnings + overstream). Pass `onStep` to receive live per-leg progress for the UI. */
-  settleVault: (vaultId: string, onStep?: (steps: SettleStep[]) => void) => Promise<TxId>
+  /** Cash out ONE resolved vault: stop its streams → mint any loss LVST → withdraw winnings + overstream. */
+  settleVault: (vaultId: string) => Promise<TxId>
   stake: (amountLvst: number) => Promise<TxId>
   unstake: (amountLvst: number) => Promise<TxId>
   claimDividends: () => Promise<TxId>
@@ -802,58 +790,29 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
   // is last so the now-frozen overstream is fully paid. Each leg is a separate sponsored tx (Solana can't
   // batch engine ops); only the legs you actually hold run (1–4). `onStep` streams live progress: each
   // leg's KNOWN amount (from the collect-projected board) is reported as its tx confirms. Chain-agnostic.
-  const settleVault = useCallback(async (
-    vaultId: string,
-    onStep?: (steps: SettleStep[]) => void,
-  ): Promise<TxId> => {
+  const settleVault = useCallback(async (vaultId: string): Promise<TxId> => {
     const user = requireUser()
     const tokenId = asTokenId(resolveTokenId(vaultId))
     const vid = asVaultId(vaultId)
     const panel = requirePanel()
     const nft = panel.nfts.find(n => n.lanes.some(l => l.vaultId === vaultId))
     const lanes = nft?.lanes.filter(l => l.vaultId === vaultId) ?? []
-
-    const streaming = lanes.filter(l => l.status === 'streaming')
     const lost = lanes.find(l => l.settlement?.won === false && l.settlement.canClaimLoss === true)
     const won = lanes.find(l => l.settlement?.won === true && (l.settlement.claimableUSDC ?? 0) > 0)
     const overstreamTotal = lanes.reduce((s, l) => s + (l.settlement?.overstreamClaimableUSDC ?? 0), 0)
-
-    // Build the plan — only the legs that apply to what you hold — then report each as its tx confirms.
-    const steps: SettleStep[] = []
-    if (streaming.length > 0) steps.push({ kind: 'freeze', status: 'pending' })
-    if (lost) steps.push({ kind: 'loss', status: 'pending', amount: lost.settlement!.lossClaimableLVST })
-    if (won) steps.push({ kind: 'win', status: 'pending', amount: won.settlement!.claimableUSDC })
-    if (overstreamTotal > 0) steps.push({ kind: 'overstream', status: 'pending', amount: overstreamTotal })
-    const emit = () => onStep?.(steps.map(s => ({ ...s })))
-    const mark = (kind: SettleStepKind, status: SettleStep['status']) => {
-      const s = steps.find(x => x.kind === kind)
-      if (s) { s.status = status; emit() }
-    }
-    emit()
-
-    // 1. Freeze — stop this vault's still-streaming lanes so overstream stops growing (per-lane stopFunding).
-    if (streaming.length > 0) {
-      mark('freeze', 'active')
-      for (const lane of streaming) {
+    // 1. stop this vault's still-streaming lanes so overstream stops growing (per-lane stopFunding).
+    for (const lane of lanes) {
+      if (lane.status === 'streaming') {
         await callBridgeAction('stopFunding', { tokenId, vaultId: vid, side: lane.side })
       }
-      mark('freeze', 'done')
     }
-    // 2. NO — mint the losing side's LVST consolation.
+    // 2. mint the losing side's LVST, if you held one and haven't claimed it yet.
     let lossTx: TxId | undefined
-    if (lost) {
-      mark('loss', 'active')
-      lossTx = await callBridgeAction('claimLossLvst', { tokenId, vaultId: vid, side: lost.side, to: user })
-      mark('loss', 'done')
-    }
-    // 3. YES + Overstream — one withdraw runs collect (pot finalize) then pays winnings AND both sides'
-    // overstream refund. Skipped when there's neither, so a pure-loss vault doesn't fire a no-op tx.
+    if (lost) lossTx = await callBridgeAction('claimLossLvst', { tokenId, vaultId: vid, side: lost.side, to: user })
+    // 3. withdraw — runs collect (pot finalize) then pays winnings + both sides' overstream. Skipped when
+    // there's neither, so a pure-loss vault doesn't fire a no-op tx.
     let winTx: TxId | undefined
-    if (won || overstreamTotal > 0) {
-      mark('win', 'active'); mark('overstream', 'active')
-      winTx = await callBridgeAction('withdraw', { tokenId, vaultId: vid, to: user })
-      mark('win', 'done'); mark('overstream', 'done')
-    }
+    if (won || overstreamTotal > 0) winTx = await callBridgeAction('withdraw', { tokenId, vaultId: vid, to: user })
     const tx = winTx ?? lossTx
     if (!tx) throw new Error('Nothing to cash out')
     return tx

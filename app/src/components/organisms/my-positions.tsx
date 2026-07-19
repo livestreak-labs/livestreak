@@ -1,13 +1,13 @@
 import { useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Pulse, Pause, Play, CircleNotch, Check } from '@phosphor-icons/react'
+import { Pulse, Pause, Play } from '@phosphor-icons/react'
 import { StreamSlider } from '#/components/molecules/stream-slider'
 import { ScoreNumber } from '#/components/atoms/score-number'
 import { formatUSDC, formatRate, formatLvst, formatRunway, formatShares } from '#/utils/format'
 import type { Position } from '#/utils/mock'
 import type { OptionsVault } from '@livestreak/options'
 import { isOptionsModeEnabled } from '#/utils/env'
-import { useOptionsContext, type SettleStep, type SettleStepKind } from '#/providers/options-provider'
+import { useOptionsContext } from '#/providers/options-provider'
 import { useLaneEditor } from '#/hooks/use-lane-editor'
 
 interface Props {
@@ -309,24 +309,24 @@ function ResolvedVaultCard({ group, index = 0 }: { group: VaultGroup; index?: nu
   const canSettle = useOptions && (
     sides.some(p => (p.won && (p.payout ?? 0) > 0) || (!p.won && p.canClaimLoss === true)) || overstream > 0
   )
-  const [steps, setSteps] = useState<SettleStep[] | null>(null)
-  const [done, setDone] = useState(false)
+  const [claimed, setClaimed] = useState(false)
   const onSettle = async () => {
     if (!canSettle || busy) return
-    setBusy(true); setErr(undefined); setDone(false); setSteps([])
+    setBusy(true); setErr(undefined)
     try {
-      await options.settleVault(group.vaultId, setSteps)
-      setDone(true)
+      await options.settleVault(group.vaultId)
+      setClaimed(true)
     }
     catch (e) {
       const msg = e instanceof Error ? e.message : 'Cash out failed'
-      // The engine gates a payout until the drips cycle boundary after resolve (SettlementPending) — turn
-      // that into a wait-and-retry hint instead of a raw error, and keep the button (steps → null).
+      // The engine gates a payout until the drips cycle boundary after resolve (SettlementPending) —
+      // turn that into a wait-and-retry hint instead of a raw error.
       setErr(/settlement.?pending/i.test(msg) ? 'Winnings unlock in a few seconds — try again shortly.' : msg)
-      setSteps(null)
     }
     finally { setBusy(false) }
   }
+  // Once claimed (or nothing left to collect) the button is a dead, non-clickable "CLAIMED" marker.
+  const settled = claimed || !canSettle
 
   return (
     <motion.div
@@ -360,26 +360,22 @@ function ResolvedVaultCard({ group, index = 0 }: { group: VaultGroup; index?: nu
       </div>
       {useOptions && (
         <>
-          {steps !== null ? (
-            <CashOutProgress steps={steps} done={done} />
-          ) : (
-            <button
-              onClick={onSettle}
-              disabled={!canSettle}
-              title="Collects winnings + overstream and mints any LVST, then stops this vault's stream — this vault only"
-              style={{
-                width: '100%', marginTop: 12, minHeight: 34, borderRadius: 7,
-                background: canSettle ? 'rgba(0,255,135,0.1)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${canSettle ? 'rgba(0,255,135,0.3)' : 'rgba(255,255,255,0.08)'}`,
-                color: canSettle ? '#00ff87' : 'rgba(255,255,255,0.3)',
-                fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
-                cursor: !canSettle ? 'not-allowed' : 'pointer',
-                transition: 'opacity 0.15s, background 0.15s',
-              }}
-            >
-              {hasCash ? 'Cash out' : 'Claim'}
-            </button>
-          )}
+          <button
+            onClick={onSettle}
+            disabled={settled || busy}
+            title="Collects winnings + overstream and mints any LVST, then stops this vault's stream — this vault only"
+            style={{
+              width: '100%', marginTop: 12, minHeight: 34, borderRadius: 7,
+              background: settled ? 'rgba(255,255,255,0.03)' : 'rgba(0,255,135,0.1)',
+              border: `1px solid ${settled ? 'rgba(255,255,255,0.08)' : 'rgba(0,255,135,0.3)'}`,
+              color: settled ? 'rgba(255,255,255,0.3)' : '#00ff87',
+              fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
+              cursor: settled ? 'default' : busy ? 'wait' : 'pointer',
+              transition: 'opacity 0.15s, background 0.15s',
+            }}
+          >
+            {busy ? 'CLAIMING…' : settled ? 'CLAIMED' : hasCash ? 'Cash out' : 'Claim'}
+          </button>
           <AnimatePresence>
             {err && (
               <motion.p key="settle-err" initial={{ opacity: 0, y: -2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
@@ -396,70 +392,6 @@ function ResolvedVaultCard({ group, index = 0 }: { group: VaultGroup; index?: nu
 
 // One settled side: SIDE · won/lost · shares ───── payout ($ if won, LVST if lost). No button — the card's
 // single Cash out collects everything.
-// Live cash-out progress. Each leg the settlement runs (freeze → mint NO's LVST → pay YES + overstream)
-// lights up as its tx confirms — spinner while active, a coloured check + the earned amount when done — so
-// "NO is done, YES is done, overstream is done" all read in one place. Ends with a CASHED OUT stamp.
-const STEP_META: Record<SettleStepKind, { label: string; color: string; unit: 'usdc' | 'lvst' | 'none' }> = {
-  freeze: { label: 'Stream stopped', color: 'rgba(255,255,255,0.55)', unit: 'none' },
-  loss: { label: 'NO settled', color: '#ffd553', unit: 'lvst' },
-  win: { label: 'YES paid', color: YES, unit: 'usdc' },
-  overstream: { label: 'Overstream refunded', color: '#00c8ff', unit: 'usdc' },
-}
-
-function StepDot({ status, color }: { status: SettleStep['status']; color: string }) {
-  if (status === 'done') return <Check size={13} weight="bold" color={color} />
-  if (status === 'active') return (
-    <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }} style={{ display: 'inline-flex' }}>
-      <CircleNotch size={12} weight="bold" color="rgba(255,255,255,0.6)" />
-    </motion.span>
-  )
-  return <span style={{ display: 'inline-block', width: 5, height: 5, margin: 4, borderRadius: '50%', background: 'rgba(255,255,255,0.2)' }} />
-}
-
-function CashOutProgress({ steps, done }: { steps: SettleStep[]; done: boolean }) {
-  return (
-    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {steps.map((s) => {
-        const meta = STEP_META[s.kind]
-        const complete = s.status === 'done'
-        const amount = s.amount === undefined || s.amount <= 0 ? null
-          : meta.unit === 'lvst' ? `+${formatLvst(s.amount)}`
-          : `+${formatUSDC(s.amount)}`
-        return (
-          <motion.div key={s.kind} layout initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-              <span style={{ width: 13, height: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                <StepDot status={s.status} color={meta.color} />
-              </span>
-              <span style={{
-                fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.04em',
-                color: complete ? meta.color : s.status === 'active' ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.35)',
-                transition: 'color 0.25s',
-              }}>{meta.label}</span>
-            </div>
-            {amount && (
-              <span className="mono" style={{
-                fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
-                color: complete ? meta.color : 'rgba(255,255,255,0.35)', transition: 'color 0.25s',
-              }}>{amount}</span>
-            )}
-          </motion.div>
-        )
-      })}
-      <AnimatePresence>
-        {done && (
-          <motion.div key="cashed-out" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, delay: 0.05 }}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <Check size={12} weight="bold" color={YES} />
-            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.1em', color: YES }}>CASHED OUT</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
 function SettleRow({ pos }: { pos: Position }) {
   const c = pos.side === 'yes' ? YES : NO
   return (
