@@ -217,7 +217,7 @@ export function StreamLayout({ streamTitle, category, totalPooled, totalPooledRa
           <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 10 }}>
             <AnimatePresence>
               {floatingVaults.map((vault, i) => (
-                <NikoNikoCard key={vault.vaultId} vault={vault} index={i} total={floatingVaults.length} onClickCard={handleNikoClick} />
+                <NikoNikoCard key={vault.vaultId} vault={vault} index={i} onClickCard={handleNikoClick} />
               ))}
             </AnimatePresence>
           </div>
