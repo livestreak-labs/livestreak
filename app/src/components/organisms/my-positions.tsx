@@ -1,14 +1,13 @@
 import { useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useVaultView } from '#/hooks/use-vault-views'
-import { Pulse, Pause, Play } from '@phosphor-icons/react'
+import { Pulse, Pause, Play, CircleNotch, Check } from '@phosphor-icons/react'
 import { StreamSlider } from '#/components/molecules/stream-slider'
 import { ScoreNumber } from '#/components/atoms/score-number'
 import { formatUSDC, formatRate, formatLvst, formatRunway, formatShares } from '#/utils/format'
 import type { Position } from '#/utils/mock'
 import type { OptionsVault } from '@livestreak/options'
 import { isOptionsModeEnabled } from '#/utils/env'
-import { useOptionsContext } from '#/providers/options-provider'
+import { useOptionsContext, type SettleStep, type SettleStepKind } from '#/providers/options-provider'
 import { useLaneEditor } from '#/hooks/use-lane-editor'
 
 interface Props {
@@ -95,11 +94,6 @@ function ActiveVaultCard({ group, index = 0 }: { group: VaultGroup; index?: numb
   const { editing, busy, error, paused, depleted, rate, shownSide, streaming, canPause, startEditing, onDrag, togglePause } = useLaneEditor(primary)
   // The lit side = the one streaming now (follows the finger mid-drag via shownSide). Held side recedes.
   const activeSide = streaming ? shownSide : null
-  // Share-accrual rate per side (shares/sec = USDC-streamed/sec ÷ share price) — feeds the lively-shares
-  // projection so a streaming holding ticks up between advances.
-  const view = useVaultView(group.vaultId)
-  const accrual = (pos: Position | undefined, price?: number): number =>
-    pos && price !== undefined && price > 0 ? (pos.streamRate / 60) / price : 0
   // Both paused and depleted are "stopped — tap ▶ to resume" (resume re-funds a depleted lane). Not a dead-end.
   const stopped = paused || depleted
 
@@ -130,8 +124,8 @@ function ActiveVaultCard({ group, index = 0 }: { group: VaultGroup; index?: numb
 
       {/* Both sides, always — NO left / YES right. Lit = streaming; the other recedes but stays legible. */}
       <div style={{ display: 'flex', gap: 8 }}>
-        <SideHolding side="no" pos={group.no} active={activeSide === 'no'} accrualPerSec={accrual(group.no, view.sharePriceNo)} />
-        <SideHolding side="yes" pos={group.yes} active={activeSide === 'yes'} accrualPerSec={accrual(group.yes, view.sharePriceYes)} />
+        <SideHolding side="no" pos={group.no} active={activeSide === 'no'} />
+        <SideHolding side="yes" pos={group.yes} active={activeSide === 'yes'} />
       </div>
 
       {/* Label line — short, concise context for the state pill below. Streaming → live rate + runway.
@@ -242,12 +236,11 @@ function ActiveVaultCard({ group, index = 0 }: { group: VaultGroup; index?: numb
 
 // One side's holding: "% of side" is the hero (instantly meaningful — your slice of the payout split), with
 // the abbreviated share count beneath it. Lit when streaming; recedes (dim, no fill) when merely held.
-function SideHolding({ side, pos, active, accrualPerSec }: { side: 'yes' | 'no'; pos?: Position; active: boolean; accrualPerSec: number }) {
+function SideHolding({ side, pos, active }: { side: 'yes' | 'no'; pos?: Position; active: boolean }) {
   const c = side === 'yes' ? YES : NO
   const has = !!pos
-  // % grows in step with your shares (re-anchored each poll). Only projected while STREAMING — a held /
-  // paused / depleted position passes live=false, so the scoreboard counters do no work.
-  const pctRate = pos && pos.shares > 0 && active ? (pos.sharePercent ?? 0) * accrualPerSec / pos.shares : 0
+  // Streaming → the number steps every 3–6s to the REAL current value (sh is the SDK's live accrual; % is
+  // the settled ratio). Held/paused/depleted → static. Nothing is projected in the UI, so nothing bounces.
   const statusLabel = active
     ? 'STREAMING'
     : pos?.status === 'paused' ? 'PAUSED' : pos?.status === 'depleted' ? 'DEPLETED' : null
@@ -275,7 +268,7 @@ function SideHolding({ side, pos, active, accrualPerSec }: { side: 'yes' | 'no';
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
             {pos!.sharePercent !== undefined ? (
               <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: active ? '#fff' : 'rgba(255,255,255,0.82)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, display: 'inline-flex', alignItems: 'baseline' }}>
-                <ScoreNumber value={pos!.sharePercent} live={active} ratePerSec={pctRate} max={100} format={{ maximumFractionDigits: 1 }} />
+                <ScoreNumber value={pos!.sharePercent} live={active} max={100} format={{ maximumFractionDigits: 1 }} />
                 <span style={{ marginLeft: 1 }}>%</span>
               </span>
             ) : (
@@ -284,7 +277,7 @@ function SideHolding({ side, pos, active, accrualPerSec }: { side: 'yes' | 'no';
             {pos!.sharePercent !== undefined && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>of side</span>}
           </div>
           <div className="mono" style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 3, fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'baseline', gap: 3 }}>
-            <ScoreNumber value={pos!.shares} live={active} ratePerSec={accrualPerSec} format={{ maximumFractionDigits: 2 }} />
+            <ScoreNumber value={pos!.shares} live={active} format={{ maximumFractionDigits: 2 }} />
             <span>sh</span>
           </div>
         </>
@@ -316,11 +309,22 @@ function ResolvedVaultCard({ group, index = 0 }: { group: VaultGroup; index?: nu
   const canSettle = useOptions && (
     sides.some(p => (p.won && (p.payout ?? 0) > 0) || (!p.won && p.canClaimLoss === true)) || overstream > 0
   )
+  const [steps, setSteps] = useState<SettleStep[] | null>(null)
+  const [done, setDone] = useState(false)
   const onSettle = async () => {
     if (!canSettle || busy) return
-    setBusy(true); setErr(undefined)
-    try { await options.settleVault(group.vaultId) }
-    catch (e) { setErr(e instanceof Error ? e.message : 'Cash out failed') }
+    setBusy(true); setErr(undefined); setDone(false); setSteps([])
+    try {
+      await options.settleVault(group.vaultId, setSteps)
+      setDone(true)
+    }
+    catch (e) {
+      const msg = e instanceof Error ? e.message : 'Cash out failed'
+      // The engine gates a payout until the drips cycle boundary after resolve (SettlementPending) — turn
+      // that into a wait-and-retry hint instead of a raw error, and keep the button (steps → null).
+      setErr(/settlement.?pending/i.test(msg) ? 'Winnings unlock in a few seconds — try again shortly.' : msg)
+      setSteps(null)
+    }
     finally { setBusy(false) }
   }
 
@@ -356,22 +360,26 @@ function ResolvedVaultCard({ group, index = 0 }: { group: VaultGroup; index?: nu
       </div>
       {useOptions && (
         <>
-          <button
-            onClick={onSettle}
-            disabled={!canSettle || busy}
-            title="Collects winnings + overstream and mints any LVST, then stops this vault's stream — this vault only"
-            style={{
-              width: '100%', marginTop: 12, minHeight: 34, borderRadius: 7,
-              background: canSettle ? 'rgba(0,255,135,0.1)' : 'rgba(255,255,255,0.03)',
-              border: `1px solid ${canSettle ? 'rgba(0,255,135,0.3)' : 'rgba(255,255,255,0.08)'}`,
-              color: canSettle ? '#00ff87' : 'rgba(255,255,255,0.3)',
-              fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
-              cursor: !canSettle ? 'not-allowed' : busy ? 'wait' : 'pointer',
-              opacity: busy ? 0.6 : 1, transition: 'opacity 0.15s, background 0.15s',
-            }}
-          >
-            {busy ? 'CASHING OUT…' : hasCash ? 'Cash out' : 'Claim'}
-          </button>
+          {steps !== null ? (
+            <CashOutProgress steps={steps} done={done} />
+          ) : (
+            <button
+              onClick={onSettle}
+              disabled={!canSettle}
+              title="Collects winnings + overstream and mints any LVST, then stops this vault's stream — this vault only"
+              style={{
+                width: '100%', marginTop: 12, minHeight: 34, borderRadius: 7,
+                background: canSettle ? 'rgba(0,255,135,0.1)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${canSettle ? 'rgba(0,255,135,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                color: canSettle ? '#00ff87' : 'rgba(255,255,255,0.3)',
+                fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
+                cursor: !canSettle ? 'not-allowed' : 'pointer',
+                transition: 'opacity 0.15s, background 0.15s',
+              }}
+            >
+              {hasCash ? 'Cash out' : 'Claim'}
+            </button>
+          )}
           <AnimatePresence>
             {err && (
               <motion.p key="settle-err" initial={{ opacity: 0, y: -2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
@@ -388,6 +396,70 @@ function ResolvedVaultCard({ group, index = 0 }: { group: VaultGroup; index?: nu
 
 // One settled side: SIDE · won/lost · shares ───── payout ($ if won, LVST if lost). No button — the card's
 // single Cash out collects everything.
+// Live cash-out progress. Each leg the settlement runs (freeze → mint NO's LVST → pay YES + overstream)
+// lights up as its tx confirms — spinner while active, a coloured check + the earned amount when done — so
+// "NO is done, YES is done, overstream is done" all read in one place. Ends with a CASHED OUT stamp.
+const STEP_META: Record<SettleStepKind, { label: string; color: string; unit: 'usdc' | 'lvst' | 'none' }> = {
+  freeze: { label: 'Stream stopped', color: 'rgba(255,255,255,0.55)', unit: 'none' },
+  loss: { label: 'NO settled', color: '#ffd553', unit: 'lvst' },
+  win: { label: 'YES paid', color: YES, unit: 'usdc' },
+  overstream: { label: 'Overstream refunded', color: '#00c8ff', unit: 'usdc' },
+}
+
+function StepDot({ status, color }: { status: SettleStep['status']; color: string }) {
+  if (status === 'done') return <Check size={13} weight="bold" color={color} />
+  if (status === 'active') return (
+    <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }} style={{ display: 'inline-flex' }}>
+      <CircleNotch size={12} weight="bold" color="rgba(255,255,255,0.6)" />
+    </motion.span>
+  )
+  return <span style={{ display: 'inline-block', width: 5, height: 5, margin: 4, borderRadius: '50%', background: 'rgba(255,255,255,0.2)' }} />
+}
+
+function CashOutProgress({ steps, done }: { steps: SettleStep[]; done: boolean }) {
+  return (
+    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {steps.map((s) => {
+        const meta = STEP_META[s.kind]
+        const complete = s.status === 'done'
+        const amount = s.amount === undefined || s.amount <= 0 ? null
+          : meta.unit === 'lvst' ? `+${formatLvst(s.amount)}`
+          : `+${formatUSDC(s.amount)}`
+        return (
+          <motion.div key={s.kind} layout initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <span style={{ width: 13, height: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <StepDot status={s.status} color={meta.color} />
+              </span>
+              <span style={{
+                fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.04em',
+                color: complete ? meta.color : s.status === 'active' ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.35)',
+                transition: 'color 0.25s',
+              }}>{meta.label}</span>
+            </div>
+            {amount && (
+              <span className="mono" style={{
+                fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+                color: complete ? meta.color : 'rgba(255,255,255,0.35)', transition: 'color 0.25s',
+              }}>{amount}</span>
+            )}
+          </motion.div>
+        )
+      })}
+      <AnimatePresence>
+        {done && (
+          <motion.div key="cashed-out" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, delay: 0.05 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <Check size={12} weight="bold" color={YES} />
+            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.1em', color: YES }}>CASHED OUT</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 function SettleRow({ pos }: { pos: Position }) {
   const c = pos.side === 'yes' ? YES : NO
   return (
