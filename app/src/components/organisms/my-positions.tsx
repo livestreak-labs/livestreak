@@ -324,7 +324,7 @@ function ResolvedVaultCard({ group, index = 0 }: { group: VaultGroup; index?: nu
               <span
                 role="img"
                 aria-label="What is overstream?"
-                title="Overstream is USDC that kept streaming after the vault resolved. A stream only stops when you stop it, so anything that flows past the result can't change the outcome — it's returned to you in full when you cash out."
+                title="USDC that streamed after the vault resolved. Refunded when you cash out."
                 style={{ fontSize: 10, color: 'rgba(0,200,255,0.5)', cursor: 'help', fontFamily: 'var(--font-mono)', lineHeight: 1 }}
               >ⓘ</span>
             </div>
