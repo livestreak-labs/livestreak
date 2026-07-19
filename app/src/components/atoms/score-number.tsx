@@ -1,19 +1,19 @@
 import NumberFlow, { type Format } from '@number-flow/react'
 import type { CSSProperties } from 'react'
 
-import { useLiveCounter } from '#/hooks/use-live-counter'
+import { useSteppedValue } from '#/hooks/use-stepped-value'
 
 /**
- * A plain number that rolls like a scoreboard when it changes (NumberFlow) — the SAME animation the pool
- * uses (ScoreUSD), just without the currency format. Pass `live` + `ratePerSec` for a value that grows
- * continuously (a streaming position's shares/%): it projects `value + ratePerSec × elapsed` between the
- * 3s polls and re-anchors each poll. Omit/undefined `live` (paused, depleted, held) → no RAF loop runs at
- * all, so idle positions cost nothing.
+ * A number for a streaming position's shares / %. Unlike the pool (ScoreUSD, a smooth live counter), this
+ * updates in DISCRETE steps every 3–6s and holds between them — NumberFlow rolls the digits on each jump.
+ * Pass `live` + `ratePerSec` for a streaming holding; `max` caps the value (100 for a share-%). Held /
+ * paused / depleted (live=false) → shows the real value, no ticking, no work.
  */
 export function ScoreNumber({
   value,
   live = false,
   ratePerSec,
+  max,
   format,
   className,
   style,
@@ -21,11 +21,12 @@ export function ScoreNumber({
   value: number
   live?: boolean
   ratePerSec?: number
+  max?: number
   format?: Format
   className?: string
   style?: CSSProperties
 }) {
-  const v = useLiveCounter(value, { live, ratePerSec })
+  const v = useSteppedValue(value, { live, ratePerSec, max })
   return (
     <NumberFlow
       className={className}

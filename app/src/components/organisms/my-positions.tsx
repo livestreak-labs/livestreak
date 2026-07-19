@@ -275,7 +275,7 @@ function SideHolding({ side, pos, active, accrualPerSec }: { side: 'yes' | 'no';
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
             {pos!.sharePercent !== undefined ? (
               <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: active ? '#fff' : 'rgba(255,255,255,0.82)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, display: 'inline-flex', alignItems: 'baseline' }}>
-                <ScoreNumber value={pos!.sharePercent} live={active} ratePerSec={pctRate} format={{ maximumFractionDigits: 1 }} />
+                <ScoreNumber value={pos!.sharePercent} live={active} ratePerSec={pctRate} max={100} format={{ maximumFractionDigits: 1 }} />
                 <span style={{ marginLeft: 1 }}>%</span>
               </span>
             ) : (
