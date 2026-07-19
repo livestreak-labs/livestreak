@@ -19,6 +19,9 @@ export interface OptionsLane {
   /** LVST this losing lane is worth (basis × mintRate) — the EARNED amount, shown even after claiming.
    *  Pair with `lossClaimed` for the settled state; `canClaimLoss` gates the button on `!lossClaimed`. */
   readonly lossClaimable?: bigint;
+  /** The USDC this lane LOST (the loss basis the LVST is minted against) — shown beneath the LVST as
+   *  "-$X". The raw vault basis, before the mintRate conversion. */
+  readonly lossBasisUSDC?: bigint;
   /** True once this loss has been claimed on-chain (the LVST was already minted). Keeps the earned amount
    *  visible as a "claimed" row instead of a re-clickable claim that would fail AlreadyClaimed. Some
    *  readers can't observe it (Sui has no claimed view yet) → undefined = treated as not-claimed. */

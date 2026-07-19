@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useVaultView } from '#/hooks/use-vault-views'
 import { Pulse, Pause, Play } from '@phosphor-icons/react'
 import { StreamSlider } from '#/components/molecules/stream-slider'
 import { formatUSDC, formatRate, formatLvst, formatRunway, formatShares, formatSharePct } from '#/utils/format'
@@ -16,6 +17,39 @@ interface Props {
 
 const YES = '#00ff87'
 const NO = '#ff2d78'
+
+// "Alive" shares. The on-chain share count only advances on a write, so between rate changes it sits static
+// and the display feels dead. This projects it forward from the streaming accrual (rate ÷ share price =
+// shares/sec) and reveals the growth in DISCRETE jumps at a RANDOM 2–8s cadence — each position runs its
+// own timer, so several never tick in lockstep. Re-anchors to the real value whenever a poll advances it.
+function useLivelyShares(polledShares: number, accrualPerSec: number, active: boolean): number {
+  const [display, setDisplay] = useState(polledShares)
+  const anchor = useRef({ shares: polledShares, at: Date.now() })
+  // Read the (poll-varying) inputs via refs so the 2–8s timer is scheduled ONCE and never reset by a poll
+  // — otherwise a fresh accrualPerSec every 3s cleared the pending timeout before it could fire.
+  const rate = useRef(accrualPerSec); rate.current = accrualPerSec
+  const activeRef = useRef(active); activeRef.current = active
+  useEffect(() => {
+    // Re-anchor to truth whenever an advance moves the on-chain shares; project forward from there.
+    anchor.current = { shares: polledShares, at: Date.now() }
+    setDisplay(polledShares)
+  }, [polledShares])
+  useEffect(() => {
+    let id: ReturnType<typeof setTimeout>
+    const tick = () => {
+      id = setTimeout(() => {
+        if (activeRef.current && rate.current > 0) {
+          const elapsed = (Date.now() - anchor.current.at) / 1000
+          setDisplay(anchor.current.shares + rate.current * elapsed)
+        }
+        tick()
+      }, 2000 + Math.random() * 6000) // random per-position → staggered, "alive" not mechanical
+    }
+    tick()
+    return () => clearTimeout(id)
+  }, [])
+  return display
+}
 
 // One vault = one card, even when the viewer holds shares on BOTH sides (streamed one, switched, streamed the
 // other). Group the per-side positions by vault; the card lights the streaming side and shows held shares on
@@ -88,6 +122,11 @@ function ActiveVaultCard({ group, index = 0 }: { group: VaultGroup; index?: numb
   const { editing, busy, error, paused, depleted, rate, shownSide, streaming, canPause, startEditing, onDrag, togglePause } = useLaneEditor(primary)
   // The lit side = the one streaming now (follows the finger mid-drag via shownSide). Held side recedes.
   const activeSide = streaming ? shownSide : null
+  // Share-accrual rate per side (shares/sec = USDC-streamed/sec ÷ share price) — feeds the lively-shares
+  // projection so a streaming holding ticks up between advances.
+  const view = useVaultView(group.vaultId)
+  const accrual = (pos: Position | undefined, price?: number): number =>
+    pos && price !== undefined && price > 0 ? (pos.streamRate / 60) / price : 0
   // Both paused and depleted are "stopped — tap ▶ to resume" (resume re-funds a depleted lane). Not a dead-end.
   const stopped = paused || depleted
 
@@ -118,8 +157,8 @@ function ActiveVaultCard({ group, index = 0 }: { group: VaultGroup; index?: numb
 
       {/* Both sides, always — NO left / YES right. Lit = streaming; the other recedes but stays legible. */}
       <div style={{ display: 'flex', gap: 8 }}>
-        <SideHolding side="no" pos={group.no} active={activeSide === 'no'} />
-        <SideHolding side="yes" pos={group.yes} active={activeSide === 'yes'} />
+        <SideHolding side="no" pos={group.no} active={activeSide === 'no'} accrualPerSec={accrual(group.no, view.sharePriceNo)} />
+        <SideHolding side="yes" pos={group.yes} active={activeSide === 'yes'} accrualPerSec={accrual(group.yes, view.sharePriceYes)} />
       </div>
 
       {/* Label line — short, concise context for the state pill below. Streaming → live rate + runway.
@@ -230,9 +269,14 @@ function ActiveVaultCard({ group, index = 0 }: { group: VaultGroup; index?: numb
 
 // One side's holding: "% of side" is the hero (instantly meaningful — your slice of the payout split), with
 // the abbreviated share count beneath it. Lit when streaming; recedes (dim, no fill) when merely held.
-function SideHolding({ side, pos, active }: { side: 'yes' | 'no'; pos?: Position; active: boolean }) {
+function SideHolding({ side, pos, active, accrualPerSec }: { side: 'yes' | 'no'; pos?: Position; active: boolean; accrualPerSec: number }) {
   const c = side === 'yes' ? YES : NO
   const has = !!pos
+  // Lively projected shares + a proportionally-scaled % of side (grows with your shares between advances).
+  const livelyShares = useLivelyShares(pos?.shares ?? 0, accrualPerSec, active)
+  const livelyPct = pos && pos.shares > 0 && pos.sharePercent !== undefined
+    ? Math.min(100, pos.sharePercent * (livelyShares / pos.shares))
+    : pos?.sharePercent
   const statusLabel = active
     ? 'STREAMING'
     : pos?.status === 'paused' ? 'PAUSED' : pos?.status === 'depleted' ? 'DEPLETED' : null
@@ -259,12 +303,12 @@ function SideHolding({ side, pos, active }: { side: 'yes' | 'no'; pos?: Position
         <>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
             <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: active ? '#fff' : 'rgba(255,255,255,0.82)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-              {pos!.sharePercent !== undefined ? formatSharePct(pos!.sharePercent) : '—'}
+              {livelyPct !== undefined ? formatSharePct(livelyPct) : '—'}
             </span>
-            {pos!.sharePercent !== undefined && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>of side</span>}
+            {livelyPct !== undefined && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>of side</span>}
           </div>
           <div className="mono" style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
-            {formatShares(pos!.shares)} sh
+            {formatShares(livelyShares)} sh
           </div>
         </>
       ) : (
@@ -392,11 +436,18 @@ function SettleRow({ pos }: { pos: Position }) {
         )}
         <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'rgba(255,255,255,0.3)' }}>{formatShares(pos.shares)} sh</span>
       </div>
-      {/* Earned amount stays visible after claiming (dimmed = already collected), so the row reads as a
-          settled record rather than a re-clickable claim. */}
-      <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: pos.won ? '#ffd553' : pos.lossClaimed ? 'rgba(255,213,83,0.35)' : 'rgba(255,213,83,0.6)', fontVariantNumeric: 'tabular-nums' }}>
-        {pos.won ? `+${formatUSDC(pos.payout ?? 0)}` : pos.lvstReceived ? `+${formatLvst(pos.lvstReceived)}` : '—'}
-      </span>
+      {/* Earned LVST (dimmed once claimed = already collected), with the USDC LOST beneath it in a smaller,
+          right-aligned, minus-signed line — so a loss reads "won LVST for it, but lost this much cash". */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+        <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: pos.won ? '#ffd553' : pos.lossClaimed ? 'rgba(255,213,83,0.35)' : 'rgba(255,213,83,0.6)', fontVariantNumeric: 'tabular-nums' }}>
+          {pos.won ? `+${formatUSDC(pos.payout ?? 0)}` : pos.lvstReceived ? `+${formatLvst(pos.lvstReceived)}` : '—'}
+        </span>
+        {!pos.won && (pos.lossUSDC ?? 0) > 0 && (
+          <span className="mono" style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,45,120,0.6)', fontVariantNumeric: 'tabular-nums' }}>
+            -{formatUSDC(pos.lossUSDC ?? 0)}
+          </span>
+        )}
+      </div>
     </div>
   )
 }

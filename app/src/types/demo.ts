@@ -52,6 +52,8 @@ export interface Position {
   /** Loss-mint LVST this losing resolved position EARNED (from the lane's `lossClaimableLVST`). Shown even
    *  after claiming. Drives the loss toast's "You received N $LVST". */
   lvstReceived?: number
+  /** USDC this side LOST (the loss basis) — shown as "-$X" beneath the earned LVST on the settle row. */
+  lossUSDC?: number
   /** The loss-mint LVST has already been claimed on-chain — the row shows the earned amount as "claimed"
    *  and the settlement no longer offers it (a re-claim would revert). */
   lossClaimed?: boolean

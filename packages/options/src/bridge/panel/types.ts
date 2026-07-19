@@ -44,6 +44,8 @@ export interface OptionsLanePanel {
     readonly claimableUSDC: number;
     /** LVST this loss EARNED (basis × mintRate) — shown even after claiming. Pair with `lossClaimed`. */
     readonly lossClaimableLVST: number;
+    /** The USDC this side LOST (the basis the LVST is minted against) — shown as "-$X" under the LVST. */
+    readonly lossUSDC: number;
     /** USDC that streamed past resolution on this lane, refundable via withdraw ("overstream" in UI). */
     readonly overstreamClaimableUSDC: number;
     readonly canClaimWin: boolean;

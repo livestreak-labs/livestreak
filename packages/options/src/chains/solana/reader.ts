@@ -359,7 +359,8 @@ const readNft = async (
             lossClaimable,
             winning,
             Number(vault.resolvedAt ?? 0),
-            lossClaimed
+            lossClaimed,
+            basis
           )
         );
       }

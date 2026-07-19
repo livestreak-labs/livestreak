@@ -733,6 +733,7 @@ const projectLanePanel = (
             // The EARNED LVST — shown even after claiming. `canClaimLoss` (button) additionally requires
             // the loss to be UNCLAIMED, so a settled loss keeps its amount but isn't re-claimable.
             lossClaimableLVST: lvstToNumber(lane.lossClaimable ?? 0n, lvstDecimals),
+            lossUSDC: usdcToNumber(lane.lossBasisUSDC ?? 0n),
             overstreamClaimableUSDC: usdcToNumber(lane.overstreamClaimable ?? 0n),
             canClaimWin: (lane.claimable ?? 0n) > 0n,
             canClaimLoss: (lane.lossClaimable ?? 0n) > 0n && lane.lossClaimed !== true,

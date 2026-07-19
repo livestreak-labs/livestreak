@@ -743,7 +743,15 @@ const readNft = async (
         };
         const mapped = mapLane(asTokenId(id), rawLane, position, nowSec);
         const claimable = await readClaimable(ctx, asTokenId(id), vaultId, side);
-        const lossClaimable = await readLossClaimable(ctx, asTokenId(id), vaultId, side);
+        // Read the raw USDC loss basis + mintRate here (not via readLossClaimable, which only returns the
+        // LVST) so the lane carries BOTH the earned LVST and the USDC lost (shown as "-$X" under it).
+        const [lossBasis, mintRate] = await Promise.all([
+          call<bigint>(ctx, ctx.addresses.vault, ctx.abis.Vault, "lossClaimable", [
+            id, validateVaultIdForContracts(vaultId), sideToSolidityValue(side)
+          ]),
+          call<bigint>(ctx, ctx.addresses.treasury, ctx.abis.Treasury, "mintRate", [])
+        ]);
+        const lossClaimable = lossBasisToLvst(lossBasis, mintRate);
         const lossClaimed = lossClaimable > 0n && (await readLossClaimed(ctx, asTokenId(id), vaultId, side));
         const overstream = computeOverstreamClaimable(
           committedRate,
@@ -751,7 +759,7 @@ const readNft = async (
           resolvedAtSec,
           nowSec
         );
-        lanes.push(enrichLane(mapped, claimable, lossClaimable, winningSide, overstream, lossClaimed));
+        lanes.push(enrichLane(mapped, claimable, lossClaimable, winningSide, overstream, lossClaimed, lossBasis));
       }
     }
 
