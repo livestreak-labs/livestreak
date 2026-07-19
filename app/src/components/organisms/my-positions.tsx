@@ -386,7 +386,7 @@ function SettleRow({ pos }: { pos: Position }) {
         <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'rgba(255,255,255,0.3)' }}>{formatShares(pos.shares)} sh</span>
       </div>
       <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: pos.won ? '#ffd553' : 'rgba(255,213,83,0.6)', fontVariantNumeric: 'tabular-nums' }}>
-        {pos.won ? `+${formatUSDC(pos.payout ?? 0)}` : pos.lvstReceived ? `+${formatLvst(pos.lvstReceived)} $LVST` : '—'}
+        {pos.won ? `+${formatUSDC(pos.payout ?? 0)}` : pos.lvstReceived ? `+${formatLvst(pos.lvstReceived)}` : '—'}
       </span>
     </div>
   )
