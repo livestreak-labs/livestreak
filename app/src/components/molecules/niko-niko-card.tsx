@@ -32,8 +32,9 @@ export function NikoNikoCard({ vault, index, onClickCard }: Props) {
   const noTotal = view.poolNo ?? Number(vault.pools.no)
   const multiplier = view.multiplier ?? (yesTotal > 0 ? (yesTotal + noTotal) / yesTotal : 1)
   const ref = useRef<HTMLDivElement>(null)
-  // laneY = this card's home lane; x wraps back to it on the left when it exits right.
-  const posRef = useRef({ x: 0, y: 0, dx: DRIFT_SPEED, laneY: 0 })
+  // News-ticker drift, right → left. dx (per-card speed), laneY (home row), and a gentle vertical sway
+  // (amp·sin(phase + t·freq)) give each card its own organic motion instead of one stagnant line.
+  const posRef = useRef({ x: 0, y: 0, dx: -DRIFT_SPEED, laneY: 0, amp: 0, freq: 0, phase: 0, t: 0 })
   const rafRef = useRef<number>(0)
   const hoveredRef = useRef(false)
   const textRef = useRef<HTMLSpanElement>(null)
@@ -63,11 +64,20 @@ export function NikoNikoCard({ vault, index, onClickCard }: Props) {
     const numLanes = Math.max(1, Math.floor((ph - 24) / LANE_H))
     const laneY = Math.min(12 + (index % numLanes) * LANE_H + (Math.random() - 0.5) * 8, ph - CARD_H - 8)
 
-    // Left → right. The first batch spreads across the pane; a later addition slides in from off the
-    // left edge — "joining from the left" without touching anyone else.
-    const x = isInitial ? Math.random() * Math.max(0, pw - CARD_W) : -CARD_W - Math.random() * 60
+    // Right → left (news flow). The first batch spreads across the pane; a later addition enters from off
+    // the RIGHT edge and scrolls in — no disturbance to the others.
+    const x = isInitial ? Math.random() * Math.max(0, pw - CARD_W) : pw + Math.random() * 80
 
-    posRef.current = { x, y: laneY, dx: DRIFT_SPEED + Math.random() * 0.15, laneY }
+    posRef.current = {
+      x,
+      y: laneY,
+      laneY,
+      dx: -(DRIFT_SPEED + Math.random() * 0.4),   // per-card speed → not one stagnant pace
+      amp: 5 + Math.random() * 5,                  // vertical sway amplitude (px), bounded within the lane
+      freq: 0.012 + Math.random() * 0.02,          // slow, ~4–9s per sway cycle
+      phase: Math.random() * Math.PI * 2,          // desync the sway across cards
+      t: 0,
+    }
     setEnterDelay(isInitial ? Math.min(index * 0.05, 0.5) : 0)
     setReady(true)
 
@@ -80,23 +90,26 @@ export function NikoNikoCard({ vault, index, onClickCard }: Props) {
   }, [])
 
   // Drift loop — depends only on `ready`, so a changing vault count never tears it down (which would
-  // stutter every card). Pure horizontal in the card's lane; wraps right → left off the same lane.
+  // stutter every card). Scrolls right → left at the card's own speed with a gentle vertical sway; wraps
+  // off the left edge back to the right, same lane. Sway continues while hovered (drift pauses).
   useEffect(() => {
     if (!ready) return
     function tick() {
       const el = ref.current
       const p = el?.parentElement
       if (!el || !p) return
+      const pw = p.clientWidth
+      const pos = posRef.current
+      pos.t += 1
       if (!hoveredRef.current) {
-        const pw = p.clientWidth
-        const pos = posRef.current
         pos.x += pos.dx
-        if (pos.x > pw + 10) {
-          pos.x = -CARD_W - 10
-          pos.y = pos.laneY + (Math.random() - 0.5) * 8
+        if (pos.x < -CARD_W - 10) {
+          pos.x = pw + 10                          // re-enter from the right, same lane
+          pos.phase = Math.random() * Math.PI * 2  // fresh sway phase each pass
         }
       }
-      el.style.transform = `translate3d(${posRef.current.x}px, ${posRef.current.y}px, 0)`
+      const y = pos.laneY + pos.amp * Math.sin(pos.phase + pos.t * pos.freq)
+      el.style.transform = `translate3d(${pos.x}px, ${y}px, 0)`
       rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
