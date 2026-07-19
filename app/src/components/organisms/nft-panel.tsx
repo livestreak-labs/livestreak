@@ -6,7 +6,7 @@ import { isOptionsModeEnabled } from '#/utils/env'
 import { isValidRecipientAddress, recipientPlaceholder, type OptionsChainKind } from '#/utils/chain'
 import { useOptionsContext } from '#/providers/options-provider'
 import { OptionsActionButton } from '#/components/atoms/options-action-button'
-import { formatUSDC, formatRunway } from '#/utils/format'
+import { formatUSDC, formatRunway, shortenId } from '#/utils/format'
 import { hasBalanceReadout } from '#/utils/options'
 
 // UI-only input gating (amount/address format); protocol gating comes from the real SDK descriptors.
@@ -158,11 +158,11 @@ function NftRow({
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
         <div>
-          <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>
-            #{nft.tokenId}
+          <div className="mono" title={String(nft.tokenId)} style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>
+            #{shortenId(String(nft.tokenId))}
           </div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-            {nft.marketId} · {nft.laneCount} lane{nft.laneCount === 1 ? '' : 's'}
+          <div title={nft.marketId} style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+            {shortenId(nft.marketId)} · {nft.laneCount} lane{nft.laneCount === 1 ? '' : 's'}
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
