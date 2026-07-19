@@ -9,7 +9,6 @@ import {
   solanaAddress
 } from "@livestreak/wallet";
 import { readOptionalEnv } from "../../config/env.js";
-import { readSolanaDeployment } from "../../config/solana-deployment.js";
 import type { HostServerConfig } from "../../config/host.js";
 import {
   resolveSolanaPayerSeed,
@@ -89,17 +88,11 @@ export const readSolanaPaymasterRuntimeConfig = async (
           .map((token) => token.trim())
           .filter((token) => token.length > 0);
 
-  // The app only builds a sponsored Solana config when feeTokens[0] is present. With the free-price
-  // in-process signer the honest fee token is the deployment's mock USDC mint, so default to it when
-  // no explicit LIVESTREAK_SOLANA_FEE_TOKENS override is set — otherwise sponsorship is silently
-  // unsatisfiable and every write self-pays.
-  const feeTokens =
-    envFeeTokens.length > 0
-      ? envFeeTokens
-      : (() => {
-          const mint = readSolanaDeployment()?.usdcMint;
-          return mint === undefined ? [] : [mint];
-        })();
+  // Token-free by default: the free-price paymaster co-signs as fee payer and takes NOTHING, so it
+  // advertises NO fee token. The app then builds a token-free config (sponsor pays SOL, no fee-token
+  // transfer, no sponsor fee-token ATA needed — the prod-safe path). Set LIVESTREAK_SOLANA_FEE_TOKENS
+  // ONLY to opt a real Kora node into the legacy fee-token flow.
+  const feeTokens = envFeeTokens;
 
   return {
     rpcUrl,

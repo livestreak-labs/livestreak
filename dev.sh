@@ -329,10 +329,10 @@ solana_leg_up() {
 # mirror of sui_fund_sponsor. MUST run before host_up: the host paymaster checks the sponsor balance
 # once at bootstrap and sets advertise=false if it is unfunded, so funding it later (in solana_wire,
 # after host_up) leaves sponsorship un-advertised for the whole session. Idempotent (tops up to target).
-# ALSO mints a dust of the fee-token (mock USDC) to the sponsor so its associated token account EXISTS:
-# the Kora client appends a fee-token payment transfer whose DESTINATION is the sponsor's fee-token ATA
-# (even at the free-price zero amount), and a transfer to a non-existent token account fails simulation
-# with "invalid account data for instruction" — so every sponsored write would abort without this ATA.
+# Token-free sponsorship: the sponsor only needs SOL to pay fees — NO fee-token ATA (the wallet skips
+# the Kora fee-token transfer entirely), which is exactly the prod-safe condition. (Was: also minted a
+# dust of mock USDC so the sponsor's fee-token ATA existed, or every sponsored write aborted "invalid
+# account data" — that whole crutch is gone.)
 solana_fund_sponsor() {
   # Runs inside solana_leg_up, BEFORE solana_leg_env sets the seed — so set the same default here.
   export LIVESTREAK_SOLANA_SPONSOR_SEED="${LIVESTREAK_SOLANA_SPONSOR_SEED:-test test test test test test test test test test test junk}"
@@ -340,8 +340,8 @@ solana_fund_sponsor() {
   sponsor_addr="$( cd "$ROOT" && node -e "import('@livestreak/wallet').then(async(w)=>{const m=w.createWalletManager('solana',process.env.LIVESTREAK_SOLANA_SPONSOR_SEED,{provider:'$SOLANA_RPC_LOCAL'});console.log(await (await m.getAccount(0)).getAddress())}).catch(()=>{})" 2>/dev/null )"
   [ -z "$sponsor_addr" ] && { warn "Solana sponsor address derive failed — sponsorship may not advertise"; return 0; }
   ( cd "$ROOT/packages/contracts" \
-      && LIVESTREAK_SOLANA_RPC_URL="$SOLANA_RPC_LOCAL" npm run wire:solana -- --fund-sol "$sponsor_addr=2000000000" --mint "$sponsor_addr=$DEMO_USDC_MINT" ) 2>&1 | sed 's/^/  /' \
-    || warn "Solana sponsor funding failed — sponsorship may not advertise"
+      && LIVESTREAK_SOLANA_RPC_URL="$SOLANA_RPC_LOCAL" npm run wire:solana -- --fund-sol "$sponsor_addr=2000000000" ) 2>&1 | sed 's/^/  /' \
+    || warn "Solana sponsor SOL funding failed — sponsorship may not advertise"
 }
 
 # Wiring: hand the registry default steward to the steward ROLE + mint mock USDC to the role/UI

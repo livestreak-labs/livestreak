@@ -251,9 +251,9 @@ const buildSolanaSponsorshipDescriptor = (
     ...(deps.solanaPaymaster.payerAddress === null
       ? {}
       : { payerAddress: deps.solanaPaymaster.payerAddress }),
-    // feeTokens + rpcUrl complete the sponsorship triple the app needs to construct the Kora-sponsored
-    // wallet config (options-provider buildSolanaWalletInit). Omit each when empty/unset so the field
-    // is absent rather than a poison empty value.
+    // Token-free by default: payerAddress + rpcUrl is all the app needs (solanaWalletInitFromDescriptor
+    // sponsors on the payer alone, no fee token). feeTokens is advertised ONLY when explicitly set
+    // (LIVESTREAK_SOLANA_FEE_TOKENS) to opt into the legacy Kora fee-token flow; omitted when empty.
     ...(deps.solanaPaymaster.feeTokens.length === 0
       ? {}
       : { feeTokens: [...deps.solanaPaymaster.feeTokens] }),

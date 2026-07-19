@@ -76,12 +76,16 @@ describe("solanaWalletInitFromDescriptor — shared descriptor→WalletInit mapp
     expect(c.paymasterAddress).toBeUndefined();
   });
 
-  it("falls back to self-pay when the triple is incomplete (payer but no fee token)", () => {
+  it("token-free: sponsors with a payer address and NO fee token (no paymasterToken)", () => {
     const init = solanaWalletInitFromDescriptor(
       { paymasterPath: "/aa/solana/paymaster", payerAddress: "oeYfSponsor" },
       opts
     );
-    expect((init.config as Record<string, unknown>).isSponsored).toBeUndefined();
+    const c = init.config as Record<string, unknown>;
+    expect(c.isSponsored).toBe(true); // sponsored — the paymaster pays SOL and takes nothing
+    expect(c.paymasterAddress).toBe("oeYfSponsor");
+    expect(c.paymasterUrl).toBe("http://host:8787/aa/solana/paymaster");
+    expect(c.paymasterToken).toBeUndefined(); // token-free — no fee-token ATA needed in prod
   });
 
   it("uses fallbackRpc when the sponsorship omits rpcUrl", () => {

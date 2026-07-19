@@ -77,17 +77,15 @@ export const SolanaWalletInitConfig = Schema.Struct({
   paymasterToken: Schema.optional(Schema.Struct({ address: Schema.String })),
   network: Schema.optional(Schema.Literal("mainnet-beta", "devnet", "testnet", "localnet"))
 }).pipe(
-  // Same contradiction-kill as the EVM arm: the wallet's assertSolanaSponsorshipConfig throws when
-  // sponsored without the paymaster triple — fail at decode instead of first send.
+  // Contradiction-kill (fail at decode, not first send): sponsored needs a paymaster URL + fee-payer
+  // address. paymasterToken is OPTIONAL — absent selects token-free sponsorship (the paymaster pays the
+  // SOL fee and takes nothing); present enables the legacy Kora fee-token flow.
   Schema.filter(
     (config) =>
       config.isSponsored !== true ||
-      (config.paymasterUrl !== undefined &&
-        config.paymasterAddress !== undefined &&
-        config.paymasterToken !== undefined),
+      (config.paymasterUrl !== undefined && config.paymasterAddress !== undefined),
     {
-      message: () =>
-        "paymasterUrl, paymasterAddress and paymasterToken are required when isSponsored is true"
+      message: () => "paymasterUrl and paymasterAddress are required when isSponsored is true"
     }
   )
 );
@@ -139,9 +137,11 @@ export interface SolanaSponsorshipInput {
 
 // Map a host's advertised Solana sponsorship into a WalletInit — the ONE place both edges (the app
 // provider and the CLI gateway) shape this config, instead of each hand-rolling the same field copy.
-// Sponsors only when the full paymaster triple is advertised (payerAddress + a fee token); otherwise a
-// self-pay config so the read-only board still loads and writes fund their own fee. `hostBaseUrl`
-// prefixes the relative paymasterPath; `fallbackRpc` is used when the descriptor carries no rpcUrl.
+// TOKEN-FREE by default: sponsor whenever a fee-payer address is advertised — the paymaster co-signs as
+// fee payer and takes nothing, so no fee token (and no sponsor fee-token ATA) is needed. If the
+// descriptor also advertises a feeToken it opts into the legacy Kora fee-token flow. With no payer
+// address, a self-pay config so the read-only board still loads and writes fund their own fee.
+// `hostBaseUrl` prefixes the relative paymasterPath; `fallbackRpc` is used when the descriptor has no rpcUrl.
 export function solanaWalletInitFromDescriptor(
   sponsorship: SolanaSponsorshipInput | undefined,
   opts: {
@@ -153,13 +153,13 @@ export function solanaWalletInitFromDescriptor(
   const network = opts.network ?? "localnet";
   const feeToken = sponsorship?.feeTokens?.[0];
   const raw =
-    sponsorship !== undefined && sponsorship.payerAddress !== undefined && feeToken !== undefined
+    sponsorship !== undefined && sponsorship.payerAddress !== undefined
       ? {
           provider: sponsorship.rpcUrl ?? opts.fallbackRpc,
           isSponsored: true,
           paymasterUrl: `${opts.hostBaseUrl}${sponsorship.paymasterPath}`,
           paymasterAddress: sponsorship.payerAddress,
-          paymasterToken: { address: feeToken },
+          ...(feeToken !== undefined ? { paymasterToken: { address: feeToken } } : {}),
           network
         }
       : { provider: opts.fallbackRpc, network };
