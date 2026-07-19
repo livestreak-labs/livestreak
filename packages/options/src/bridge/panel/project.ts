@@ -644,6 +644,13 @@ const projectNftPanel = (entry: OptionsNftSnapshot, ctx: ProjectPanelContext): O
   const status: OptionsAccountStatus =
     activeRate > 0n ? "streaming" : hasDepleted ? "depleted" : balance > 0n ? "idle" : "empty";
 
+  // Runway = when the shared balance runs dry. EVM's reader supplies the exact Drips maxEnd; Solana's
+  // doesn't, so fall back to now + balance ÷ drain-rate. Without this a funded, streaming Solana position
+  // showed RUNWAY "—" (no endsAtMs) even though it clearly had money left.
+  const runwayEndMs =
+    entry.nft.runwayEndMs ??
+    (activeRate > 0n && balance > 0n ? Date.now() + Number((balance * 1000n) / activeRate) : undefined);
+
   // Paused lanes (session intent) overlay the matching ledger position — forcing "paused" + the remembered
   // resume rate. A paused entry with NO ledger position (paused before any shares accrued) is re-injected.
   const pausedByKey = new Map(
@@ -682,8 +689,8 @@ const projectNftPanel = (entry: OptionsNftSnapshot, ctx: ProjectPanelContext): O
       ...(entry.nft.balance === undefined
         ? {}
         : { balanceUSDC: usdcToNumber(balance), balanceRaw: balance.toString() }),
-      ...(status === "streaming" && entry.nft.runwayEndMs !== undefined
-        ? { endsAtMs: entry.nft.runwayEndMs, drainRatePerSecUSDC: usdcToNumber(activeRate) }
+      ...(status === "streaming" && runwayEndMs !== undefined
+        ? { endsAtMs: runwayEndMs, drainRatePerSecUSDC: usdcToNumber(activeRate) }
         : {})
     },
     pnl: {
