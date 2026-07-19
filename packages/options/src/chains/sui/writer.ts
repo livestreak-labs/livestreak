@@ -360,6 +360,23 @@ export const createSuiOptionsWriter = (config: OptionsChainConfig): OptionsWrite
       const to = validateSuiUserAddress(input.to, "to");
 
       const tx = new Transaction();
+      // Engine withdraw pays nothing until the pot is finalized: vault::withdraw aborts while `!collected`.
+      // Collect first (permissionless + idempotent post-resolve) — the same gate every chain enforces, and
+      // the Solana/EVM writers prepend it too. Sui PTBs batch, so collect + withdraw ride ONE tx (no
+      // Solana-style heap split needed). collect_vault pulls the receivers + skim_bps internally.
+      tx.moveCall({
+        target: target(packageId, MODULES.vaultDriver, "collect_vault"),
+        typeArguments: [coinType],
+        arguments: [
+          tx.object(ids.vaultDriverRegistry),
+          tx.object(ids.vaultRegistry),
+          tx.object(ids.dripsRegistry),
+          tx.object(ids.streamsRegistry),
+          tx.object(ids.treasuryRegistry),
+          tx.pure(vaultBytes),
+          tx.object(SUI_CLOCK_OBJECT_ID)
+        ]
+      });
       tx.moveCall({
         target: target(packageId, MODULES.marketDriver, "withdraw"),
         typeArguments: [coinType],

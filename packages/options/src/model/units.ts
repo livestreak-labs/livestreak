@@ -36,6 +36,32 @@ export const computeOverstreamClaimable = (
   return overEnd > resolvedAtSec ? committedRate * BigInt(overEnd - resolvedAtSec) : 0n;
 };
 
+/** House skim on a resolved vault: 2% of the LOSING pool goes to the treasury, the rest forms the pot.
+ *  Mirrors the on-chain `treasury.skim_bps` default (finalize_pot: skim = lose_pool·bps/10000, applied to
+ *  the losing side only). A protocol constant on every chain; if governance ever tunes it, thread it from a
+ *  view. Used to project the winner's payout BEFORE the permissionless `collect` finalizes the pot. */
+export const HOUSE_SKIM_BPS = 200n;
+const BPS_DENOM = 10_000n;
+
+/** Projected withdraw payout for a WINNING position, computed the way `finalize_pot` + `pay_winnings` will:
+ *  pot = winPool + losePool − skim(losePool); payout = pot × myShares / winningSideShares. The engine's
+ *  `claimable()` view returns 0 until the vault is `collect`ed, but collect is permissionless + idempotent
+ *  and always runs at cash-out — so this is the real amount the user will receive. Shares are the descaled
+ *  (SCALE-unit) totals the board speaks; the /wad cancels in the ratio. Chain-agnostic: any reader with the
+ *  vault's two pools + the winning-side share split can fill a pre-collect winning lane's `claimable`. */
+export const computeWinClaimable = (
+  winPool: bigint,
+  losePool: bigint,
+  myWinningShares: bigint,
+  winningSideShares: bigint
+): bigint => {
+  if (winningSideShares <= 0n || myWinningShares <= 0n) return 0n;
+  const skim = losePool > 0n ? (losePool * HOUSE_SKIM_BPS) / BPS_DENOM : 0n;
+  const pot = winPool + losePool - skim;
+  if (pot <= 0n) return 0n;
+  return (pot * myWinningShares) / winningSideShares;
+};
+
 /** USDC base units → whole USDC. */
 export const usdcToNumber = (raw: bigint): number => Number(raw) / USDC_SCALE;
 

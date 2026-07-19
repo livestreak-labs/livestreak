@@ -304,6 +304,11 @@ export const createEvmOptionsWriter = (config: OptionsChainConfig): OptionsWrite
       const vaultBytes = validateVaultIdForContracts(input.vaultId);
       const to = validateUserAddress(input.to, "to");
 
+      // Engine withdraw pays 0 until the pot is finalized: Vault.withdraw returns 0 while `!collected`.
+      // Collect first (permissionless + idempotent post-resolve) — the same gate every chain enforces, and
+      // the Solana writer prepends it too. Separate call to the Vault (collect lives there, not on the
+      // MarketDriver that routes withdraw), mirroring the existing `advance` send.
+      await send(addresses.vault, abis.Vault, "collect", [vaultBytes]);
       return send(addresses.marketDriver, abis.MarketDriver, "withdraw", [
         tokenId,
         vaultBytes,

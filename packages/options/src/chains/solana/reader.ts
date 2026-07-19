@@ -23,7 +23,8 @@ import {
 import { decodeProtocolState, type EngineView } from "@livestreak/contracts/solana";
 
 import { asMarketId, asTokenId, asVaultId } from "../../model/ids.js";
-import { lossBasisToLvst } from "../../model/units.js";
+import { WAD } from "../../model/math/curve.js";
+import { computeWinClaimable, lossBasisToLvst } from "../../model/units.js";
 import type { LvstAccount } from "../../model/lvst.js";
 import type { MarketId, TokenId, UserAddress, VaultId } from "../../model/ids.js";
 import type { OptionsBoardState } from "../../model/math/accrual.js";
@@ -339,15 +340,31 @@ const readNft = async (
               ? "no"
               : undefined
           : undefined;
+      // The engine's `claimable()` view is gated to 0 until the vault is `collect`ed (the pot finalize).
+      // Collect is permissionless + idempotent and always runs at cash-out, so a winning position on a
+      // resolved-but-uncollected vault would otherwise read $0 — and, with no cash to claim, its Cash out
+      // button would be disabled, a pure winner stuck. Read the pools ONCE here and project what
+      // collect+withdraw will pay; once collected, the real view value (>0 unclaimed, 0 once claimed) wins.
+      const uncollected = winning !== undefined && !view.collected(vId);
+      const pools = uncollected ? view.vaultPools(vId) : undefined;
       for (const sideNum of [0, 1] as const) {
         const pos = view.position(vId, sideNum, tokenHex);
         if (pos.rate === 0n && pos.sharesAccrued === 0n && pos.gPaid === 0n) continue;
-        const claimable = view.claimable(tokenHex, vId, sideNum);
+        let claimable = view.claimable(tokenHex, vId, sideNum);
+        if (pools !== undefined && sideFromSolana(sideNum) === winning) {
+          const winPool = winning === "yes" ? pools.yesPool : pools.noPool;
+          const losePool = winning === "yes" ? pools.noPool : pools.yesPool;
+          const winShares = winning === "yes" ? pools.yesShares : pools.noShares;
+          claimable = computeWinClaimable(winPool, losePool, pos.sharesAccrued / WAD, winShares);
+        }
         // Earned LVST for this loss (basis × mintRate) — shown even after claiming. The claimed-aware view
         // (loss_lvst_claimable) drops to 0 once claimed, so basis>0 with a zero claimable ⇒ already claimed.
         const basis = view.lossClaimable(tokenHex, vId, sideNum);
         const lossClaimable = lossBasisToLvst(basis, mintRate);
         const lossClaimed = basis > 0n && view.lossLvstClaimable(tokenHex, vId, sideNum) === 0n;
+        // TRUE live shares = settled + real bonding-curve accrual to now (engine pending_shares), so the
+        // absolute "sh" display grows honestly between advances instead of the app guessing with a rate.
+        const livePendingRaw = view.pendingShares(vId, sideNum, tokenHex, now);
         lanes.push(
           mapSolanaLane(
             tokenId,
@@ -360,7 +377,8 @@ const readNft = async (
             winning,
             Number(vault.resolvedAt ?? 0),
             lossClaimed,
-            basis
+            basis,
+            livePendingRaw
           )
         );
       }

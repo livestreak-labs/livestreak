@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeOverstreamClaimable,
+  computeWinClaimable,
   lossBasisToLvst,
   lvstToNumber
 } from "../src/model/units.js";
@@ -73,6 +74,37 @@ describe("computeOverstreamClaimable — post-resolution refundable stream", () 
 
   it("no maxEnd cap (maxEnd 0 = uncapped) uses now", () => {
     expect(computeOverstreamClaimable(RATE, 0, 1000, 1100)).toBe(RATE * 100n);
+  });
+});
+
+// The engine's claimable() view returns 0 until the permissionless `collect` finalizes the pot — so a
+// winning position read $0 (and its Cash out button disarmed) until the instant of collection. The reader
+// now projects what collect+withdraw will pay, using the same finalize_pot + pay_winnings math, so the win
+// shows its real amount and the button arms. pot = winPool + losePool − 2%·losePool; payout = pot × myShare.
+describe("computeWinClaimable — projected payout before collect finalizes the pot", () => {
+  it("sole winner takes the whole pot (win + lose − 2% skim on the losing pool)", () => {
+    // winPool 100, losePool 100 → skim 2 → pot 198; sole winner (mine == side total) gets it all
+    expect(computeWinClaimable(100_000_000n, 100_000_000n, 500n, 500n)).toBe(198_000_000n);
+  });
+
+  it("splits the pot by the winner's share of the winning side", () => {
+    // pot 198; I hold 25% of the winning side (125/500) → 49.5
+    expect(computeWinClaimable(100_000_000n, 100_000_000n, 125n, 500n)).toBe(49_500_000n);
+  });
+
+  it("skim hits only the losing pool — the winning pool is never skimmed", () => {
+    expect(computeWinClaimable(200_000_000n, 0n, 10n, 10n)).toBe(200_000_000n);
+  });
+
+  it("no winning shares, or none held → 0", () => {
+    expect(computeWinClaimable(100_000_000n, 100_000_000n, 0n, 500n)).toBe(0n);
+    expect(computeWinClaimable(100_000_000n, 100_000_000n, 500n, 0n)).toBe(0n);
+  });
+
+  it("the live red-card scenario ($119.23 YES / $161.67 NO), sole winner ≈ $277.67 — NOT $0", () => {
+    const payout = computeWinClaimable(119_230_000n, 161_670_000n, 1_000n, 1_000n);
+    expect(payout).toBe(277_666_600n); // 280.90 − 2% of 161.67
+    expect(payout).toBeGreaterThan(0n); // the pre-collect claimable() view would have returned 0 here
   });
 });
 
