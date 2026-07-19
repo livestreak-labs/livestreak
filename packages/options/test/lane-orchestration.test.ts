@@ -96,3 +96,72 @@ describe("lane orchestration preserves depleted siblings (bug: depleted lanes wi
     expect(lanes.some((l) => l.vaultId === vaultDepleted && l.rate === 500_000n)).toBe(true);
   });
 });
+
+describe("multi-vault funding survives a stale snapshot (bug: the 2nd vault wiped the 1st, capping the NFT at 1)", () => {
+  const vaultA = asVaultId("vault_01");
+  const vaultB = asVaultId("vault_02");
+
+  // A fresh-mint NFT that NEVER shows a just-funded lane — exactly the Solana read-after-write window
+  // where the polled snapshot lags the write. `setLanes` is full-replacement, so without the runtime's
+  // own-write overlay the second fund would rebuild `desired` from these zero lanes and wipe the first.
+  const laggingMintReader = () =>
+    createFakeOptionsReader({
+      markets: [fixtureMarket({ vaultIds: [vaultA, vaultB] })],
+      vaults: [fixtureVault({ vaultId: vaultA }), fixtureVault({ vaultId: vaultB })],
+      nfts: [fixtureNft(user, { laneCount: 0, lanes: [] })],
+      lvstAccounts: [fixtureLvstAccount(user)],
+      shareTotals: { vault_01: { yes: 1n, no: 1n }, vault_02: { yes: 1n, no: 1n } }
+    });
+
+  const bootLagging = async () => {
+    const writer = createFakeChainWriter();
+    const runtime = createOptionsRuntime({
+      config: {
+        runtimeId: "multi_vault",
+        user,
+        marketIds: [asMarketId("market_01")],
+        defaultMarketId: asMarketId("market_01")
+      },
+      chainConfig: createFakeChainConfig(),
+      chain: { reader: laggingMintReader(), writer }
+    });
+    await runtime.refreshUser(user, asMarketId("market_01"));
+    return { runtime, writer };
+  };
+
+  const laneCalls = (writer: ReturnType<typeof createFakeChainWriter>) =>
+    writer.requests
+      .filter((r) => r.action === "setLanes")
+      .map((r) => (r.args as { lanes: readonly LaneWriteInput[] }).lanes);
+
+  it("funding a second vault keeps the first even though the read never caught up", async () => {
+    const { runtime, writer } = await bootLagging();
+
+    await runtime.streamLane({ vaultId: vaultA, side: "yes", ratePerMin: 5 });
+    // The post-write refresh still returns zero lanes (lagging read) — the overlay must outlive it.
+    await runtime.refreshUser(user, asMarketId("market_01"));
+    await runtime.streamLane({ vaultId: vaultB, side: "no", ratePerMin: 3 });
+
+    const calls = laneCalls(writer);
+    expect(calls).toHaveLength(2);
+    // First fund: just A.
+    expect(calls[0]!.map((l) => l.vaultId)).toEqual([vaultA]);
+    // Second fund: BOTH vaults — A survived despite the snapshot never reflecting it.
+    expect(calls[1]!.some((l) => l.vaultId === vaultA)).toBe(true);
+    expect(calls[1]!.some((l) => l.vaultId === vaultB)).toBe(true);
+    expect(calls[1]).toHaveLength(2);
+  });
+
+  it("accumulates up to many vaults on one NFT across successive stale-snapshot funds", async () => {
+    const { runtime, writer } = await bootLagging();
+    const vaults = [vaultA, vaultB] as const;
+
+    // Fund both vaults back-to-back with the read never reflecting either.
+    await runtime.streamLane({ vaultId: vaults[0], side: "yes", ratePerMin: 4 });
+    await runtime.streamLane({ vaultId: vaults[1], side: "yes", ratePerMin: 4 });
+
+    const calls = laneCalls(writer);
+    expect(calls[calls.length - 1]).toHaveLength(2); // both lanes present on the final write
+    expect(new Set(calls[calls.length - 1]!.map((l) => l.vaultId)).size).toBe(2);
+  });
+});
