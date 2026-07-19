@@ -42,11 +42,15 @@ export interface OptionsLanePanel {
   readonly settlement?: {
     readonly won: boolean;
     readonly claimableUSDC: number;
+    /** LVST this loss EARNED (basis × mintRate) — shown even after claiming. Pair with `lossClaimed`. */
     readonly lossClaimableLVST: number;
     /** USDC that streamed past resolution on this lane, refundable via withdraw ("overstream" in UI). */
     readonly overstreamClaimableUSDC: number;
     readonly canClaimWin: boolean;
+    /** Only when there's an unclaimed loss (earned > 0 AND not yet claimed). False once claimed. */
     readonly canClaimLoss: boolean;
+    /** The loss-mint LVST has already been claimed on-chain (row shows the earned amount as settled). */
+    readonly lossClaimed: boolean;
     readonly canClaimOverstream: boolean;
   };
 }

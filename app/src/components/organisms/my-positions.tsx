@@ -288,11 +288,12 @@ function ResolvedVaultCard({ group, index = 0 }: { group: VaultGroup; index?: nu
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | undefined>()
 
-  // Enabled when there's anything to collect. Label softens to "Claim" for a pure-loss vault (LVST only, no
-  // cash) — "Cash out" implies money coming back, which is true whenever there's a payout or overstream.
+  // Enabled when there's anything left to collect: unclaimed winnings, an UNCLAIMED loss-mint, or overstream.
+  // A loss whose LVST was already claimed (canClaimLoss false) still shows its earned amount but no longer
+  // arms Cash out. Label softens to "Claim" for a pure-loss vault (LVST only, no cash).
   const hasCash = sides.some(p => p.won && (p.payout ?? 0) > 0) || overstream > 0
   const canSettle = useOptions && (
-    sides.some(p => (p.won && (p.payout ?? 0) > 0) || (!p.won && (p.lvstReceived ?? 0) > 0)) || overstream > 0
+    sides.some(p => (p.won && (p.payout ?? 0) > 0) || (!p.won && p.canClaimLoss === true)) || overstream > 0
   )
   const onSettle = async () => {
     if (!canSettle || busy) return
@@ -383,9 +384,17 @@ function SettleRow({ pos }: { pos: Position }) {
           background: pos.won ? 'rgba(255,213,83,0.1)' : 'rgba(255,255,255,0.04)',
           padding: '2px 6px', borderRadius: 4,
         }}>{pos.won ? 'WON' : 'LOST'}</span>
+        {pos.lossClaimed && (
+          <span style={{
+            fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.04em',
+            color: 'rgba(0,200,255,0.7)', background: 'rgba(0,200,255,0.08)', padding: '2px 6px', borderRadius: 4,
+          }}>CLAIMED</span>
+        )}
         <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'rgba(255,255,255,0.3)' }}>{formatShares(pos.shares)} sh</span>
       </div>
-      <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: pos.won ? '#ffd553' : 'rgba(255,213,83,0.6)', fontVariantNumeric: 'tabular-nums' }}>
+      {/* Earned amount stays visible after claiming (dimmed = already collected), so the row reads as a
+          settled record rather than a re-clickable claim. */}
+      <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: pos.won ? '#ffd553' : pos.lossClaimed ? 'rgba(255,213,83,0.35)' : 'rgba(255,213,83,0.6)', fontVariantNumeric: 'tabular-nums' }}>
         {pos.won ? `+${formatUSDC(pos.payout ?? 0)}` : pos.lvstReceived ? `+${formatLvst(pos.lvstReceived)}` : '—'}
       </span>
     </div>

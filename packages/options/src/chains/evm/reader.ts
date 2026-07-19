@@ -4,7 +4,7 @@ import { LiveStreakConfigError } from "@livestreak/core";
 import { createPublicClient, http, type Abi } from "viem";
 
 import { asMarketId, asTokenId } from "../../model/ids.js";
-import { computeOverstreamClaimable } from "../../model/units.js";
+import { computeOverstreamClaimable, lossBasisToLvst } from "../../model/units.js";
 import type {
   MarketId,
   TokenId,
@@ -522,19 +522,42 @@ const readLossClaimable = async (
 ): Promise<bigint> => {
   const id = validateTokenIdForContracts(tokenId);
   const vaultBytes = validateVaultIdForContracts(vaultId);
+  const sideVal = sideToSolidityValue(side);
 
   try {
-    // Treasury.lossLvstClaimable = lossClaimable(USDC basis) × mintRate / USDC_ONE, and 0 once claimed.
-    // Returning the LVST the claim would MINT (not the raw USDC basis) makes the panel's loss preview
-    // equal what lands on-chain — the projection scales this by the chain's LVST decimals. Sui/Solana
-    // readers reach the same LVST figure via the shared lossBasisToLvst helper.
-    return await call<bigint>(ctx, ctx.addresses.treasury, ctx.abis.Treasury, "lossLvstClaimable", [
+    // The EARNED LVST for this loss = Vault.lossClaimable(USDC basis) × Treasury.mintRate / USDC_ONE
+    // (the same figure the on-chain claim mints). Shown even after claiming; the claimed STATE is a
+    // separate flag (readLossClaimed / readNft) so the row can say "claimed". Sui/Solana use the same
+    // shared lossBasisToLvst helper for parity.
+    const [basis, mintRate] = await Promise.all([
+      call<bigint>(ctx, ctx.addresses.vault, ctx.abis.Vault, "lossClaimable", [id, vaultBytes, sideVal]),
+      call<bigint>(ctx, ctx.addresses.treasury, ctx.abis.Treasury, "mintRate", [])
+    ]);
+    return lossBasisToLvst(basis, mintRate);
+  } catch (error) {
+    throw contractsReadFailed("loss claimable", error);
+  }
+};
+
+// Has this NFT account already claimed the loss-mint for (vault, side)? Treasury.lossClaimed is a public
+// mapping getter. Lets the panel show a claimed loss as a settled "claimed" row (earned amount still
+// visible) rather than a re-clickable claim that would revert.
+const readLossClaimed = async (
+  ctx: ReaderContext,
+  tokenId: TokenId,
+  vaultId: VaultId,
+  side: OptionsVaultSide
+): Promise<boolean> => {
+  const id = validateTokenIdForContracts(tokenId);
+  const vaultBytes = validateVaultIdForContracts(vaultId);
+  try {
+    return await call<boolean>(ctx, ctx.addresses.treasury, ctx.abis.Treasury, "lossClaimed", [
       id,
       vaultBytes,
       sideToSolidityValue(side)
     ]);
   } catch (error) {
-    throw contractsReadFailed("loss claimable", error);
+    throw contractsReadFailed("loss claimed", error);
   }
 };
 
@@ -721,13 +744,14 @@ const readNft = async (
         const mapped = mapLane(asTokenId(id), rawLane, position, nowSec);
         const claimable = await readClaimable(ctx, asTokenId(id), vaultId, side);
         const lossClaimable = await readLossClaimable(ctx, asTokenId(id), vaultId, side);
+        const lossClaimed = lossClaimable > 0n && (await readLossClaimed(ctx, asTokenId(id), vaultId, side));
         const overstream = computeOverstreamClaimable(
           committedRate,
           position.maxEnd,
           resolvedAtSec,
           nowSec
         );
-        lanes.push(enrichLane(mapped, claimable, lossClaimable, winningSide, overstream));
+        lanes.push(enrichLane(mapped, claimable, lossClaimable, winningSide, overstream, lossClaimed));
       }
     }
 

@@ -23,6 +23,7 @@ import {
 import { decodeProtocolState, type EngineView } from "@livestreak/contracts/solana";
 
 import { asMarketId, asTokenId, asVaultId } from "../../model/ids.js";
+import { lossBasisToLvst } from "../../model/units.js";
 import type { LvstAccount } from "../../model/lvst.js";
 import type { MarketId, TokenId, UserAddress, VaultId } from "../../model/ids.js";
 import type { OptionsBoardState } from "../../model/math/accrual.js";
@@ -168,9 +169,12 @@ export const createSolanaOptionsReader = (
       ),
     readLossClaimable: (tokenId, vaultId, side) =>
       withVaultView(vaultId, (view, target) =>
-        // Claimed-aware LVST view (EVM parity): returns the mint AND 0 once claimed, so the panel's
-        // loss row clears after Cash out instead of lingering as still-claimable.
-        view.lossLvstClaimable(tokenIdToHex32(tokenId), target, sideToSolana(side))
+        // The EARNED LVST for this loss (basis × mintRate), shown even after claiming. The claimed state
+        // is a separate flag (readNft derives it from the claimed-aware view) so the row can say "claimed".
+        lossBasisToLvst(
+          view.lossClaimable(tokenIdToHex32(tokenId), target, sideToSolana(side)),
+          BigInt(view.mintRate())
+        )
       ),
     readPot: (vaultId) => withVaultView(vaultId, (view, target) => view.pot(target)),
     readCollected: (vaultId) => withVaultView(vaultId, (view, target) => view.collected(target)),
@@ -323,6 +327,7 @@ const readNft = async (
   const nft = await withTokenView(tokenId, (view, tokenHex, marketId) => {
     const laneCount = view.laneCount(tokenHex);
     const balance = view.nftBalance(tokenHex);
+    const mintRate = BigInt(view.mintRate()); // protocol-wide; loss basis → earned LVST for the whole NFT
     const lanes: OptionsLane[] = [];
     for (const vId of view.accountVaultIds(tokenHex)) {
       const vault = view.vault(vId);
@@ -338,9 +343,11 @@ const readNft = async (
         const pos = view.position(vId, sideNum, tokenHex);
         if (pos.rate === 0n && pos.sharesAccrued === 0n && pos.gPaid === 0n) continue;
         const claimable = view.claimable(tokenHex, vId, sideNum);
-        // Claimed-aware LVST (EVM parity): the mint amount, and 0 once claimed — so a settled loss row
-        // clears after Cash out rather than lingering with a re-clickable (AlreadyClaimed) Claim button.
-        const lossClaimable = view.lossLvstClaimable(tokenHex, vId, sideNum);
+        // Earned LVST for this loss (basis × mintRate) — shown even after claiming. The claimed-aware view
+        // (loss_lvst_claimable) drops to 0 once claimed, so basis>0 with a zero claimable ⇒ already claimed.
+        const basis = view.lossClaimable(tokenHex, vId, sideNum);
+        const lossClaimable = lossBasisToLvst(basis, mintRate);
+        const lossClaimed = basis > 0n && view.lossLvstClaimable(tokenHex, vId, sideNum) === 0n;
         lanes.push(
           mapSolanaLane(
             tokenId,
@@ -351,7 +358,8 @@ const readNft = async (
             claimable,
             lossClaimable,
             winning,
-            Number(vault.resolvedAt ?? 0)
+            Number(vault.resolvedAt ?? 0),
+            lossClaimed
           )
         );
       }

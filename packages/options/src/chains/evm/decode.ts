@@ -235,12 +235,14 @@ export const enrichLane = (
   claimable: bigint,
   lossClaimable: bigint,
   winningSide?: OptionsVaultSide,
-  overstreamClaimable?: bigint
+  overstreamClaimable?: bigint,
+  lossClaimed?: boolean
 ): OptionsLane => ({
   ...lane,
   claimable,
   lossClaimable,
   ...(overstreamClaimable === undefined ? {} : { overstreamClaimable }),
+  ...(lossClaimed === undefined ? {} : { lossClaimed }),
   ...(winningSide === undefined ? {} : { won: lane.side === winningSide })
 });
 
@@ -348,6 +350,7 @@ export type ContractsReadEntity =
   | "protocol summary"
   | "claimable"
   | "loss claimable"
+  | "loss claimed"
   | "pot"
   | "collected"
   | "account vault ids"

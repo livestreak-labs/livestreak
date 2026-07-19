@@ -110,7 +110,8 @@ export const mapSolanaLane = (
   claimable: bigint,
   lossClaimable: bigint,
   winningSide?: OptionsVaultSide,
-  resolvedAtSec = 0
+  resolvedAtSec = 0,
+  lossClaimed = false
 ): OptionsLane => {
   // Stored `depleted` only flips on a write; also treat maxEnd ≤ wall-clock-now as dry (EVM/Sui parity).
   const depleted =
@@ -137,6 +138,7 @@ export const mapSolanaLane = (
     depleted,
     claimable,
     lossClaimable,
+    lossClaimed,
     overstreamClaimable,
     ...(winningSide === undefined ? {} : { won: side === winningSide })
   };
