@@ -234,11 +234,13 @@ export const enrichLane = (
   lane: OptionsLane,
   claimable: bigint,
   lossClaimable: bigint,
-  winningSide?: OptionsVaultSide
+  winningSide?: OptionsVaultSide,
+  overstreamClaimable?: bigint
 ): OptionsLane => ({
   ...lane,
   claimable,
   lossClaimable,
+  ...(overstreamClaimable === undefined ? {} : { overstreamClaimable }),
   ...(winningSide === undefined ? {} : { won: lane.side === winningSide })
 });
 

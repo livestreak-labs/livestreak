@@ -4,6 +4,7 @@ import { LiveStreakConfigError } from "@livestreak/core";
 import { createPublicClient, http, type Abi } from "viem";
 
 import { asMarketId, asTokenId } from "../../model/ids.js";
+import { computeOverstreamClaimable } from "../../model/units.js";
 import type {
   MarketId,
   TokenId,
@@ -523,7 +524,11 @@ const readLossClaimable = async (
   const vaultBytes = validateVaultIdForContracts(vaultId);
 
   try {
-    return await call<bigint>(ctx, ctx.addresses.vault, ctx.abis.Vault, "lossClaimable", [
+    // Treasury.lossLvstClaimable = lossClaimable(USDC basis) × mintRate / USDC_ONE, and 0 once claimed.
+    // Returning the LVST the claim would MINT (not the raw USDC basis) makes the panel's loss preview
+    // equal what lands on-chain — the projection scales this by the chain's LVST decimals. Sui/Solana
+    // readers reach the same LVST figure via the shared lossBasisToLvst helper.
+    return await call<bigint>(ctx, ctx.addresses.treasury, ctx.abis.Treasury, "lossLvstClaimable", [
       id,
       vaultBytes,
       sideToSolidityValue(side)
@@ -667,17 +672,23 @@ const readNft = async (
     // vault ever funded, never pruned), so a swept / switched-away / depleted side keeps surfacing its
     // banked shares instead of vanishing. Read BOTH sides per vault to show sequential-hedge legs.
     const vaultIds = await readAccountVaultIds(ctx, asTokenId(id));
-    const winningSideByVault = new Map<string, OptionsVaultSide | undefined>();
+    const vaultByVaultId = new Map<string, OptionsVault>();
     const lanes = [];
     let totalActiveRate = 0n;
 
     for (const vaultId of vaultIds) {
       const vaultBytes = validateVaultIdForContracts(vaultId);
-      let winningSide = winningSideByVault.get(vaultId);
-      if (!winningSideByVault.has(vaultId)) {
-        winningSide = await readWinningSide(ctx, vaultId);
-        winningSideByVault.set(vaultId, winningSide);
+      let vault = vaultByVaultId.get(vaultId);
+      if (vault === undefined) {
+        vault = await readVault(ctx, vaultId);
+        vaultByVaultId.set(vaultId, vault);
       }
+      // Winning side from the vault's resolved outcome (parity with the Solana reader — no separate
+      // winningSide() call), and resolvedAt for the overstream (USDC that streamed past resolution).
+      const winningSide: OptionsVaultSide | undefined =
+        vault.outcome === "yes" ? "yes" : vault.outcome === "no" ? "no" : undefined;
+      const resolvedAtSec =
+        vault.timing.resolvedAtMs !== undefined ? Math.floor(vault.timing.resolvedAtMs / 1000) : 0;
 
       for (const side of ["yes", "no"] as const) {
         const positionRaw = await call<unknown>(
@@ -710,7 +721,13 @@ const readNft = async (
         const mapped = mapLane(asTokenId(id), rawLane, position, nowSec);
         const claimable = await readClaimable(ctx, asTokenId(id), vaultId, side);
         const lossClaimable = await readLossClaimable(ctx, asTokenId(id), vaultId, side);
-        lanes.push(enrichLane(mapped, claimable, lossClaimable, winningSide));
+        const overstream = computeOverstreamClaimable(
+          committedRate,
+          position.maxEnd,
+          resolvedAtSec,
+          nowSec
+        );
+        lanes.push(enrichLane(mapped, claimable, lossClaimable, winningSide, overstream));
       }
     }
 

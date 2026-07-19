@@ -321,6 +321,12 @@ function ResolvedVaultCard({ group, index = 0 }: { group: VaultGroup; index?: nu
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
               <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.06em', color: 'rgba(0,200,255,0.7)' }}>OVERSTREAM</span>
               <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)' }}>streamed past the result</span>
+              <span
+                role="img"
+                aria-label="What is overstream?"
+                title="Overstream is USDC that kept streaming after the vault resolved. A stream only stops when you stop it, so anything that flows past the result can't change the outcome — it's returned to you in full when you cash out."
+                style={{ fontSize: 10, color: 'rgba(0,200,255,0.5)', cursor: 'help', fontFamily: 'var(--font-mono)', lineHeight: 1 }}
+              >ⓘ</span>
             </div>
             <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: 'rgba(0,200,255,0.8)', fontVariantNumeric: 'tabular-nums' }}>+{formatUSDC(overstream)}</span>
           </div>

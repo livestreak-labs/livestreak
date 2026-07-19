@@ -23,6 +23,7 @@ import {
 import { decodeProtocolState, type EngineView } from "@livestreak/contracts/solana";
 
 import { asMarketId, asTokenId, asVaultId } from "../../model/ids.js";
+import { lossBasisToLvst } from "../../model/units.js";
 import type { LvstAccount } from "../../model/lvst.js";
 import type { MarketId, TokenId, UserAddress, VaultId } from "../../model/ids.js";
 import type { OptionsBoardState } from "../../model/math/accrual.js";
@@ -426,12 +427,9 @@ const readUsdcBalance = async (ctx: SolanaOptionsContext, owner: UserAddress): P
   return dv.getBigUint64(64, true);
 };
 
-// The engine's lossClaimable returns the USDC loss BASIS; the on-chain claim mints LVST as
-// basis × mintRate / USDC_ONE (treasury.rs mint_loss_lvst). Convert here so the panel's
-// lossClaimableLVST (which the projection scales by the chain's LVST decimals) previews what the
-// claim actually mints, not the raw basis. (EVM/Sui readers return the basis too and want the same.)
-const USDC_ONE_UNITS = 1_000_000n;
-const lossBasisToLvst = (basisUsdc: bigint, mintRate: bigint): bigint => (basisUsdc * mintRate) / USDC_ONE_UNITS;
+// The engine's lossClaimable returns the USDC loss BASIS; `lossBasisToLvst` (shared, model/units)
+// converts it to the LVST the claim actually mints — EVM/Sui readers apply the identical helper, so
+// every chain's panel previews the same figure the on-chain claim produces.
 
 // Same SPL token-account read as USDC, against the LVST mint's ATA (loss-mint / future staking credit it).
 const readLvstBalance = async (ctx: SolanaOptionsContext, owner: UserAddress): Promise<bigint> => {

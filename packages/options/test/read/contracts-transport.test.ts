@@ -407,6 +407,12 @@ const respond = (request: SimRequest, options: FakeReaderOptions): unknown => {
     if (functionName === "lvstPendingDividends") {
       return 5_000_000n;
     }
+
+    // readLossClaimable now reads the LVST-denominated view (0 for this open vault) instead of the
+    // raw USDC basis off the Vault — see loss-overstream.test.ts for the conversion coverage.
+    if (functionName === "lossLvstClaimable") {
+      return 0n;
+    }
   }
 
   if (address === ADDRESSES.stewardRegistry) {

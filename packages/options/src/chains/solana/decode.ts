@@ -13,6 +13,7 @@ import type {
 
 import { asMarketId, asVaultId } from "../../model/ids.js";
 import { WAD } from "../../model/math/curve.js";
+import { computeOverstreamClaimable } from "../../model/units.js";
 import type { MarketId, TokenId, UserAddress, VaultId } from "../../model/ids.js";
 import type { LvstAccount } from "../../model/lvst.js";
 import type { OptionsLane } from "../../model/lane.js";
@@ -115,14 +116,14 @@ export const mapSolanaLane = (
   const depleted =
     position.depleted ||
     (position.rate > 0n && position.maxEnd > 0 && position.maxEnd <= nowSec);
-  // Overstream: USDC that streamed AFTER resolvedAt (rate × (min(maxEnd, now) − resolvedAt)), the exact
-  // pay_overage entitlement (treasury/vault.rs). Uses committed rate so a depleted-but-unstopped lane
-  // still shows it (min(maxEnd, now) caps at maxEnd). 0 on an open vault or a pre-resolution end.
-  const overEnd = position.maxEnd > 0 ? Math.min(position.maxEnd, nowSec) : nowSec;
-  const overstreamClaimable =
-    position.rate > 0n && resolvedAtSec > 0 && overEnd > resolvedAtSec
-      ? position.rate * BigInt(overEnd - resolvedAtSec)
-      : 0n;
+  // Overstream: USDC that streamed AFTER resolvedAt — the shared, chain-agnostic pay_overage entitlement
+  // (uses the committed rate so a depleted-but-unstopped lane still shows its owed refund).
+  const overstreamClaimable = computeOverstreamClaimable(
+    position.rate,
+    position.maxEnd,
+    resolvedAtSec,
+    nowSec
+  );
   return {
     tokenId,
     vaultId,
