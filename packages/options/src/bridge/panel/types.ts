@@ -43,8 +43,11 @@ export interface OptionsLanePanel {
     readonly won: boolean;
     readonly claimableUSDC: number;
     readonly lossClaimableLVST: number;
+    /** USDC that streamed past resolution on this lane, refundable via withdraw ("overstream" in UI). */
+    readonly overstreamClaimableUSDC: number;
     readonly canClaimWin: boolean;
     readonly canClaimLoss: boolean;
+    readonly canClaimOverstream: boolean;
   };
 }
 

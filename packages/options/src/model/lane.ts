@@ -17,5 +17,8 @@ export interface OptionsLane {
   readonly depleted: boolean;
   readonly claimable?: bigint;
   readonly lossClaimable?: bigint;
+  /** Overstream: raw USDC that streamed out of this lane AFTER the vault resolved (rate × (min(maxEnd,
+   *  now) − resolvedAt)), refundable via withdraw. 0 on an open lane. Each chain reader fills it. */
+  readonly overstreamClaimable?: bigint;
   readonly won?: boolean;
 }

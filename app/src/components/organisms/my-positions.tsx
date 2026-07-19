@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pulse, Pause, Play } from '@phosphor-icons/react'
 import { StreamSlider } from '#/components/molecules/stream-slider'
@@ -8,7 +8,6 @@ import type { OptionsVault } from '@livestreak/options'
 import { isOptionsModeEnabled } from '#/utils/env'
 import { useOptionsContext } from '#/providers/options-provider'
 import { useLaneEditor } from '#/hooks/use-lane-editor'
-import { OptionsActionButton } from '#/components/atoms/options-action-button'
 
 interface Props {
   positions: Position[]
@@ -275,12 +274,33 @@ function SideHolding({ side, pos, active }: { side: 'yes' | 'no'; pos?: Position
   )
 }
 
+// One resolved vault = one settlement card. Rows are conditional: a YES/NO row shows only for a side you
+// actually streamed, and the Overstream row only when a stream ran past the result. Individual buttons are
+// gone — a single "Cash out" runs the whole settlement per-vault (stop this vault's lanes → claim LVST on
+// the losing side → withdraw winnings + overstream). It never touches your other vaults or shared balance.
 function ResolvedVaultCard({ group, index = 0 }: { group: VaultGroup; index?: number }) {
   const optionsEnabled = isOptionsModeEnabled()
   const options = useOptionsContext()
   const useOptions = optionsEnabled && options.isConnected
   const sides = sidesOf(group)
   const option = sides[0]?.option ?? ''
+  const overstream = sides.reduce((s, p) => s + (p.overstream ?? 0), 0)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | undefined>()
+
+  // Enabled when there's anything to collect. Label softens to "Claim" for a pure-loss vault (LVST only, no
+  // cash) — "Cash out" implies money coming back, which is true whenever there's a payout or overstream.
+  const hasCash = sides.some(p => p.won && (p.payout ?? 0) > 0) || overstream > 0
+  const canSettle = useOptions && (
+    sides.some(p => (p.won && (p.payout ?? 0) > 0) || (!p.won && (p.lvstReceived ?? 0) > 0)) || overstream > 0
+  )
+  const onSettle = async () => {
+    if (!canSettle || busy) return
+    setBusy(true); setErr(undefined)
+    try { await options.settleVault(group.vaultId) }
+    catch (e) { setErr(e instanceof Error ? e.message : 'Cash out failed') }
+    finally { setBusy(false) }
+  }
 
   return (
     <motion.div
@@ -289,54 +309,80 @@ function ResolvedVaultCard({ group, index = 0 }: { group: VaultGroup; index?: nu
       transition={{ type: 'spring', stiffness: 320, damping: 30, delay: index * 0.04 }}
       style={{
         background: 'rgba(255,255,255,0.015)',
-        border: '1px solid rgba(255,255,255,0.04)',
-        borderRadius: 10, padding: '12px 14px', marginBottom: 8, opacity: 0.85,
+        border: '1px solid rgba(255,255,255,0.05)',
+        borderRadius: 10, padding: '12px 14px', marginBottom: 8,
       }}
     >
-      <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: 400, marginBottom: 8 }}>{option}</p>
+      <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: 400, marginBottom: 10 }}>{option}</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {sides.map(p => {
-          const withdrawFn = useOptions && p.won
-            ? options.findFunction('withdraw', fn => fn.target?.vaultId === p.vaultId && fn.target?.kind === 'vault')
-            : undefined
-          const claimLossFn = useOptions && !p.won
-            ? options.findFunction('claimLossLvst', fn => fn.target?.vaultId === p.vaultId && fn.target?.side === p.side && fn.target?.kind === 'vault')
-            : undefined
-          return (
-            <div key={p.side} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{
-                  fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700,
-                  color: p.side === 'yes' ? 'rgba(0,255,135,0.6)' : 'rgba(255,45,120,0.6)',
-                  background: p.side === 'yes' ? 'rgba(0,255,135,0.06)' : 'rgba(255,45,120,0.06)',
-                  padding: '2px 6px', borderRadius: 4,
-                }}>{p.side.toUpperCase()}</span>
-                <span style={{
-                  fontSize: 10, fontFamily: 'var(--font-mono)',
-                  color: p.won ? '#ffd553' : 'rgba(255,255,255,0.3)',
-                  background: p.won ? 'rgba(255,213,83,0.1)' : 'rgba(255,255,255,0.04)',
-                  padding: '2px 6px', borderRadius: 4,
-                }}>{p.won ? 'WON' : 'LOST'}</span>
-                <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'rgba(255,255,255,0.3)' }}>{formatShares(p.shares)} sh</span>
-                {useOptions && p.won && (
-                  <OptionsActionButton label="Withdraw" fn={withdrawFn} onAction={() => options.claimWin(p.vaultId)} variant="green" compact />
-                )}
-                {useOptions && !p.won && (
-                  <OptionsActionButton label="Claim &amp; Exit" fn={claimLossFn} onAction={() => options.claimLossAndExit(p.vaultId, p.side)} variant="red" compact />
-                )}
-              </div>
-              <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: 10 }}>
-                {p.won ? (
-                  <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: '#ffd553' }}>+{formatUSDC(p.payout ?? 0)}</span>
-                ) : p.lvstReceived ? (
-                  <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,213,83,0.6)' }}>+{formatLvst(p.lvstReceived)}</span>
-                ) : null}
-              </div>
+        {sides.map(p => <SettleRow key={p.side} pos={p} />)}
+        {overstream > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+              <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.06em', color: 'rgba(0,200,255,0.7)' }}>OVERSTREAM</span>
+              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)' }}>streamed past the result</span>
             </div>
-          )
-        })}
+            <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: 'rgba(0,200,255,0.8)', fontVariantNumeric: 'tabular-nums' }}>+{formatUSDC(overstream)}</span>
+          </div>
+        )}
       </div>
+      {useOptions && (
+        <>
+          <button
+            onClick={onSettle}
+            disabled={!canSettle || busy}
+            title="Collects winnings + overstream and mints any LVST, then stops this vault's stream — this vault only"
+            style={{
+              width: '100%', marginTop: 12, minHeight: 34, borderRadius: 7,
+              background: canSettle ? 'rgba(0,255,135,0.1)' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${canSettle ? 'rgba(0,255,135,0.3)' : 'rgba(255,255,255,0.08)'}`,
+              color: canSettle ? '#00ff87' : 'rgba(255,255,255,0.3)',
+              fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
+              cursor: !canSettle ? 'not-allowed' : busy ? 'wait' : 'pointer',
+              opacity: busy ? 0.6 : 1, transition: 'opacity 0.15s, background 0.15s',
+            }}
+          >
+            {busy ? 'CASHING OUT…' : hasCash ? 'Cash out' : 'Claim'}
+          </button>
+          <AnimatePresence>
+            {err && (
+              <motion.p key="settle-err" initial={{ opacity: 0, y: -2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
+                style={{ margin: '8px 0 0', fontSize: 10, fontFamily: 'var(--font-mono)', color: '#ff7a7a', lineHeight: 1.4 }}>
+                {err}
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </>
+      )}
     </motion.div>
+  )
+}
+
+// One settled side: SIDE · won/lost · shares ───── payout ($ if won, LVST if lost). No button — the card's
+// single Cash out collects everything.
+function SettleRow({ pos }: { pos: Position }) {
+  const c = pos.side === 'yes' ? YES : NO
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{
+          fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700,
+          color: c === YES ? 'rgba(0,255,135,0.65)' : 'rgba(255,45,120,0.65)',
+          background: c === YES ? 'rgba(0,255,135,0.06)' : 'rgba(255,45,120,0.06)',
+          padding: '2px 6px', borderRadius: 4,
+        }}>{pos.side.toUpperCase()}</span>
+        <span style={{
+          fontSize: 10, fontFamily: 'var(--font-mono)',
+          color: pos.won ? '#ffd553' : 'rgba(255,255,255,0.3)',
+          background: pos.won ? 'rgba(255,213,83,0.1)' : 'rgba(255,255,255,0.04)',
+          padding: '2px 6px', borderRadius: 4,
+        }}>{pos.won ? 'WON' : 'LOST'}</span>
+        <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'rgba(255,255,255,0.3)' }}>{formatShares(pos.shares)} sh</span>
+      </div>
+      <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: pos.won ? '#ffd553' : 'rgba(255,213,83,0.6)', fontVariantNumeric: 'tabular-nums' }}>
+        {pos.won ? `+${formatUSDC(pos.payout ?? 0)}` : pos.lvstReceived ? `+${formatLvst(pos.lvstReceived)} $LVST` : '—'}
+      </span>
+    </div>
   )
 }
 

@@ -731,8 +731,10 @@ const projectLanePanel = (
             won: lane.won,
             claimableUSDC: usdcToNumber(lane.claimable ?? 0n),
             lossClaimableLVST: lvstToNumber(lane.lossClaimable ?? 0n, lvstDecimals),
+            overstreamClaimableUSDC: usdcToNumber(lane.overstreamClaimable ?? 0n),
             canClaimWin: (lane.claimable ?? 0n) > 0n,
-            canClaimLoss: (lane.lossClaimable ?? 0n) > 0n
+            canClaimLoss: (lane.lossClaimable ?? 0n) > 0n,
+            canClaimOverstream: (lane.overstreamClaimable ?? 0n) > 0n
           }
         })
   };

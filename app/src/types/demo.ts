@@ -52,6 +52,9 @@ export interface Position {
   /** Loss-mint LVST a losing resolved position can claim (from the lane's `lossClaimableLVST`). Drives the
    *  loss toast's "You received N $LVST". */
   lvstReceived?: number
+  /** Overstream: USDC that streamed past resolution on this lane, refundable at cash-out (from the lane's
+   *  `overstreamClaimableUSDC`). Only present when the stream ran past the result. */
+  overstream?: number
   minute: number
   /** Runway: ms-since-epoch when this lane's deposit runs dry (streaming only; drives the time-left readout). */
   runwayEndMs?: number

@@ -197,7 +197,7 @@ export function VaultCard({ vault, index = 0, onStream, onGoToMint }: {
               side={side ?? 'yes'}
               useOptions={useOptions}
               claimLossFn={useOptions && side ? options.findFunction('claimLossLvst', fn => fn.target?.vaultId === vault.vaultId && fn.target?.side === side && fn.target?.kind === 'vault') : undefined}
-              onClaimLoss={async () => { if (side) await options.claimLossAndExit(vault.vaultId, side) }}
+              onClaimLoss={async () => { await options.settleVault(vault.vaultId) }}
             />
           )}
         </AnimatePresence>

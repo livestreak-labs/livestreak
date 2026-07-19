@@ -160,7 +160,7 @@ interface OptionsContextValue {
   hasNftForVault: (vaultId: string) => boolean
   mint: (marketId: string) => Promise<TxId>
   claimLoss: (vaultId: string, side: 'yes' | 'no') => Promise<TxId>
-  claimLossAndExit: (vaultId: string, side: 'yes' | 'no') => Promise<TxId>
+  settleVault: (vaultId: string) => Promise<TxId>
   stake: (amountLvst: number) => Promise<TxId>
   unstake: (amountLvst: number) => Promise<TxId>
   claimDividends: () => Promise<TxId>
@@ -770,18 +770,31 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     })
   }, [callBridgeAction, requireUser, resolveTokenId])
 
-  // Claim & exit a LOSING position in one gesture: mint the LVST consolation, THEN stop every stream
-  // and claw back the remaining shared balance to the wallet. Claim first — it's the once-only value
-  // (loss basis is fixed at resolution) and now reliable; if the sweep leg fails the claim still
-  // landed and the standalone "Sweep to wallet" button recovers the funds. Chain-agnostic: both
-  // claimLossLvst and stopAllFunding exist on evm/sui/solana. stopAllFunding is position-wide (halts
-  // every lane + returns the whole Drips balance), which is the correct semantic for "exit this bet".
-  const claimLossAndExit = useCallback(async (vaultId: string, side: 'yes' | 'no'): Promise<TxId> => {
+  // Cash out ONE resolved vault — strictly per-vault, never NFT-wide (leaves your other vaults + the
+  // shared balance alone). Runs the settlement steps in order: (1) stop this vault's still-streaming
+  // lanes so overstream stops growing, (2) mint LVST on the losing side if you lost, (3) withdraw —
+  // which pays winnings AND overstream for BOTH sides in one call. Withdraw is last so the now-frozen
+  // overstream is fully paid. Each leg is a separate sponsored tx (Solana can't batch engine ops); the
+  // steps are optional per what you actually hold, so the button adapts (1–3 legs). Chain-agnostic.
+  const settleVault = useCallback(async (vaultId: string): Promise<TxId> => {
     const user = requireUser()
     const tokenId = asTokenId(resolveTokenId(vaultId))
-    await callBridgeAction('claimLossLvst', { tokenId, vaultId: asVaultId(vaultId), side, to: user })
-    return callBridgeAction('stopAllFunding', { tokenId })
-  }, [callBridgeAction, requireUser, resolveTokenId])
+    const vid = asVaultId(vaultId)
+    const panel = requirePanel()
+    const nft = panel.nfts.find(n => n.lanes.some(l => l.vaultId === vaultId))
+    const lanes = nft?.lanes.filter(l => l.vaultId === vaultId) ?? []
+    // 1. stop this vault's still-streaming lanes (the real per-lane stopFunding — halts overstream growth)
+    for (const lane of lanes) {
+      if (lane.status === 'streaming') {
+        await callBridgeAction('stopFunding', { tokenId, vaultId: vid, side: lane.side })
+      }
+    }
+    // 2. mint LVST on the losing side, if you held one
+    const lost = lanes.find(l => l.settlement && !l.settlement.won && l.settlement.canClaimLoss)
+    if (lost) await callBridgeAction('claimLossLvst', { tokenId, vaultId: vid, side: lost.side, to: user })
+    // 3. withdraw — winnings (won side) + overstream (both sides) in one call
+    return callBridgeAction('withdraw', { tokenId, vaultId: vid, to: user })
+  }, [requirePanel, callBridgeAction, resolveTokenId, requireUser])
 
   const stake = useCallback(async (amountLvst: number): Promise<TxId> => {
     return callBridgeAction('stakeLvst', {
@@ -862,7 +875,7 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     hasNftForVault,
     mint,
     claimLoss,
-    claimLossAndExit,
+    settleVault,
     stake,
     unstake,
     claimDividends,
@@ -873,7 +886,7 @@ export function OptionsProvider({ children }: { children: ReactNode }) {
     enabled, ready, chain, setChain, isConnected, isLoading, derivationStep, claiming, error, address, usdcBalance, board, controls,
     connect, disconnect, afterWrite, setActiveMarketId, findFunction, findFundFunctionForVault,
     findStopFundingFunctionForVault, streamLane, pauseLane, resumeLane,
-    addFundsNft, sweepNft, withdrawAllNft, previewAccrual, claimWin, hasNftForVault, mint, claimLoss, claimLossAndExit,
+    addFundsNft, sweepNft, withdrawAllNft, previewAccrual, claimWin, hasNftForVault, mint, claimLoss, settleVault,
     stake, unstake, claimDividends, transferNft, approveNft, setApprovalForAll,
   ])
 

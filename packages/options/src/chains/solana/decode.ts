@@ -108,12 +108,21 @@ export const mapSolanaLane = (
   nowSec: number,
   claimable: bigint,
   lossClaimable: bigint,
-  winningSide?: OptionsVaultSide
+  winningSide?: OptionsVaultSide,
+  resolvedAtSec = 0
 ): OptionsLane => {
   // Stored `depleted` only flips on a write; also treat maxEnd ≤ wall-clock-now as dry (EVM/Sui parity).
   const depleted =
     position.depleted ||
     (position.rate > 0n && position.maxEnd > 0 && position.maxEnd <= nowSec);
+  // Overstream: USDC that streamed AFTER resolvedAt (rate × (min(maxEnd, now) − resolvedAt)), the exact
+  // pay_overage entitlement (treasury/vault.rs). Uses committed rate so a depleted-but-unstopped lane
+  // still shows it (min(maxEnd, now) caps at maxEnd). 0 on an open vault or a pre-resolution end.
+  const overEnd = position.maxEnd > 0 ? Math.min(position.maxEnd, nowSec) : nowSec;
+  const overstreamClaimable =
+    position.rate > 0n && resolvedAtSec > 0 && overEnd > resolvedAtSec
+      ? position.rate * BigInt(overEnd - resolvedAtSec)
+      : 0n;
   return {
     tokenId,
     vaultId,
@@ -127,6 +136,7 @@ export const mapSolanaLane = (
     depleted,
     claimable,
     lossClaimable,
+    overstreamClaimable,
     ...(winningSide === undefined ? {} : { won: side === winningSide })
   };
 };
