@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useVaultView } from '#/hooks/use-vault-views'
 import { Pulse, Pause, Play } from '@phosphor-icons/react'
 import { StreamSlider } from '#/components/molecules/stream-slider'
-import { formatUSDC, formatRate, formatLvst, formatRunway, formatShares, formatSharePct } from '#/utils/format'
+import { ScoreNumber } from '#/components/atoms/score-number'
+import { formatUSDC, formatRate, formatLvst, formatRunway, formatShares } from '#/utils/format'
 import type { Position } from '#/utils/mock'
 import type { OptionsVault } from '@livestreak/options'
 import { isOptionsModeEnabled } from '#/utils/env'
@@ -17,39 +18,6 @@ interface Props {
 
 const YES = '#00ff87'
 const NO = '#ff2d78'
-
-// "Alive" shares. The on-chain share count only advances on a write, so between rate changes it sits static
-// and the display feels dead. This projects it forward from the streaming accrual (rate ÷ share price =
-// shares/sec) and reveals the growth in DISCRETE jumps at a RANDOM 2–8s cadence — each position runs its
-// own timer, so several never tick in lockstep. Re-anchors to the real value whenever a poll advances it.
-function useLivelyShares(polledShares: number, accrualPerSec: number, active: boolean): number {
-  const [display, setDisplay] = useState(polledShares)
-  const anchor = useRef({ shares: polledShares, at: Date.now() })
-  // Read the (poll-varying) inputs via refs so the 2–8s timer is scheduled ONCE and never reset by a poll
-  // — otherwise a fresh accrualPerSec every 3s cleared the pending timeout before it could fire.
-  const rate = useRef(accrualPerSec); rate.current = accrualPerSec
-  const activeRef = useRef(active); activeRef.current = active
-  useEffect(() => {
-    // Re-anchor to truth whenever an advance moves the on-chain shares; project forward from there.
-    anchor.current = { shares: polledShares, at: Date.now() }
-    setDisplay(polledShares)
-  }, [polledShares])
-  useEffect(() => {
-    let id: ReturnType<typeof setTimeout>
-    const tick = () => {
-      id = setTimeout(() => {
-        if (activeRef.current && rate.current > 0) {
-          const elapsed = (Date.now() - anchor.current.at) / 1000
-          setDisplay(anchor.current.shares + rate.current * elapsed)
-        }
-        tick()
-      }, 2000 + Math.random() * 6000) // random per-position → staggered, "alive" not mechanical
-    }
-    tick()
-    return () => clearTimeout(id)
-  }, [])
-  return display
-}
 
 // One vault = one card, even when the viewer holds shares on BOTH sides (streamed one, switched, streamed the
 // other). Group the per-side positions by vault; the card lights the streaming side and shows held shares on
@@ -118,7 +86,12 @@ function ActiveVaultCard({ group, index = 0 }: { group: VaultGroup; index?: numb
   // Bind the editor to the side that owns the live control: the streaming side, else a paused one, else
   // whichever exists. The slider spans NO↔YES, so dragging across centre still switches sides from here.
   const sides = sidesOf(group)
-  const primary = sides.find(p => p.status === 'streaming') ?? sides.find(p => p.status === 'paused') ?? sides[0]
+  // Prefer streaming, then paused, then DEPLETED (explicit — so the control's amber pill reads DEPLETED,
+  // not PAUSED, when the money actually ran dry), then whatever exists.
+  const primary = sides.find(p => p.status === 'streaming')
+    ?? sides.find(p => p.status === 'paused')
+    ?? sides.find(p => p.status === 'depleted')
+    ?? sides[0]
   const { editing, busy, error, paused, depleted, rate, shownSide, streaming, canPause, startEditing, onDrag, togglePause } = useLaneEditor(primary)
   // The lit side = the one streaming now (follows the finger mid-drag via shownSide). Held side recedes.
   const activeSide = streaming ? shownSide : null
@@ -272,11 +245,9 @@ function ActiveVaultCard({ group, index = 0 }: { group: VaultGroup; index?: numb
 function SideHolding({ side, pos, active, accrualPerSec }: { side: 'yes' | 'no'; pos?: Position; active: boolean; accrualPerSec: number }) {
   const c = side === 'yes' ? YES : NO
   const has = !!pos
-  // Lively projected shares + a proportionally-scaled % of side (grows with your shares between advances).
-  const livelyShares = useLivelyShares(pos?.shares ?? 0, accrualPerSec, active)
-  const livelyPct = pos && pos.shares > 0 && pos.sharePercent !== undefined
-    ? Math.min(100, pos.sharePercent * (livelyShares / pos.shares))
-    : pos?.sharePercent
+  // % grows in step with your shares (re-anchored each poll). Only projected while STREAMING — a held /
+  // paused / depleted position passes live=false, so the scoreboard counters do no work.
+  const pctRate = pos && pos.shares > 0 && active ? (pos.sharePercent ?? 0) * accrualPerSec / pos.shares : 0
   const statusLabel = active
     ? 'STREAMING'
     : pos?.status === 'paused' ? 'PAUSED' : pos?.status === 'depleted' ? 'DEPLETED' : null
@@ -302,13 +273,19 @@ function SideHolding({ side, pos, active, accrualPerSec }: { side: 'yes' | 'no';
       {has ? (
         <>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-            <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: active ? '#fff' : 'rgba(255,255,255,0.82)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-              {livelyPct !== undefined ? formatSharePct(livelyPct) : '—'}
-            </span>
-            {livelyPct !== undefined && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>of side</span>}
+            {pos!.sharePercent !== undefined ? (
+              <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: active ? '#fff' : 'rgba(255,255,255,0.82)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, display: 'inline-flex', alignItems: 'baseline' }}>
+                <ScoreNumber value={pos!.sharePercent} live={active} ratePerSec={pctRate} format={{ maximumFractionDigits: 1 }} />
+                <span style={{ marginLeft: 1 }}>%</span>
+              </span>
+            ) : (
+              <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,0.82)', lineHeight: 1 }}>—</span>
+            )}
+            {pos!.sharePercent !== undefined && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>of side</span>}
           </div>
-          <div className="mono" style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
-            {formatShares(livelyShares)} sh
+          <div className="mono" style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 3, fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'baseline', gap: 3 }}>
+            <ScoreNumber value={pos!.shares} live={active} ratePerSec={accrualPerSec} format={{ maximumFractionDigits: 2 }} />
+            <span>sh</span>
           </div>
         </>
       ) : (
@@ -443,7 +420,7 @@ function SettleRow({ pos }: { pos: Position }) {
           {pos.won ? `+${formatUSDC(pos.payout ?? 0)}` : pos.lvstReceived ? `+${formatLvst(pos.lvstReceived)}` : '—'}
         </span>
         {!pos.won && (pos.lossUSDC ?? 0) > 0 && (
-          <span className="mono" style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,45,120,0.6)', fontVariantNumeric: 'tabular-nums' }}>
+          <span className="mono" style={{ fontSize: 9, fontWeight: 600, color: '#9a9aac', fontVariantNumeric: 'tabular-nums' }}>
             -{formatUSDC(pos.lossUSDC ?? 0)}
           </span>
         )}
