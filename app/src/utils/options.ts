@@ -276,7 +276,7 @@ export function panelToHomepage(panel: OptionsPanel): HomepageData {
         id: routeId,
         marketId: market.marketId,
         title: market.title,
-        category: market.category ?? 'Tech',
+        category: market.category ?? 'Sports',
         activeVaults: market.totals.activeVaults,
         totalPooled: pooled,
         elapsed: streamElapsed(market),
