@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { LiveStreakConfigError } from "@livestreak/core";
+
 import { asMarketId, asTokenId, asVaultId } from "../src/model/ids.js";
 import type { LaneWriteInput } from "../src/chains/types.js";
 import { createOptionsRuntime } from "../src/runtime/index.js";
@@ -163,5 +165,63 @@ describe("multi-vault funding survives a stale snapshot (bug: the 2nd vault wipe
     const calls = laneCalls(writer);
     expect(calls[calls.length - 1]).toHaveLength(2); // both lanes present on the final write
     expect(new Set(calls[calls.length - 1]!.map((l) => l.vaultId)).size).toBe(2);
+  });
+});
+
+// addFunds is a RUNTIME verb (not a writer method): re-assert the token's current lanes + the deposit via
+// setLanes, using the overlay-aware set so a lagging read can't wipe a sibling. Chain-agnostic — the
+// runtime calls writer.setLanes, which every chain implements.
+describe("addFunds (runtime top-up) preserves lanes and parks on a laneless mint", () => {
+  const setLanesReq = (writer: ReturnType<typeof createFakeChainWriter>) => {
+    const req = writer.requests.find((r) => r.action === "setLanes");
+    expect(req).toBeDefined();
+    return req!.args as { lanes: readonly LaneWriteInput[]; addDeposit: bigint };
+  };
+
+  it("re-asserts ALL current lanes with the deposit (never drops the depleted sibling)", async () => {
+    const { runtime, writer } = await bootRuntime();
+    await runtime.addFunds({ tokenId, deposit: 1_000_000n });
+
+    const { lanes, addDeposit } = setLanesReq(writer);
+    expect(addDeposit).toBe(1_000_000n);
+    expect(lanes.some((l) => l.vaultId === vaultActive && l.rate === 800_000n)).toBe(true);
+    expect(lanes.some((l) => l.vaultId === vaultDepleted && l.rate === 500_000n)).toBe(true);
+  });
+
+  it("parks the deposit as budget on a laneless mint (empty lane set)", async () => {
+    const writer = createFakeChainWriter();
+    const runtime = createOptionsRuntime({
+      config: {
+        runtimeId: "addfunds_laneless",
+        user,
+        marketIds: [asMarketId("market_01")],
+        defaultMarketId: asMarketId("market_01")
+      },
+      chainConfig: createFakeChainConfig(),
+      chain: {
+        reader: createFakeOptionsReader({
+          markets: [fixtureMarket({ vaultIds: [vaultActive] })],
+          vaults: [fixtureVault({ vaultId: vaultActive })],
+          nfts: [fixtureNft(user, { laneCount: 0, lanes: [] })],
+          lvstAccounts: [fixtureLvstAccount(user)],
+          shareTotals: { vault_01: { yes: 1n, no: 1n } }
+        }),
+        writer
+      }
+    });
+    await runtime.refreshUser(user, asMarketId("market_01"));
+    await runtime.addFunds({ tokenId, deposit: 500_000n });
+
+    const { lanes, addDeposit } = setLanesReq(writer);
+    expect(lanes).toHaveLength(0);
+    expect(addDeposit).toBe(500_000n);
+  });
+
+  it("rejects a non-positive deposit before any write", async () => {
+    const { runtime, writer } = await bootRuntime();
+    await expect(runtime.addFunds({ tokenId, deposit: 0n })).rejects.toBeInstanceOf(
+      LiveStreakConfigError
+    );
+    expect(writer.requests.find((r) => r.action === "setLanes")).toBeUndefined();
   });
 });

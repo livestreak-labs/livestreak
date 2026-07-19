@@ -17,6 +17,7 @@ import {
   type PreviewAccrualInput
 } from "../model/math/accrual.js";
 import type {
+  AddFundsInput,
   FundStreamInput,
   LaneWriteInput,
   StopAllFundingInput,
@@ -81,6 +82,9 @@ export interface OptionsRuntime {
   pauseLane: (input: PauseLaneInput) => Promise<TxId>;
   /** Resume a paused stream at the remembered rate. */
   resumeLane: (input: ResumeLaneInput) => Promise<TxId>;
+  /** Balance-first top-up: deposit into the NFT's shared budget, re-asserting its current lanes so a
+   *  full-replacement setLanes never drops one. Works on a laneless mint (parks the deposit as budget). */
+  addFunds: (input: AddFundsInput) => Promise<TxId>;
   /** Sweep to wallet: stop every lane and withdraw the shared balance. Positions persist via the ledger,
    *  now reading `depleted` (the money's gone); clears any paused intent for the NFT. */
   sweepNft: (input: StopAllFundingInput) => Promise<TxId>;
@@ -316,6 +320,37 @@ class OptionsRuntimeFacade implements OptionsRuntime {
     const tx = await this.chain.writer.setLanes({ tokenId: nft.tokenId, lanes: desired, addDeposit });
     this.recordLaneWrites(nft.tokenId, desired);
     this.forgetPaused(tokenId, input.vaultId, input.side);
+    return tx;
+  }
+
+  async addFunds(input: AddFundsInput): Promise<TxId> {
+    if (input.deposit <= 0n) {
+      throw new LiveStreakConfigError({
+        message: "addFunds deposit must be positive",
+        metadata: { details: input.deposit.toString() }
+      });
+    }
+    const snapshot = this.requireUserSnapshot();
+    const entry = snapshot.nfts.find(
+      (candidate) => candidate.nft.tokenId.toString() === input.tokenId.toString()
+    );
+    if (entry === undefined) {
+      throw new LiveStreakConfigError({
+        message: "No position NFT for this token — mint one first",
+        metadata: { details: input.tokenId.toString() }
+      });
+    }
+    // Re-assert the token's CURRENT full lane set (overlay-aware) with the deposit as add_deposit. setLanes
+    // is full-replacement, so building this from a snapshot that lags a just-funded lane (Solana
+    // read-after-write) would drop it — the overlay is what makes addFunds safe on every chain. A laneless
+    // mint re-asserts [] and just parks the deposit as budget (the first-bet top-up).
+    const desired = this.currentLaneWrites(entry.nft);
+    const tx = await this.chain.writer.setLanes({
+      tokenId: entry.nft.tokenId,
+      lanes: desired,
+      addDeposit: input.deposit
+    });
+    this.recordLaneWrites(entry.nft.tokenId, desired);
     return tx;
   }
 
