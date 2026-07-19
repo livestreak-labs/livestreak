@@ -6,35 +6,27 @@ import { formatMultiplier } from '#/utils/format'
 
 interface Props {
   vault: OptionsVault
-  index: number
   onClickCard?: (vaultId: string) => void
 }
 
 const CARD_W = 340
 const CARD_H = 42
-const LANE_H = CARD_H + 14 // vertical pitch between lanes (fixed — NOT count-derived, so lanes are stable)
-const DRIFT_SPEED = 0.3 // px per frame, left → right
-
-// Batch tracking so cards present at first paint SPREAD across the pane, while a card ADDED later drifts
-// in from the left edge. Module-level (shared by the sibling cards); reset once every card has unmounted
-// so a fresh visit spreads again.
-let mountCount = 0
-let firstBatchUntil = 0
+const DRIFT_SPEED = 0.3 // px per frame, right → left
+const VERTICAL_WOBBLE = 0.4
 
 /**
  * NikoNiko-style read-only card that drifts across the video area.
  * Shows the question + multiplier. Hovering pauses drift and shows full title.
  * Clicking opens the vault detail in the right panel.
  */
-export function NikoNikoCard({ vault, index, onClickCard }: Props) {
+export function NikoNikoCard({ vault, onClickCard }: Props) {
   const view = useVaultView(vault.vaultId)
   const yesTotal = view.poolYes ?? Number(vault.pools.yes)
   const noTotal = view.poolNo ?? Number(vault.pools.no)
   const multiplier = view.multiplier ?? (yesTotal > 0 ? (yesTotal + noTotal) / yesTotal : 1)
   const ref = useRef<HTMLDivElement>(null)
-  // News-ticker drift, right → left. dx (per-card speed), laneY (home row), and a gentle vertical sway
-  // (amp·sin(phase + t·freq)) give each card its own organic motion instead of one stagnant line.
-  const posRef = useRef({ x: 0, y: 0, dx: -DRIFT_SPEED, laneY: 0, amp: 0, freq: 0, phase: 0, t: 0 })
+  // Original organic drift: right → left with a little vertical wobble, bouncing off top/bottom.
+  const posRef = useRef({ x: 0, y: 0, dx: -DRIFT_SPEED, dy: 0 })
   const rafRef = useRef<number>(0)
   const hoveredRef = useRef(false)
   const textRef = useRef<HTMLSpanElement>(null)
@@ -45,71 +37,51 @@ export function NikoNikoCard({ vault, index, onClickCard }: Props) {
 
   const isHot = vault.status === 'hot'
 
-  // Position — initialized ONCE on mount, deliberately independent of the vault COUNT. The old
-  // [index, total] init re-ran (and re-randomized) every card whenever a vault was added/removed, so the
-  // whole field reset — a jarring CLS. Now an added vault only mounts ITS OWN card; the others keep
-  // drifting untouched.
+  // Position — random seed, initialized ONCE on mount. Deliberately independent of the vault COUNT: the
+  // ONLY thing the earlier bug fix changed is that an added/removed vault no longer re-inits every card
+  // (which reset the whole field — a jarring CLS). The motion itself is the original organic drift.
   useEffect(() => {
     const parent = ref.current?.parentElement
     if (!parent) return
     const pw = parent.clientWidth
     const ph = parent.clientHeight
 
-    if (mountCount === 0) firstBatchUntil = Date.now() + 1000
-    mountCount += 1
-    const isInitial = Date.now() < firstBatchUntil
-
-    // Stable vertical lane: index × a FIXED pitch, wrapped over the lanes that fit. An appended vault
-    // gets the next index/lane; the existing cards' lanes never move (they don't depend on the count).
-    const numLanes = Math.max(1, Math.floor((ph - 24) / LANE_H))
-    const laneY = Math.min(12 + (index % numLanes) * LANE_H + (Math.random() - 0.5) * 8, ph - CARD_H - 8)
-
-    // Right → left (news flow). The first batch spreads across the pane; a later addition enters from off
-    // the RIGHT edge and scrolls in — no disturbance to the others.
-    const x = isInitial ? Math.random() * Math.max(0, pw - CARD_W) : pw + Math.random() * 80
-
     posRef.current = {
-      x,
-      y: laneY,
-      laneY,
-      dx: -(DRIFT_SPEED + Math.random() * 0.4),   // per-card speed → not one stagnant pace
-      amp: 5 + Math.random() * 5,                  // vertical sway amplitude (px), bounded within the lane
-      freq: 0.012 + Math.random() * 0.02,          // slow, ~4–9s per sway cycle
-      phase: Math.random() * Math.PI * 2,          // desync the sway across cards
-      t: 0,
+      x: pw * 0.15 + Math.random() * pw * 0.8,          // random start across the pane
+      y: 8 + Math.random() * Math.max(0, ph - CARD_H - 16),
+      dx: -(DRIFT_SPEED + Math.random() * 0.2),         // right → left, slight per-card variance
+      dy: (Math.random() - 0.5) * VERTICAL_WOBBLE,
     }
-    setEnterDelay(isInitial ? Math.min(index * 0.05, 0.5) : 0)
+    setEnterDelay(Math.random() * 0.4)                  // random fade-in stagger
     setReady(true)
-
-    return () => {
-      mountCount = Math.max(0, mountCount - 1)
-      if (mountCount === 0) firstBatchUntil = 0
-    }
-    // Mount-once by design (position must NOT re-init on count changes). index is stable per vaultId key.
+    // Mount-once by design (must NOT re-init on count changes). Stable per vaultId key.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Drift loop — depends only on `ready`, so a changing vault count never tears it down (which would
-  // stutter every card). Scrolls right → left at the card's own speed with a gentle vertical sway; wraps
-  // off the left edge back to the right, same lane. Sway continues while hovered (drift pauses).
+  // Drift loop — depends only on `ready`, so a changing vault count never tears it down. Original motion:
+  // drift right → left with a little vertical wobble, bounce off top/bottom, respawn from the right edge.
   useEffect(() => {
     if (!ready) return
     function tick() {
       const el = ref.current
       const p = el?.parentElement
       if (!el || !p) return
-      const pw = p.clientWidth
-      const pos = posRef.current
-      pos.t += 1
       if (!hoveredRef.current) {
+        const pw = p.clientWidth
+        const ph = p.clientHeight
+        const pos = posRef.current
         pos.x += pos.dx
+        pos.y += pos.dy
         if (pos.x < -CARD_W - 10) {
-          pos.x = pw + 10                          // re-enter from the right, same lane
-          pos.phase = Math.random() * Math.PI * 2  // fresh sway phase each pass
+          pos.x = pw + 10
+          pos.y = 8 + Math.random() * Math.max(0, ph - CARD_H - 16)
+        }
+        if (pos.y < 4 || pos.y > ph - CARD_H - 4) {
+          pos.dy = -pos.dy
+          pos.y = Math.min(Math.max(4, pos.y), ph - CARD_H - 4)
         }
       }
-      const y = pos.laneY + pos.amp * Math.sin(pos.phase + pos.t * pos.freq)
-      el.style.transform = `translate3d(${pos.x}px, ${y}px, 0)`
+      el.style.transform = `translate3d(${posRef.current.x}px, ${posRef.current.y}px, 0)`
       rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
@@ -149,7 +121,7 @@ export function NikoNikoCard({ vault, index, onClickCard }: Props) {
           ? `0 0 24px ${accentColor}, 0 4px 16px rgba(0,0,0,0.5)`
           : `0 0 12px ${accentColor}, 0 2px 8px rgba(0,0,0,0.4)`,
         willChange: 'transform',
-        zIndex: hovered ? 100 : 15 + index,
+        zIndex: hovered ? 100 : 15,
         transition: 'background 0.15s, border-color 0.15s, box-shadow 0.2s',
       }}
     >
