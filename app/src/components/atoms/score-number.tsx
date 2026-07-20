@@ -4,15 +4,14 @@ import type { CSSProperties } from 'react'
 import { useSteppedValue } from '#/hooks/use-stepped-value'
 
 /**
- * A number for a streaming position's shares / %. Unlike the pool (ScoreUSD, a smooth live counter), this
- * updates in DISCRETE steps every 3–6s and holds between them — NumberFlow rolls the digits on each jump.
- * Pass `live` + `ratePerSec` for a streaming holding; `max` caps the value (100 for a share-%). Held /
- * paused / depleted (live=false) → shows the real value, no ticking, no work.
+ * A number for a streaming position's shares / %. It updates in DISCRETE steps every 3–6s, snapping to the
+ * REAL current value and holding between — NumberFlow rolls the digits on each jump. No projection: the value
+ * is exactly what the SDK reports, so it never bounces. `max` caps it (100 for a share-%). Held / paused /
+ * depleted (live=false) → the real value, no ticking.
  */
 export function ScoreNumber({
   value,
   live = false,
-  ratePerSec,
   max,
   format,
   className,
@@ -20,13 +19,12 @@ export function ScoreNumber({
 }: {
   value: number
   live?: boolean
-  ratePerSec?: number
   max?: number
   format?: Format
   className?: string
   style?: CSSProperties
 }) {
-  const v = useSteppedValue(value, { live, ratePerSec, max })
+  const v = useSteppedValue(value, { live, max })
   return (
     <NumberFlow
       className={className}

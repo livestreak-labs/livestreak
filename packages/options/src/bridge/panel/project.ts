@@ -725,8 +725,11 @@ const projectLanePanel = (
       ...(streaming && lane.maxEndMs !== undefined ? { endsAtMs: lane.maxEndMs } : {})
     },
     shares: {
-      accrued: sharesToNumber(lane.sharesAccrued),
-      accruedRaw: lane.sharesAccrued.toString(),
+      // Absolute "sh" uses the LIVE value (settled + real pending) so it grows truthfully; the % stays a
+      // SETTLED ratio (vs the settled side total) — consistent, and it barely moves second-to-second, so
+      // it needs no live projection. Neither is guessed in the UI anymore.
+      accrued: sharesToNumber(lane.sharesLive ?? lane.sharesAccrued),
+      accruedRaw: (lane.sharesLive ?? lane.sharesAccrued).toString(),
       ...(sideShareTotal !== undefined && sideShareTotal > 0n
         ? { percentOfSide: Number((lane.sharesAccrued * 10_000n) / sideShareTotal) / 100 }
         : {})

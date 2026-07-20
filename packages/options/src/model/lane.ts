@@ -12,7 +12,13 @@ export interface OptionsLane {
    *  rebuild re-assert depleted lanes instead of dropping them — see runtime `existingLaneWrites`. */
   readonly committedRate: bigint;
   readonly gPaid: bigint;
+  /** SETTLED shares from the last on-chain advance. Used for `percentOfSide` (a ratio vs the settled side
+   *  total — consistent, and it barely moves second-to-second, so it need not be live). */
   readonly sharesAccrued: bigint;
+  /** LIVE shares accrued to NOW (settled + the real bonding-curve pending, from the engine's pending_shares).
+   *  The absolute "X sh" display uses this so it grows truthfully between advances instead of the app
+   *  GUESSING with a linear rate (which bounced). Undefined ⇒ reader has no live view; fall back to settled. */
+  readonly sharesLive?: bigint;
   readonly maxEndMs?: number;
   readonly depleted: boolean;
   readonly claimable?: bigint;
