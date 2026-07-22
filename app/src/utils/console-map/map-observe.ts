@@ -249,7 +249,7 @@ export const mapObserve: PackageMapper = ({ functions, board, pending }) => {
                 name: 'Go live',
                 state: 'ready',
                 hot: true,
-                fields: schemaToFields(goLiveFn?.inputSchema, { scheme: '0' }),
+                fields: schemaToFields(goLiveFn?.inputSchema),
               }
             : {
                 name: 'Go live',
@@ -275,7 +275,7 @@ export const mapObserve: PackageMapper = ({ functions, board, pending }) => {
             ? {
                 name: 'Set ended',
                 state: 'ready',
-                fields: schemaToFields(setEndedFn?.inputSchema, { scheme: '0' }),
+                fields: schemaToFields(setEndedFn?.inputSchema),
               }
             : { name: 'Set ended', state: 'locked', hint: 'needs · live' }
       )
