@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import { runCellIdOf } from "#run/control/board/index.js";
 import { LiveStreakConfigError, LiveStreakRuntimeError, type LiveStreakError } from "@livestreak/core";
 import type { PackageRuntimeInit } from "@livestreak/schema";
 import type { ControlCallEnvelope } from "#run/control/bus/index.js";
@@ -18,7 +19,6 @@ import type {
   ObserveRunMarketConfig,
   StreamId
 } from "#market/types.js";
-import { readLiveConfigurators } from "#run/control/board/visibility.js";
 
 export const marketRegisterScope = "market:register" as const;
 export const marketGoLiveScope = "market:goLive" as const;
@@ -81,12 +81,23 @@ const registerCall = (
   deps: MarketControlDeps
 ): Effect.Effect<{ readonly boardPatch: BoardPatch }, LiveStreakError> =>
   Effect.gen(function* () {
-    const title = yield* decodeRegisterPayload(envelope.payload);
+    const payloadTitle = yield* decodeRegisterPayload(envelope.payload);
+    const cellTitle = context.board.cells[context.cellId]?.readonly?.title;
+    const title =
+      payloadTitle.trim() !== ""
+        ? payloadTitle
+        : typeof cellTitle === "string"
+          ? cellTitle
+          : "";
     const runId = readRunId(context);
     const registration = yield* buildMarketConfig(deps, title);
     const registrar = yield* resolveRegistrar(deps, registration);
 
-    const result = yield* registrar.registerMarket({ runId, title }).pipe(
+    // The streamId (and so marketId = hash(observer, streamId)) derives from the registrar's
+    // runId — scope it PER OBSERVATION or two families would mint the SAME market.
+    const obsId = context.cellId.startsWith("obs:") ? context.cellId.split(":")[1] : undefined;
+    const familyRunId = obsId === undefined ? runId : `${runId}#${obsId}`;
+    const result = yield* registrar.registerMarket({ runId: familyRunId, title }).pipe(
       Effect.matchEffect({
         onFailure: (error) => Effect.succeed(failureFromError(error)),
         onSuccess: (registered) =>
@@ -107,7 +118,7 @@ const registerCall = (
       yield* notifyCatalogFailOpen(deps.sessionInit, result.marketId, registration.walletInit.chain);
     }
 
-    return { boardPatch: marketLifecyclePatch(result) };
+    return { boardPatch: marketLifecyclePatch(result, Date.now(), context.cellId) };
   });
 
 // Instant catalog ingest: a fresh market appears in the app catalog without waiting for the
@@ -161,24 +172,17 @@ const lifecycleCall = (
             endedAtMs: Date.now()
           };
 
-    return { boardPatch: marketLifecyclePatch(lifecycle) };
+    return { boardPatch: marketLifecyclePatch(lifecycle, Date.now(), context.cellId) };
   });
 
 const closeCall = (
   context: ControlFunctionContext
 ): Effect.Effect<{ readonly boardPatch: BoardPatch }, LiveStreakError> =>
   Effect.sync(() => {
-    const live = readLiveConfigurators(context.board).filter((id) => id !== "observe.market");
-
     return {
       boardPatch: {
         cells: {
-          market: { remove: true },
-          "system:config": {
-            readonly: {
-              set: { liveConfigurators: live }
-            }
-          }
+          [context.cellId]: { remove: true }
         }
       }
     };
@@ -255,7 +259,8 @@ const buildMarketConfig = (
   });
 
 const readRunId = (context: ControlFunctionContext): string => {
-  const fromRun = context.board.cells["system:run"]?.readonly?.runId;
+  const runCellId = runCellIdOf(context.board);
+  const fromRun = runCellId === undefined ? undefined : context.board.cells[runCellId]?.readonly?.runId;
   if (typeof fromRun === "string" && fromRun.length > 0) {
     return fromRun;
   }
@@ -307,7 +312,7 @@ const decodeLifecyclePayload = (
     }
 
     const record = payload as Record<string, unknown>;
-    const marketReadonly = context.board.cells.market?.readonly;
+    const marketReadonly = context.board.cells[context.cellId]?.readonly;
     const marketId =
       typeof record.marketId === "string"
         ? record.marketId

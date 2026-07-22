@@ -67,6 +67,8 @@ export {
 
 export {
   createInitialBoard,
+  pauseCellIdOf,
+  runCellIdOf,
   type Board,
   type BoardCell,
   type BoardCellId,

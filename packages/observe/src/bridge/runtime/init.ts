@@ -4,6 +4,7 @@
 // Effect-typed (observe src stays runPromise-free); the promise boundary is the consumer's.
 
 import { Effect, Scope, Exit } from "effect";
+import { runCellIdOf } from "#run/control/board/index.js";
 import type { LiveStreakError } from "@livestreak/core";
 import type { PackageRuntimeInit } from "@livestreak/schema";
 
@@ -68,7 +69,8 @@ const ACTIVE_RUN_STATUSES: ReadonlySet<BoardRunStatus> = new Set([
 ]);
 
 const restoreBoard = (board: Board): Board => {
-  const runCell = board.cells["system:run"];
+  const initRunCellId = runCellIdOf(board) ?? "system:run";
+  const runCell = board.cells[initRunCellId];
   if (runCell === undefined || !ACTIVE_RUN_STATUSES.has(runCell.status[0] as BoardRunStatus)) {
     return board;
   }
@@ -77,7 +79,7 @@ const restoreBoard = (board: Board): Board => {
     revision: board.revision + 1,
     cells: {
       ...board.cells,
-      "system:run": {
+      [initRunCellId]: {
         ...runCell,
         status: ["created", "reset after gateway restart", Date.now()]
       }
