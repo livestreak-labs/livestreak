@@ -45,12 +45,9 @@ const wireFunctions: FunctionDescriptor[] = [
   fn(`observe.obs.${OBS}.run.prepare`, 'prepare'),
   fn(`observe.obs.${OBS}.run.start`, 'start'),
   fn(`observe.obs.${OBS}.pause.pause`, 'pause'),
-  fn(`observe.obs.${OBS}.market.goLive`, 'goLive', {
-    inputSchema: obj([{ name: 'scheme', type: 'integer' }, { name: 'pointerId' }]),
-  }),
-  fn(`observe.obs.${OBS}.market.setEnded`, 'setEnded', {
-    inputSchema: obj([{ name: 'scheme', type: 'integer' }, { name: 'pointerId' }]),
-  }),
+  // goLive/setEnded carry NO fields — pointer and scheme are board-derived in the package.
+  fn(`observe.obs.${OBS}.market.goLive`, 'goLive'),
+  fn(`observe.obs.${OBS}.market.setEnded`, 'setEnded'),
 ]
 
 const cell = (state: string, extra: Partial<{ settings: Record<string, unknown>; readonly: Record<string, unknown> }> = {}) => ({
@@ -160,7 +157,7 @@ describe('mapObserve (families)', () => {
     expect(model.attention[0]).toMatchObject({ title: 'Prepare Friday Cup', tone: 'do' })
   })
 
-  it('running + registered: Go live hot with scheme preset; sub names the market', () => {
+  it('running + registered: Go live hot and field-less; sub names the market', () => {
     const model = mapObserve({ functions: wireFunctions, board: boardAt('running', 'registered'), pending: NONE })
     expect(consoleModelViolations(model)).toEqual([])
     const card = model.focus[`obs:${OBS}`]
@@ -169,7 +166,7 @@ describe('mapObserve (families)', () => {
     expect(byName.get('Start')?.state).toBe('done')
     const goLive = byName.get('Go live')
     expect(goLive).toMatchObject({ state: 'ready', hot: true, callRef: `observe.obs.${OBS}.market.goLive` })
-    expect(goLive?.fields?.find((f) => f.name === 'scheme')?.value).toBe('0')
+    expect(goLive?.fields ?? []).toEqual([])
     expect(byName.get('Pause')).toMatchObject({ state: 'ready', callRef: `observe.obs.${OBS}.pause.pause` })
     expect(card?.sub).toContain(`${MARKET.slice(0, 6)}… registered`)
     expect(card?.history).toEqual([`marketId · ${MARKET}`])
