@@ -10,6 +10,7 @@ import {
   marketRegisterScope,
   marketSetEndedScope
 } from "#market/control.js";
+import { RECORDING_POINTER_KEY } from "#market/keys.js";
 import type { MarketLifecycleInput, MarketStorageScheme } from "#market/types.js";
 import type { Board } from "#run/control/board/index.js";
 import { extendBoardForMarketTests } from "#test/helpers/board.js";
@@ -186,13 +187,16 @@ describe("market lifecycle pointer/scheme derivation", () => {
     expect(seen[0]).toEqual({ marketId: MARKET, scheme: 2, id: "bafyStoragePointerId" });
   });
 
+  // The seam is pinned through the SHARED constant, not a restated literal: if Slice-2's writer
+  // and this reader ever disagreed on the key name, this test would go green while the feature
+  // silently never wired up. Writing the cell via RECORDING_POINTER_KEY makes that impossible.
   it("a board-saved recordingPointer wins over the marketId formality", async () => {
     const { seen } = await callLifecycle({
       scope: marketSetEndedScope,
       marketReadonly: {
         registrationState: "live",
         marketId: MARKET,
-        recordingPointer: "walrusBlobIdForTheRecording"
+        [RECORDING_POINTER_KEY]: "walrusBlobIdForTheRecording"
       }
     });
 

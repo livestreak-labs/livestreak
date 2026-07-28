@@ -10,6 +10,7 @@ import type {
   ControlSurface
 } from "#run/control/bus/index.js";
 import { marketLifecyclePatch } from "#market/board.js";
+import { RECORDING_POINTER_KEY } from "#market/keys.js";
 import { createMarketRegistrar } from "#market/chains/index.js";
 import type {
   MarketFailurePhase,
@@ -358,12 +359,12 @@ const decodeLifecyclePayload = (
           ? record.id
           : undefined;
 
-    // Slice-2 seam: the recording upload will save its blob id here and this reads it with no
-    // further change. Nothing writes `recordingPointer` today — do not build upload logic for it.
-    const recordedPointer =
-      typeof marketReadonly?.recordingPointer === "string" && marketReadonly.recordingPointer.length > 0
-        ? marketReadonly.recordingPointer
-        : undefined;
+    // Slice-2 seam: the recording upload will save its blob id under RECORDING_POINTER_KEY and
+    // this reads it with no further change. Nothing writes the key today — do not build upload
+    // logic for it. The key is a shared constant (market/keys.ts) so the future writer cannot
+    // pick a different literal and leave this silently falling back to the formality.
+    const recorded = marketReadonly?.[RECORDING_POINTER_KEY];
+    const recordedPointer = typeof recorded === "string" && recorded.length > 0 ? recorded : undefined;
 
     const derivedPointer = marketId.slice(2);
     const pointer = explicitPointer ?? recordedPointer ?? derivedPointer;

@@ -172,12 +172,15 @@ describe('mapObserve (families)', () => {
     expect(card?.history).toEqual([`marketId · ${MARKET}`])
   })
 
-  it('live: Set ended ready, no do-cards left, tone ok', () => {
+  it('live: Set ended guarded, no do-cards left, tone ok', () => {
     const model = mapObserve({ functions: wireFunctions, board: boardAt('running', 'live'), pending: NONE })
     expect(consoleModelViolations(model)).toEqual([])
     const byName = new Map(model.focus[`obs:${OBS}`]?.verbs.map((v) => [v.name, v]))
     expect(byName.get('Go live')?.state).toBe('done')
-    expect(byName.get('Set ended')?.state).toBe('ready')
+    // Field-less AND irreversible (freezes endedAt, starts the 24h lock) — hold-to-run, not one click.
+    expect(byName.get('Set ended')?.state).toBe('guarded')
+    expect(byName.get('Set ended')?.consequence).toContain('24 hours')
+    expect(byName.get('Set ended')?.fields ?? []).toEqual([])
     expect(model.attention.filter((a) => a.tone === 'do')).toEqual([])
     expect(model.things.find((t) => t.kind === 'observation')?.note).toBe('live')
   })

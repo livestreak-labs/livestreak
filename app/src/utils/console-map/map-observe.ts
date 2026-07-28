@@ -273,9 +273,12 @@ export const mapObserve: PackageMapper = ({ functions, board, pending }) => {
           ? { name: 'Set ended', state: 'done' }
           : registration === 'live'
             ? {
+                // Guarded, not ready: field-less and irreversible. The first call freezes endedAt
+                // on-chain and starts the 24h lock, after which the pointer can never be revised.
                 name: 'Set ended',
-                state: 'ready',
-                fields: schemaToFields(setEndedFn?.inputSchema),
+                state: 'guarded',
+                consequence:
+                  'ends the stream on-chain. The end time is frozen immediately and the recording pointer can only be revised for 24 hours after that',
               }
             : { name: 'Set ended', state: 'locked', hint: 'needs · live' }
       )
